@@ -15,7 +15,8 @@
 - 关闭设置后设置进程退出。206 空闲采样 60.04 秒，主程序 + supervisor 合计 **0.184% CPU（单核口径）**，结束时合计 RSS 56.99 MiB。采样前后均 IDLE，无新听写记录；这不是所有 Mac 的占用承诺。
 - GitHub 四个附件全部上传完成；DMG、ZIP、PKG 的远端 SHA-256 均与本地产物一致。本轮没有覆盖旧版附件。
 
-Homebrew 下载和官网部署结果在完成后补充。
+- [0.2.3 Preview](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.3) 已公开发布。Homebrew tap 更新至 0.2.3；实际 `brew fetch --cask --force wjc-dev/veyqa/veyqa-voice` 成功，下载缓存的 DMG SHA-256 与上述值一致，没有通过 Homebrew 覆盖本机签名版。Tap 提交：`812a54c`。
+- [GitHub Pages 部署](https://github.com/wjc-dev/voxtype/actions/runs/38866993870) 成功；[公开官网](https://wjc-dev.github.io/voxtype/) 已浏览器验收，页面与资源正常，完整 Agent 提示词复制成功，无控制台警告或错误。GitHub 仓库主页已指向官网。
 
 ---
 
