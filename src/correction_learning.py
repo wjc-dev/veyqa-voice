@@ -373,6 +373,7 @@ class CorrectionLearner:
         from ApplicationServices import (
             AXUIElementCopyAttributeValue,
             AXUIElementCreateApplication,
+            AXUIElementSetMessagingTimeout,
             AXValueGetValue,
             kAXFocusedUIElementAttribute,
             kAXSelectedTextRangeAttribute,
@@ -384,6 +385,7 @@ class CorrectionLearner:
             "workspace": NSWorkspace,
             "copy": AXUIElementCopyAttributeValue,
             "create": AXUIElementCreateApplication,
+            "timeout": AXUIElementSetMessagingTimeout,
             "get_value": AXValueGetValue,
             "focused": kAXFocusedUIElementAttribute,
             "selection": kAXSelectedTextRangeAttribute,
@@ -401,9 +403,13 @@ class CorrectionLearner:
                 return None
             pid = int(front.processIdentifier())
             app = ax["create"](pid)
+            if "timeout" in ax:
+                ax["timeout"](app, 0.5)
             error, element = ax["copy"](app, ax["focused"], None)
             if error != 0 or element is None:
                 return None
+            if "timeout" in ax:
+                ax["timeout"](element, 0.5)
             return _AXTarget(element=element, pid=pid)
         except Exception as exc:  # noqa: BLE001
             logger.debug("无法准备自动纠错观察: %s", exc)

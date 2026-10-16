@@ -11,12 +11,27 @@ class PackagingIdentityTests(unittest.TestCase):
         spec = (ROOT / "packaging" / "VoiceInput.spec").read_text(encoding="utf-8")
         build = (ROOT / "build-internal-dmg.command").read_text(encoding="utf-8")
         source_package = (ROOT / "package-source.command").read_text(encoding="utf-8")
+        settings_info = (
+            ROOT / "native_settings" / "VoiceInputSettings-Info.plist"
+        ).read_text(encoding="utf-8")
 
-        self.assertIn('__version__ = "0.2.0"', main)
-        self.assertIn('version="0.2.0"', spec)
-        self.assertIn('"CFBundleShortVersionString": "0.2.0"', spec)
-        self.assertIn('VERSION="0.2.0"', build)
-        self.assertIn('PACKAGE_NAME="Veyqa-Voice-v0.2.0"', source_package)
+        self.assertIn('__version__ = "0.2.2"', main)
+        self.assertIn('version="0.2.2"', spec)
+        self.assertIn('"CFBundleShortVersionString": "0.2.2"', spec)
+        self.assertIn('VERSION="0.2.2"', build)
+        self.assertIn('PACKAGE_NAME="Veyqa-Voice-v0.2.2"', source_package)
+        self.assertIn("<string>0.2.2</string>", settings_info)
+
+    def test_main_app_is_a_regular_dock_application(self):
+        spec = (ROOT / "packaging" / "VoiceInput.spec").read_text(encoding="utf-8")
+        controller = (ROOT / "src" / "ui" / "status_bar.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('"LSUIElement": False', spec)
+        self.assertIn("NSApplicationActivationPolicyRegular", controller)
+        self.assertNotIn("NSApplicationActivationPolicyAccessory", controller)
+        self.assertIn('SHOW_MENU_BAR_ICON", "false"', controller)
 
     def test_current_app_and_login_item_use_stable_qwen_identity(self):
         spec = (ROOT / "packaging" / "VoiceInput.spec").read_text(encoding="utf-8")
@@ -111,6 +126,7 @@ class PackagingIdentityTests(unittest.TestCase):
         self.assertIn("post-hotkey-event.py", verifier)
         self.assertIn('pgrep -f -x "$SETTINGS_EXECUTABLE"', verifier)
         self.assertIn("Hotkey cycle settings helper did not finish startup", verifier)
+        self.assertIn("dock entry ready; menu bar disabled", verifier)
         self.assertIn("mktemp -d", verifier)
         self.assertNotIn("/Applications/Veyqa Voice.app", verifier)
         self.assertNotIn("SMAppService", verifier)

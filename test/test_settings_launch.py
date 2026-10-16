@@ -7,6 +7,13 @@ from src.ui import status_bar
 
 
 class SettingsLaunchTests(unittest.TestCase):
+    def test_recovery_screen_is_reachable_and_settings_closes_after_last_window(self):
+        swift = (Path(__file__).resolve().parents[1] / "native_settings/VoiceInputSettings.swift").read_text()
+        self.assertIn("RecoverySettingsView(model: model)", swift)
+        self.assertIn("applicationShouldTerminateAfterLastWindowClosed", swift)
+        self.assertIn("guard NSApp.isActive else { return }", swift)
+        self.assertIn("guard diagnosticsGate.changed(contents) else { return }", swift)
+
     def test_status_log_rotates_and_logging_failure_is_nonfatal(self):
         with tempfile.TemporaryDirectory() as directory:
             log_dir = Path(directory)
@@ -52,12 +59,29 @@ class SettingsLaunchTests(unittest.TestCase):
 
         send_signal.assert_called_once_with(process.pid, status_bar.signal.SIGUSR1)
 
-    def test_status_item_uses_accessory_activation_policy(self):
+    def test_app_uses_regular_activation_policy_for_a_stable_dock_entry(self):
         source = (Path(__file__).resolve().parents[1] / "src/ui/status_bar.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("NSApplicationActivationPolicyAccessory", source)
+        self.assertIn("NSApplicationActivationPolicyRegular", source)
+        self.assertNotIn("NSApplicationActivationPolicyAccessory", source)
         self.assertNotIn("NSApplicationActivationPolicyProhibited", source)
+
+    def test_menu_bar_is_disabled_by_default(self):
+        with patch.dict(status_bar.os.environ, {}, clear=True):
+            self.assertFalse(status_bar._menu_bar_enabled())
+        with patch.dict(status_bar.os.environ, {"SHOW_MENU_BAR_ICON": "true"}, clear=True):
+            self.assertTrue(status_bar._menu_bar_enabled())
+
+    def test_dock_reopen_opens_settings(self):
+        delegate = status_bar._ApplicationDelegate.alloc().init()
+        delegate.controller = MagicMock()
+
+        self.assertTrue(
+            delegate.applicationShouldHandleReopen_hasVisibleWindows_(None, False)
+        )
+
+        delegate.controller._open_settings.assert_called_once_with()
 
     def test_settings_copy_has_no_enterprise_compatibility_badges(self):
         root = Path(__file__).resolve().parents[1]

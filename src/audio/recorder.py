@@ -49,7 +49,8 @@ class AudioRecorder:
         self._recording_lock = threading.RLock()
         self._device_error_detected = False  # 标记是否检测到设备错误
         self._last_used_device = None  # 上次录音使用的设备（用于判断是否切换）
-        self._check_audio_devices()
+        # Enumerate lazily during recording, under functional-health supervision.
+        # A blocked audio driver must not prevent the Dock/settings from starting.
         # logger.info(f"初始化完成，临时文件目录: {self.temp_dir}")
         logger.info(f"初始化完成，最大录音时长: {self.max_record_duration/60:.1f}分钟")
 

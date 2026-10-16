@@ -9,6 +9,7 @@ private let crashLimit = 3
 private let crashCooldown: UInt32 = 300
 private let pauseURL = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Application Support/Veyqa/.supervisor-paused")
+private let healthURL = pauseURL.deletingLastPathComponent().appendingPathComponent("health.json")
 
 private func log(_ message: String) {
     let stamp = ISO8601DateFormatter().string(from: Date())
@@ -86,7 +87,13 @@ private func launch(_ appURL: URL) -> Bool {
     task.standardError = FileHandle.standardError
     do {
         try task.run()
-        task.waitUntilExit()
+        let deadline = Date().addingTimeInterval(15)
+        while task.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.2) }
+        if task.isRunning {
+            task.terminate()
+            log("LaunchServices timed out")
+            return false
+        }
         return task.terminationStatus == 0
     } catch {
         log("launch failed: \(error.localizedDescription)")
@@ -94,6 +101,9 @@ private func launch(_ appURL: URL) -> Bool {
     }
 }
 
+@main
+struct SupervisorMain {
+static func main() {
 guard let appURL = enclosingAppURL() else {
     log("cannot locate containing Veyqa Voice.app")
     exit(78)
@@ -101,18 +111,44 @@ guard let appURL = enclosingAppURL() else {
 
 log("supervisor started for \(bundleIdentifier)")
 var launches: [Date] = []
+var health = SupervisorHealth()
+var stopping: (app: NSRunningApplication, at: Date)?
 while true {
     if FileManager.default.fileExists(atPath: pauseURL.path) {
         sleep(checkInterval)
         continue
     }
-    if appIsRunning() {
+    let now = Date()
+    launches.removeAll { now.timeIntervalSince($0) > crashWindow }
+    if let pending = stopping {
+        let alive = kill(pending.app.processIdentifier, 0) == 0
+        if alive && now.timeIntervalSince(pending.at) >= 5 {
+            // Only the previously verified host process, never a name-based kill.
+            pending.app.forceTerminate()
+        }
+        if !alive { stopping = nil }
+        sleep(checkInterval)
+        continue
+    }
+    if let app = NSRunningApplication.runningApplications(
+        withBundleIdentifier: bundleIdentifier
+    ).first(where: { $0.bundleURL?.standardizedFileURL == appURL.standardizedFileURL }) {
+        let data = try? Data(contentsOf: healthURL)
+        let snapshot = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+        if health.needsRecovery(
+            pid: app.processIdentifier,
+            heartbeatPID: (snapshot?["pid"] as? NSNumber)?.int32Value,
+            timestamp: snapshot?["timestamp"] as? Double,
+            now: now.timeIntervalSince1970
+        ) && launches.count < crashLimit {
+            log("functional heartbeat stalled; recovering host")
+            kill(app.processIdentifier, SIGTERM)
+            stopping = (app, now)
+        }
         sleep(checkInterval)
         continue
     }
 
-    let now = Date()
-    launches.removeAll { now.timeIntervalSince($0) > crashWindow }
     if launches.count >= crashLimit {
         log("crash loop detected; cooling down for \(crashCooldown) seconds")
         sleep(crashCooldown)
@@ -129,4 +165,6 @@ while true {
         continue
     }
     sleep(checkInterval)
+}
+}
 }

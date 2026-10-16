@@ -51,6 +51,11 @@ personal_context.txt
 custom_vocabulary.txt
 recovery.json
 diagnostics.json
+health.json
+automatic-restarts.json
+login-item-registration.json
+.restart-request
+.health-fault-injected
 
 .claude
 

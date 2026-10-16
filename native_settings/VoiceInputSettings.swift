@@ -182,6 +182,7 @@ struct DiagnosticSnapshot: Codable {
     var lastSessionCommitted: Bool?
     var loginItemStatus: String?
     var loginItemError: String?
+    var recoveryStatus: String?
 
     enum CodingKeys: String, CodingKey {
         case version, engine, state, microphone, hotkey
@@ -199,6 +200,7 @@ struct DiagnosticSnapshot: Codable {
         case lastSessionCommitted = "last_session_committed"
         case loginItemStatus = "login_item_status"
         case loginItemError = "login_item_error"
+        case recoveryStatus = "recovery_status"
     }
 }
 
@@ -261,6 +263,11 @@ final class SettingsModel: ObservableObject {
     @Published var transcriptionService = "qwen"
 
     @Published var qwenAPIKey = ""
+    @Published var checkingConnection = false
+    @Published var connectionStatus = ""
+    private var connectionID = UUID()
+    private var connectionTask: URLSessionWebSocketTask?
+    private var connectionSession: URLSession?
     @Published var qwenAPIHost = ""
     @Published var qwenWorkspace = ""
     @Published var qwenRegion = "beijing"
@@ -281,6 +288,9 @@ final class SettingsModel: ObservableObject {
     @Published var diagnostics = DiagnosticSnapshot()
     @Published var permissions = PermissionSnapshot()
     @Published var permissionsLoaded = false
+    @Published private(set) var permissionProcessRunning = false
+    private var diagnosticsGate = SnapshotChangeGate()
+    private var permissionsGate = SnapshotChangeGate()
     private var correctionEvents: [CorrectionEvent] = []
     @Published var notice: String?
     @Published var errorMessage: String?
@@ -345,12 +355,6 @@ final class SettingsModel: ObservableObject {
         qwenAPIHost = environment["QWEN_API_HOST"]?.trimmingCharacters(
             in: .whitespacesAndNewlines
         ) ?? ""
-        if qwenAPIHost.isEmpty {
-            qwenAPIHost = Self.defaultQwenAPIHost(
-                region: qwenRegion,
-                apiKey: qwenAPIKey
-            )
-        }
         qwenWorkspace = environment["QWEN_WORKSPACE_ID"] ?? ""
         qwenLanguage = environment["QWEN_LANGUAGE"] ?? "zh"
         qwenContextEnabled = Self.bool(environment["QWEN_CONTEXT_ENABLED"], fallback: false)
@@ -400,7 +404,9 @@ final class SettingsModel: ObservableObject {
     }
 
     func reloadDiagnostics() {
-        guard let data = try? Data(contentsOf: diagnosticsURL),
+        let contents = try? Data(contentsOf: diagnosticsURL)
+        guard diagnosticsGate.changed(contents) else { return }
+        guard let data = contents,
               let snapshot = try? JSONDecoder().decode(DiagnosticSnapshot.self, from: data)
         else {
             diagnostics = DiagnosticSnapshot()
@@ -410,14 +416,20 @@ final class SettingsModel: ObservableObject {
     }
 
     func reloadPermissions() {
-        guard let data = try? Data(contentsOf: permissionsURL),
-              let snapshot = try? JSONDecoder().decode(PermissionSnapshot.self, from: data)
-        else {
-            permissionsLoaded = false
-            return
+        let contents = try? Data(contentsOf: permissionsURL)
+        if permissionsGate.changed(contents) {
+            if let data = contents,
+               let snapshot = try? JSONDecoder().decode(PermissionSnapshot.self, from: data) {
+                permissions = snapshot
+                if !permissionsLoaded { permissionsLoaded = true }
+            } else if permissionsLoaded {
+                permissionsLoaded = false
+            }
         }
-        permissions = snapshot
-        permissionsLoaded = true
+        // A process can die without changing its last snapshot; still notice that.
+        let permissionPID = permissions.pid ?? 0
+        let alive = permissionPID > 1 && Darwin.kill(Int32(permissionPID), 0) == 0
+        if permissionProcessRunning != alive { permissionProcessRunning = alive }
     }
 
     func requestPermission(_ permission: String, openSettings: Bool = true) {
@@ -436,7 +448,7 @@ final class SettingsModel: ObservableObject {
     }
 
     var permissionsMatchCurrentApp: Bool {
-        guard permissions.checkedByCurrentProcess == true,
+        guard permissionsLoaded, permissions.checkedByCurrentProcess == true,
               permissionProcessAlive,
               let permissionVersion = permissions.version,
               permissionVersion == diagnostics.version
@@ -459,10 +471,7 @@ final class SettingsModel: ObservableObject {
     }
 
     var permissionProcessAlive: Bool {
-        guard let permissionPID = permissions.pid, permissionPID > 1 else {
-            return false
-        }
-        return Darwin.kill(Int32(permissionPID), 0) == 0
+        permissionProcessRunning
     }
 
     var allRequiredPermissionsGranted: Bool {
@@ -552,7 +561,83 @@ final class SettingsModel: ObservableObject {
         }
     }
 
+    func cancelConnectionCheck() {
+        connectionID = UUID()
+        connectionTask?.cancel(with: .goingAway, reason: nil)
+        connectionSession?.invalidateAndCancel()
+        connectionTask = nil
+        connectionSession = nil
+        checkingConnection = false
+        connectionStatus = ""
+    }
+
+    func checkConnection() {
+        cancelConnectionCheck()
+        let key = qwenAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard key.count >= 20, !key.contains(where: { $0.isWhitespace }) else {
+            connectionStatus = "请先粘贴完整的百炼 API Key。"
+            return
+        }
+        guard let host = QwenConnection.host(custom: qwenAPIHost, region: qwenRegion, workspace: qwenWorkspace),
+              let url = URL(string: "wss://\(host)/api-ws/v1/inference") else {
+            connectionStatus = "请在高级设置中填写有效的百炼 HTTPS 地址。"
+            return
+        }
+        let id = connectionID
+        checkingConnection = true
+        connectionStatus = "正在检查语音服务权限，不会录音…"
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 12
+        configuration.timeoutIntervalForResource = 12
+        let session = URLSession(configuration: configuration)
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        let socket = session.webSocketTask(with: request)
+        connectionSession = session
+        connectionTask = socket
+        socket.resume()
+        func finish(_ message: String) {
+            guard self.connectionID == id else { return }
+            self.cancelConnectionCheck()
+            self.connectionStatus = message
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
+            finish("检查超时。请检查网络；海外 Key 请在高级设置中选择对应地区。")
+        }
+        Task { @MainActor in
+            do {
+                let taskID = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+                let data = try JSONSerialization.data(withJSONObject: QwenConnection.startRequest(taskID: taskID))
+                try await socket.send(.string(String(decoding: data, as: UTF8.self)))
+                for _ in 0..<8 {
+                    let message = try await socket.receive()
+                    let payload: Data
+                    switch message {
+                    case .string(let text): payload = Data(text.utf8)
+                    case .data(let data): payload = data
+                    @unknown default: continue
+                    }
+                    let event = try JSONSerialization.jsonObject(with: payload) as? [String: Any]
+                    let header = event?["header"] as? [String: Any]
+                    if header?["event"] as? String == "task-started" {
+                        finish("连接成功，语音服务可用。点击右上角保存即可。")
+                        return
+                    }
+                    if header?["event"] as? String == "task-failed" {
+                        finish("服务未接受请求。请确认 Key 地区、语音模型权限和账户额度。")
+                        return
+                    }
+                }
+                finish("服务响应异常，请稍后重试。")
+            } catch {
+                // Don't surface request headers, API keys or server-provided content.
+                finish("连接失败。请检查 Key、网络，以及高级设置中的地区和地址。")
+            }
+        }
+    }
+
     func saveAndRestart() {
+        qwenAPIKey = qwenAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if transcriptionService == "qwen" {
             guard qwenAPIKey.count >= 20,
                   !qwenAPIKey.contains(where: { $0.isWhitespace }) else {
@@ -560,11 +645,8 @@ final class SettingsModel: ObservableObject {
                 return
             }
             let normalizedHost = qwenAPIHost.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let hostURL = URL(string: normalizedHost),
-                  hostURL.scheme?.lowercased() == "https",
-                  let host = hostURL.host?.lowercased(),
-                  host.hasSuffix(".aliyuncs.com") else {
-                errorMessage = "请填写百炼 API Key 页面展示的 OpenAI compatible API 地址。"
+            guard QwenConnection.host(custom: normalizedHost, region: qwenRegion, workspace: qwenWorkspace) != nil else {
+                errorMessage = "高级设置中的地址无效；普通百炼 Key 可将地址留空。"
                 return
             }
             qwenAPIHost = normalizedHost
@@ -634,6 +716,7 @@ final class SettingsModel: ObservableObject {
             }
             environment.merge(updates) { _, new in new }
             if isBundled {
+                try Self.privateWrite(Data("restart".utf8), to: dataURL.appendingPathComponent(".restart-request"))
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     exit(42)
                 }
@@ -655,13 +738,14 @@ final class SettingsModel: ObservableObject {
             return
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            try? Self.privateWrite(Data("restart".utf8), to: self.dataURL.appendingPathComponent(".restart-request"))
             exit(42)
         }
     }
 
     func quitVoiceInput() {
         try? Data("paused-by-user".utf8).write(to: supervisorPauseURL, options: .atomic)
-        if parentPID > 1 { kill(parentPID, SIGTERM) }
+        if permissionProcessAlive, let pid = permissions.pid, pid > 1 { kill(Int32(pid), SIGTERM) }
         NSApp.terminate(nil)
     }
 
@@ -1048,7 +1132,6 @@ struct PermissionSetupView: View {
     @ObservedObject var model: SettingsModel
     let allowsDismiss: Bool
     let onContinue: () -> Void
-    private let timer = Timer.publish(every: 0.8, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(spacing: 18) {
@@ -1128,7 +1211,6 @@ struct PermissionSetupView: View {
         .padding(28)
         .frame(width: 650)
         .onAppear { model.reloadPermissions() }
-        .onReceive(timer) { _ in model.reloadPermissions() }
         .interactiveDismissDisabled(!allowsDismiss && !model.allRequiredPermissionsGranted)
     }
 
@@ -1360,25 +1442,39 @@ struct EngineSettingsView: View {
                     }
                     .textFieldStyle(.roundedBorder)
                     Toggle("显示 API Key", isOn: $showQwenKey)
-                    TextField("OpenAI compatible API 地址", text: $model.qwenAPIHost)
-                        .textFieldStyle(.roundedBorder)
-                    Text("API 地址为必填项，必须与 API Key 的地域、业务空间或套餐匹配。优先复制百炼 API Key 页面展示的 OpenAI compatible 地址；地址不匹配会认证失败。")
+                    Text("1. 获取百炼 API Key　2. 粘贴到上方　3. 检查连接后保存")
                         .foregroundStyle(.secondary)
                         .font(.callout)
-                    Link("打开百炼 API Key 页面", destination: URL(string: "https://bailian.console.aliyun.com/?tab=model#/api-key")!)
+                    HStack {
+                        Link("获取 API Key", destination: URL(string: "https://bailian.console.aliyun.com/?tab=model#/api-key")!)
+                        Spacer()
+                        Button(model.checkingConnection ? "检查中…" : "检查连接") { model.checkConnection() }
+                            .disabled(model.checkingConnection)
+                    }
+                    if !model.connectionStatus.isEmpty {
+                        Text(model.connectionStatus).font(.callout).foregroundStyle(.secondary)
+                    }
+                    Text("音频会发送给你选择的云端语音服务；费用由对应账户承担。默认不保存本地录音。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
 
                 Section("识别") {
-                    Picker("地域", selection: $model.qwenRegion) {
-                        Text("中国内地（北京）").tag("beijing")
-                        Text("新加坡").tag("singapore")
-                    }
                     Picker("识别语言", selection: $model.qwenLanguage) {
                         Text("中文优先").tag("zh")
                         Text("自动判断").tag("auto")
                         Text("粤语").tag("yue")
                         Text("英语").tag("en")
                     }
+                }
+                DisclosureGroup("高级设置（一般无需修改）") {
+                    Picker("Key 所属地区", selection: $model.qwenRegion) {
+                        Text("中国内地（北京）").tag("beijing")
+                        Text("新加坡").tag("singapore")
+                    }
+                    TextField("自定义 API 地址（留空自动选择）", text: $model.qwenAPIHost)
+                        .textFieldStyle(.roundedBorder)
+                    Text("已有自定义地址优先使用；更换地区时请清空原地址，或填入该地区的官方地址。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             } else {
                 Section("豆包 Seed ASR 2.0") {
@@ -1404,6 +1500,9 @@ struct EngineSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onChange(of: model.qwenAPIKey) { _ in model.cancelConnectionCheck() }
+        .onChange(of: model.qwenAPIHost) { _ in model.cancelConnectionCheck() }
+        .onChange(of: model.qwenRegion) { _ in model.cancelConnectionCheck() }
     }
 }
 
@@ -1513,6 +1612,10 @@ struct RecoverySettingsView: View {
                     if let error = model.diagnostics.lastError, !error.isEmpty {
                         LabeledContent("最近错误") { Text(error).foregroundStyle(.red) }
                     }
+                    if let recovery = model.diagnostics.recoveryStatus, !recovery.isEmpty {
+                        LabeledContent("自动恢复") { Text(recovery) }
+                    }
+                    Button("重新启动后台服务") { model.restartAndRecheckPermissions() }
                     if let outcome = model.diagnostics.lastSessionOutcome {
                         LabeledContent("最近一轮") {
                             Text(sessionOutcomeLabel(outcome))
@@ -1586,6 +1689,7 @@ struct RecoverySettingsView: View {
             .padding(12)
         }
         .navigationTitle("恢复与诊断")
+        .onAppear { model.reloadRecoveries() }
         .confirmationDialog("确定清空全部恢复记录？", isPresented: $confirmingClear) {
             Button("清空", role: .destructive) { model.clearRecoveries() }
         }
@@ -1610,7 +1714,7 @@ struct RecoverySettingsView: View {
         switch backend {
         case "registered": return "系统注册组合键"
         case "passive": return "只读键盘监听"
-        case "off": return "已关闭；使用菜单栏"
+        case "off": return "已关闭"
         default: return backend
         }
     }
@@ -1635,7 +1739,7 @@ struct SettingsRootView: View {
     @State private var showVocabulary = false
     @State private var evaluatedPermissionGate = false
     private let permissionTimer = Timer.publish(
-        every: 1.0, on: .main, in: .common
+        every: 2.0, tolerance: 0.5, on: .main, in: .common
     ).autoconnect()
 
     var body: some View {
@@ -1648,6 +1752,8 @@ struct SettingsRootView: View {
                 .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
             EngineSettingsView(model: model)
                 .tabItem { Label("引擎", systemImage: "waveform.badge.magnifyingglass") }
+            RecoverySettingsView(model: model)
+                .tabItem { Label("恢复与诊断", systemImage: "lifepreserver") }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -1668,6 +1774,7 @@ struct SettingsRootView: View {
             evaluatePermissionGate()
         }
         .onReceive(permissionTimer) { _ in
+            guard NSApp.isActive else { return }
             model.reloadDiagnostics()
             model.reloadPermissions()
             evaluatePermissionGate()

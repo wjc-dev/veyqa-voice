@@ -1,5 +1,41 @@
 import Foundation
 
+/// Avoid publishing identical on-disk snapshots back into SwiftUI every tick.
+struct SnapshotChangeGate {
+    private var previous: Data?
+    mutating func changed(_ data: Data?) -> Bool {
+        guard data != previous else { return false }
+        previous = data
+        return true
+    }
+}
+
+enum QwenConnection {
+    static func host(custom: String, region: String, workspace: String = "") -> String? {
+        let value = custom.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty {
+            if !workspace.isEmpty {
+                guard workspace.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }) else { return nil }
+                return workspace + (region == "singapore" ? ".ap-southeast-1.maas.aliyuncs.com" : ".cn-beijing.maas.aliyuncs.com")
+            }
+            return region == "singapore" ? "dashscope-intl.aliyuncs.com" : "dashscope.aliyuncs.com"
+        }
+        guard let url = URL(string: value.contains("://") ? value : "https://" + value),
+              url.scheme == "https", let host = url.host?.lowercased(),
+              host.hasSuffix(".aliyuncs.com"), url.user == nil, url.password == nil,
+              url.query == nil, url.fragment == nil, url.port == nil || url.port == 443
+        else { return nil }
+        return host
+    }
+
+    static func startRequest(taskID: String) -> [String: Any] {
+        ["header": ["action": "run-task", "task_id": taskID, "streaming": "duplex"],
+         "payload": ["task_group": "audio", "task": "asr", "function": "recognition",
+                     "model": "qwen-audio-3.0-asr-flash-streaming",
+                     "parameters": ["format": "pcm", "sample_rate": 16000], "input": [:]]]
+    }
+}
+
 enum HotkeyConfig {
     static let defaultSpec = "keycode:49;mods:control+option"
     static let defaultLabel = "⌃⌥Space"

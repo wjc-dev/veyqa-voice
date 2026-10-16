@@ -234,13 +234,36 @@ class VoiceHotkeyTests(unittest.TestCase):
         listener = _PassiveTapListener(lambda *_args: None)
         listener.tap_ref = object()
         with (
-            patch("Quartz.CGEventTapIsEnabled", return_value=False),
+            patch("Quartz.CGEventTapIsEnabled", side_effect=[False, True]),
             patch("Quartz.CGEventTapEnable") as enable,
         ):
             self.assertTrue(listener._repair_if_disabled())
 
         enable.assert_called_once_with(listener.tap_ref, True)
         self.assertEqual(listener.recovery_count, 1)
+
+    def test_recovery_clears_lost_release_in_toggle_mode(self):
+        manager = self.make_manager("right_option")
+        manager._hotkey_mode = "toggle"
+        manager.is_recording = False
+        manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate)
+        manager._recover_hotkey_state()
+        manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate)
+        self.assertEqual(manager.actions, ["toggle", "toggle"])
+
+    def test_poll_reconciles_missing_release_without_new_key_event(self):
+        manager = self.make_manager("right_option")
+        manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate)
+        with patch("Quartz.CGEventSourceKeyState", return_value=False):
+            manager._reconcile_hotkey_release()
+        self.assertEqual(manager.actions, ["start", "stop"])
+
+    def test_failed_tap_enable_is_not_reported_as_recovered(self):
+        listener = _PassiveTapListener(lambda *_: None)
+        listener.tap_ref = object()
+        with patch("Quartz.CGEventTapIsEnabled", return_value=False), patch("Quartz.CGEventTapEnable"):
+            with self.assertRaises(RuntimeError):
+                listener._repair_if_disabled()
 
     def test_registered_conflict_shows_actionable_warning(self):
         manager = self.make_manager("keycode:49;mods:control+option")

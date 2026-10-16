@@ -11,6 +11,25 @@ private func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 @main
 struct SettingsCoreHarness {
     static func main() throws {
+        var snapshotGate = SnapshotChangeGate()
+        require(!snapshotGate.changed(nil), "missing snapshot stays quiet")
+        require(snapshotGate.changed(Data("first".utf8)), "first snapshot updates")
+        require(!snapshotGate.changed(Data("first".utf8)), "unchanged snapshot stays quiet")
+        require(snapshotGate.changed(Data("next".utf8)), "changed snapshot updates")
+        require(snapshotGate.changed(nil), "deleted snapshot resets")
+        require(QwenConnection.host(custom: "", region: "beijing") == "dashscope.aliyuncs.com", "key-only defaults")
+        require(QwenConnection.host(custom: "", region: "singapore") == "dashscope-intl.aliyuncs.com", "region honored")
+        require(QwenConnection.host(custom: "https://example.com", region: "beijing") == nil, "untrusted host rejected")
+        require(QwenConnection.host(custom: "https://dashscope.aliyuncs.com@evil.example", region: "beijing") == nil, "userinfo rejected")
+        require(QwenConnection.host(custom: "https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1", region: "beijing") == "workspace.cn-beijing.maas.aliyuncs.com", "existing custom endpoint preserved")
+        var health = SupervisorHealth()
+        require(!health.needsRecovery(pid: 5, heartbeatPID: nil, timestamp: nil, now: 100), "startup grace")
+        for tick in stride(from: 105.0, through: 190.0, by: 5.0) {
+            require(!health.needsRecovery(pid: 5, heartbeatPID: 5, timestamp: tick, now: tick), "healthy idle")
+        }
+        require(health.needsRecovery(pid: 5, heartbeatPID: 5, timestamp: 100, now: 195), "stale heartbeat detected")
+        require(!health.needsRecovery(pid: 5, heartbeatPID: 5, timestamp: 100, now: 4000), "wake grace")
+        require(!health.needsRecovery(pid: 6, heartbeatPID: 5, timestamp: 100, now: 4005), "new pid grace")
         let first = HotkeyConfig.registeredSpec(
             keyCode: 49, modifiers: ["control", "option"]
         )

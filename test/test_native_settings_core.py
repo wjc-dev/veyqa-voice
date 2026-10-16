@@ -21,6 +21,7 @@ class NativeSettingsCoreTests(unittest.TestCase):
                     "xcrun",
                     "swiftc",
                     str(ROOT / "native_settings" / "SettingsCore.swift"),
+                    str(ROOT / "native_settings" / "SupervisorHealth.swift"),
                     str(ROOT / "test" / "native_settings_core_harness.swift"),
                     "-o",
                     str(binary),

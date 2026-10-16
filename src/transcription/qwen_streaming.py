@@ -338,12 +338,12 @@ class QwenStreamingProcessor:
     async def _disconnect(self) -> None:
         try:
             if self._ws and not self._ws.closed:
-                await self._ws.close()
+                await asyncio.wait_for(self._ws.close(), timeout=2)
         except Exception:
             pass
         try:
             if self._session and not self._session.closed:
-                await self._session.close()
+                await asyncio.wait_for(self._session.close(), timeout=2)
         except Exception:
             pass
         self._ws = None

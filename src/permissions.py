@@ -116,7 +116,7 @@ class PermissionMonitor:
         hotkey_backend: str,
         status_path: Path | None = None,
         request_path: Path | None = None,
-        interval: float = 0.75,
+        interval: float = 2.0,
     ) -> None:
         self.version = version
         self.hotkey_backend = hotkey_backend
@@ -126,6 +126,9 @@ class PermissionMonitor:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._request_lock = threading.Lock()
+        self._last_refresh = float("-inf")
+        self._last_status: dict[str, Any] | None = None
+        self._last_snapshot: dict[str, Any] | None = None
 
         self.bundle = app_bundle_path()
         self.executable = Path(sys.executable).resolve()
@@ -170,17 +173,41 @@ class PermissionMonitor:
                 input_monitoring_required=input_required,
             ),
             "checked_by_current_process": True,
-            "updated_at": datetime.now(timezone.utc).astimezone().isoformat(
-                timespec="seconds"
-            ),
         }
-        self._atomic_write(self.status_path, snapshot)
-        return snapshot
+        if snapshot != self._last_status or not self.status_path.exists():
+            published = {**snapshot, "updated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")}
+            self._atomic_write(self.status_path, published)
+            self._last_status = snapshot
+            self._last_snapshot = published
+        self._last_refresh = time.monotonic()
+        return dict(self._last_snapshot or snapshot)
+
+    def _settings_active(self) -> bool:
+        try:
+            pid = int((self.status_path.parent / ".settings-instance").read_text().strip())
+            if pid <= 1:
+                return False
+            os.kill(pid, 0)
+            return True
+        except (OSError, ValueError):
+            return False
+
+    def _poll(self) -> None:
+        requested = self.request_path.exists()
+        if requested:
+            self._consume_request()
+        now = time.monotonic()
+        refresh_interval = self.interval if self._settings_active() else 30.0
+        if requested or now - self._last_refresh >= refresh_interval:
+            self.refresh()
+            self._last_refresh = now
 
     def _run(self) -> None:
         while not self._stop.wait(self.interval):
-            self._consume_request()
-            self.refresh()
+            try:
+                self._poll()
+            except Exception:
+                logger.exception("权限状态更新失败，将自动重试")
 
     def _consume_request(self) -> None:
         if not self.request_path.exists() or not self._request_lock.acquire(blocking=False):

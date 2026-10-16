@@ -26,6 +26,8 @@ from ..text_processing import sanitize_inline_text
 from ..utils.logger import logger
 from .inputState import InputState
 
+_UNSET_TARGET = object()
+
 
 class _PassiveTapListener:
     """Observe only the configured shortcut without swallowing keyboard input.
@@ -37,13 +39,16 @@ class _PassiveTapListener:
     it to modify or discard a user's key event.
     """
 
-    def __init__(self, intercept) -> None:
+    def __init__(self, intercept, on_recovered=None, reconcile=None) -> None:
         self._intercept = intercept
+        self._on_recovered = on_recovered or (lambda: None)
+        self._reconcile = reconcile or (lambda: None)
         self._callback = self._deliver
         self.tap_ref = None
         self.run_loop = None
         self.running = False
         self.recovery_count = 0
+        self.last_poll_at = time.monotonic()
 
     def __enter__(self):
         self.running = True
@@ -73,6 +78,9 @@ class _PassiveTapListener:
         if tap is None or CGEventTapIsEnabled(tap):
             return False
         CGEventTapEnable(tap, True)
+        if not CGEventTapIsEnabled(tap):
+            raise RuntimeError("快捷键监听无法重新启用")
+        self._on_recovered()
         self.recovery_count += 1
         logger.warning("键盘事件监听被系统暂停，已自动恢复（第 %s 次）", self.recovery_count)
         return True
@@ -119,7 +127,9 @@ class _PassiveTapListener:
         CGEventTapEnable(tap, True)
         while self.running:
             CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, False)
+            self.last_poll_at = time.monotonic()
             self._repair_if_disabled()
+            self._reconcile()
 
 
 class _PassiveGlobalMonitorListener:
@@ -317,6 +327,7 @@ class KeyboardManager:
         self.recovery_store = RecoveryStore()
         self._state = InputState.IDLE
         self.is_recording = False
+        self._cancel_pending = False
         self._recording_lock = threading.RLock()
         self._last_voice_insertion = None
         self._recovery_texts = deque(maxlen=5)
@@ -355,7 +366,9 @@ class KeyboardManager:
 
         # Audio start/stop can block briefly. Serializing them off the event-tap
         # callback prevents a quick release from overtaking a slow start.
-        self._transition_queue: queue.Queue[str] = queue.Queue()
+        self._transition_queue: queue.Queue[tuple[str, int]] = queue.Queue()
+        self._transition_generation = 0
+        self._transition_started_at = None
         self._transition_thread = threading.Thread(
             target=self._transition_worker,
             name="voice-state-transition",
@@ -412,10 +425,13 @@ class KeyboardManager:
 
     def start_recording(self) -> None:
         with self._recording_lock:
-            if self.is_recording or not self.state.can_start_recording:
+            if (self.is_recording or not self.state.can_start_recording
+                    or getattr(self, "_cancel_pending", False)
+                    or getattr(self, "_transition_started_at", None) is not None):
                 return
             self.is_recording = True
-        self._transition_queue.put("start")
+            self._transition_generation = getattr(self, "_transition_generation", 0) + 1
+            self._transition_queue.put(("start", self._transition_generation))
         logger.info("🎤 开始录音")
 
     def stop_recording(self) -> None:
@@ -423,7 +439,7 @@ class KeyboardManager:
             if not self.is_recording:
                 return
             self.is_recording = False
-        self._transition_queue.put("stop")
+            self._transition_queue.put(("stop", getattr(self, "_transition_generation", 0)))
         logger.info("⏹️ 停止录音")
 
     def cancel_recording(self) -> None:
@@ -431,7 +447,19 @@ class KeyboardManager:
             if not self.is_recording:
                 return
             self.is_recording = False
-        self._transition_queue.put("cancel")
+            self._cancel_pending = True
+            self._transition_generation = getattr(self, "_transition_generation", 0) + 1
+        # A blocked device start must not trap cancellation behind itself.
+        def cancel():
+            try:
+                self.on_record_cancel()
+            except Exception:
+                logger.exception("取消录音失败")
+            finally:
+                self.reset_state()
+                with self._recording_lock:
+                    self._cancel_pending = False
+        threading.Thread(target=cancel, name="voice-cancel", daemon=True).start()
         logger.info("已取消本轮语音输入")
 
     def toggle_recording(self) -> None:
@@ -442,8 +470,12 @@ class KeyboardManager:
 
     def _transition_worker(self) -> None:
         while True:
-            action = self._transition_queue.get()
+            action, generation = self._transition_queue.get()
+            self._transition_started_at = time.monotonic()
+            self._active_transition_generation = generation
             try:
+                if self.transition_was_cancelled():
+                    continue
                 if action == "start":
                     self.set_state(InputState.RECORDING)
                     self.on_record_start()
@@ -457,7 +489,13 @@ class KeyboardManager:
                 logger.error("录音状态切换失败: %s", exc, exc_info=True)
                 self.reset_state()
             finally:
+                self._transition_started_at = None
                 self._transition_queue.task_done()
+
+    def transition_was_cancelled(self) -> bool:
+        return getattr(self, "_active_transition_generation", 0) != getattr(
+            self, "_transition_generation", 0
+        )
 
     def capture_output_target(self):
         return self.correction_learner.capture_target()
@@ -478,7 +516,7 @@ class KeyboardManager:
                 store.add(text, reason)
         self.show_error(reason)
 
-    def type_text(self, text, error_message=None, target=None) -> bool:
+    def type_text(self, text, error_message=None, target=_UNSET_TARGET) -> bool:
         """Commit one final transcription through a compatibility paste.
 
         A captured target is mandatory. Before every fallback, it must still be
@@ -495,15 +533,12 @@ class KeyboardManager:
         if not text:
             return False
 
-        target = target or self.capture_output_target()
+        if target is _UNSET_TARGET:
+            target = self.capture_output_target()
         if target is None:
-            # Some apps (notably WeChat 4.x on macOS) never expose AX, so
-            # capture_target has nothing to lock onto.  The user explicitly
-            # held the hotkey to dictate, so abandoning the result would be
-            # worse than a best-effort Cmd+V to the foreground window.  We
-            # lose the dedup and focus checks, but we never silently drop
-            # recognized text.
-            return self._blind_paste_text(text)
+            # An explicitly missing recording target must not be recaptured
+            # after recognition: the user could now be in a different app.
+            return self._retain_failed_text(text, "无法确认输入位置，文字已保留，请在恢复页复制")
         if not self._target_is_focused(target):
             return self._retain_failed_text(text, "录音期间输入焦点已改变")
 
@@ -563,40 +598,6 @@ class KeyboardManager:
             settle_seconds=settle_seconds,
             before_paste_seconds=0.04,
         )
-
-    def _blind_paste_text(self, text: str) -> bool:
-        """Paste without a captured AX target via a foreground Cmd+V.
-
-        Used when ``capture_output_target`` returns ``None`` — for example on
-        WeChat 4.x, which disables AX entirely.  We cannot do dedup, focus, or
-        caret-aware inserts in this mode, but abandoning recognized text
-        would be worse than a best-effort paste to whatever window the user
-        is in.
-
-        Uses a longer settle window because the foreground app is unknown and
-        async consumers (WeChat's composer, Electron's paste handler) need it.
-        """
-        logger.info("未锁定 AX target，走盲 Cmd+V 路径")
-        try:
-            text = self.correction_learner.store.apply(text)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("盲粘 store.apply 失败: %s", exc, exc_info=True)
-            text = sanitize_inline_text(text)
-        if not text:
-            return False
-        try:
-            inserted = paste_text_preserving_clipboard(
-                text,
-                settle_seconds=0.5,
-                before_paste_seconds=0.04,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.error("盲粘异常: %s", exc, exc_info=True)
-            return self._retain_failed_text(text, "盲粘异常")
-        if inserted:
-            logger.info("盲粘完成（%d 个字符）", len(text))
-            return True
-        return self._retain_failed_text(text, "前台窗口拒绝粘贴")
 
     def _retain_failed_text(self, text: str, reason: str) -> bool:
         if text:
@@ -798,6 +799,19 @@ class KeyboardManager:
         elif mode == "hold":
             self.stop_recording()
 
+    def _recover_hotkey_state(self) -> None:
+        self._voice_hotkey_pressed = False
+        if getattr(self, "_hotkey_mode", "hold") == "hold" and self.is_recording:
+            self.cancel_recording()
+
+    def _reconcile_hotkey_release(self) -> None:
+        if not self._voice_hotkey_pressed:
+            return
+        from Quartz import CGEventSourceKeyState, kCGEventSourceStateCombinedSessionState
+        spec = self._voice_hotkey_spec
+        if spec and not CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, spec["vk"]):
+            self._set_voice_hotkey_pressed(False)
+
     def _handle_configured_hotkey(self, event_type, vk, flags) -> bool:
         from Quartz import kCGEventFlagsChanged, kCGEventKeyDown, kCGEventKeyUp
 
@@ -861,6 +875,7 @@ class KeyboardManager:
                 tap = getattr(self._listener, "tap_ref", None)
                 if tap is not None:
                     CGEventTapEnable(tap, True)
+                    self._recover_hotkey_state()
                     now = time.time()
                     if now - self._tap_disabled_log_time > 5:
                         self._tap_disabled_log_time = now
@@ -877,6 +892,7 @@ class KeyboardManager:
             if self._handle_configured_hotkey(event_type, vk, flags):
                 return None
         except Exception:
+            logger.exception("快捷键事件处理失败")
             return event
         return event
 
@@ -922,7 +938,11 @@ class KeyboardManager:
         # Prefer a listen-only Quartz tap: it reports when macOS disables it
         # and can be health-checked.  Some managed Macs block event taps even
         # in listen-only mode, so retain AppKit's global monitor as a fallback.
-        listener = _PassiveTapListener(self._darwin_intercept)
+        listener = _PassiveTapListener(
+            self._darwin_intercept,
+            on_recovered=self._recover_hotkey_state,
+            reconcile=self._reconcile_hotkey_release,
+        )
         self._listener = listener
         try:
             with listener:

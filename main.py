@@ -30,7 +30,7 @@ except Exception as _truststore_err:  # noqa: BLE001
     # bundle.  Home users without corporate proxies won't notice.
     pass
 
-from src.runtime_paths import ENV_FILE, IS_FROZEN, ensure_runtime_layout
+from src.runtime_paths import DATA_DIR, ENV_FILE, IS_FROZEN, ensure_runtime_layout
 
 ensure_runtime_layout()
 load_dotenv(ENV_FILE, override=True)
@@ -38,6 +38,7 @@ load_dotenv(ENV_FILE, override=True)
 from src.audio.archive import AudioArchiveManager
 from src.audio.recorder import AudioRecorder
 from src.diagnostics import DiagnosticsStore
+from src.runtime_health import RuntimeHealth, allow_automatic_restart
 from src.keyboard.inputState import InputState
 from src.keyboard.listener import KeyboardManager, check_accessibility_permissions
 from src.login_item import resume_supervisor_for_manual_launch, sync_login_item
@@ -56,7 +57,7 @@ from src.ui.status_bar import StatusBarController
 from src.utils.logger import logger
 
 
-__version__ = "0.2.0"
+__version__ = "0.2.2"
 __author__ = "Mor-Li"
 __description__ = "Qwen and Doubao realtime voice input for macOS"
 
@@ -117,6 +118,7 @@ class VoiceAssistant:
         self.archive_enabled = os.getenv("AUDIO_ARCHIVE_ENABLED", "false").lower() == "true"
 
         self._current_state = InputState.IDLE
+        self._state_since = time.monotonic()
         self._session_lock = threading.RLock()
         self._current_session: Optional[VoiceSession] = None
         self._streaming_thread: Optional[threading.Thread] = None
@@ -158,8 +160,10 @@ class VoiceAssistant:
             last_error=login_result.error,
             login_item_status=login_result.status,
             login_item_error=login_result.error,
+            recovery_status="后台服务就绪",
         )
         self._notify_status()
+        self.health = RuntimeHealth(self._health_fault, self._recover_runtime)
 
         logger.info(
             "语音引擎：%s；标点模式：%s；本地录音存档：%s",
@@ -169,21 +173,57 @@ class VoiceAssistant:
         )
 
     @staticmethod
-    def _restart_application() -> None:
+    def _restart_application(*, show_settings: bool = True) -> None:
+        (DATA_DIR / ".restart-request").unlink(missing_ok=True)
         logger.info("设置已保存，正在重启语音输入服务")
         os.environ["VOICE_INPUT_RESTARTING"] = "true"
         arguments = [
             argument
             for argument in sys.argv[1:]
-            if argument != "--show-settings-after-restart"
+            if argument not in {"--show-settings-after-restart", "--background-login"}
         ]
         os.execv(
             sys.executable,
-            [sys.executable, "--show-settings-after-restart", *arguments],
+            [sys.executable, "--show-settings-after-restart" if show_settings else "--background-login", *arguments],
         )
+
+    def _health_fault(self, now: float) -> str:
+        started = getattr(self.keyboard_manager, "_transition_started_at", None)
+        if started is not None and now - started > 10:
+            return "录音设备操作超时"
+        if self._current_state == InputState.PROCESSING and now - self._state_since > 45:
+            return "识别结束超时"
+        listener = getattr(self.keyboard_manager, "_listener", None)
+        polled = getattr(listener, "last_poll_at", None)
+        if polled is not None and now - polled > 15:
+            return "快捷键监听循环无响应"
+        return ""
+
+    def _recover_runtime(self, reason: str) -> None:
+        session = self._current_session
+        if session is not None:
+            session.cancelled = True
+        allowed = allow_automatic_restart()
+        self.diagnostics.update(last_error=reason, recovery_status=(
+            "正在自动恢复" if allowed else "恢复次数过多，请检查音频设备后重新启动"
+        ))
+        logger.warning("后台功能异常：%s；自动恢复=%s", reason, allowed)
+        if allowed:
+            # exec resets stuck native audio state and preserves PID/settings helper.
+            # A separate native supervisor covers a blocked GIL or UI thread.
+            self._restart_application(show_settings=False)
+
+    def _tick_health(self) -> None:
+        from PyObjCTools import AppHelper
+        self.health.tick_main()
+        if (DATA_DIR / ".restart-request").exists():
+            self._restart_application()
+            return
+        AppHelper.callLater(2, self._tick_health)
 
     def _on_state_change(self, state: InputState) -> None:
         self._current_state = state
+        self._state_since = time.monotonic()
         self.diagnostics.update(state=state.name)
         self._notify_status()
 
@@ -272,6 +312,10 @@ class VoiceAssistant:
             self._start_unconfigured()
             return
         with self._session_lock:
+            # Cancellation can arrive after dequeue but before the session exists.
+            # The same lock is used by cancel_streaming, closing that race too.
+            if getattr(self.keyboard_manager, "transition_was_cancelled", lambda: False)():
+                return
             if self._current_session is not None:
                 logger.warning("上一轮语音会话尚未结束，已忽略重复启动")
                 self.keyboard_manager.reset_state()
@@ -298,6 +342,11 @@ class VoiceAssistant:
             logger.error("启动录音失败: %s", exc)
             self.diagnostics.update(last_error="麦克风启动失败")
             self.keyboard_manager.show_error("麦克风启动失败")
+            self._finish_session(session)
+            return
+
+        if session.cancelled or not self._is_current(session):
+            self.audio_recorder.stop_streaming_recording(abort=True)
             self._finish_session(session)
             return
 
@@ -535,11 +584,23 @@ class VoiceAssistant:
     def run(self) -> None:
         logger.info("语音输入已启动 (v%s)", __version__)
         self.permission_monitor.start()
+        self.health.start()
+        from PyObjCTools import AppHelper
+        AppHelper.callAfter(self._tick_health)
         threading.Thread(
             target=self.keyboard_manager.start_listening,
             name="keyboard-listener",
             daemon=True,
         ).start()
+        # Release verification only: never activate against normal user storage.
+        if (os.getenv("VEYQA_HEALTH_SELF_TEST") == "true"
+                and os.getenv("VOICE_INPUT_DATA_DIR")
+                and os.getenv("VOICE_INPUT_DISABLE_LOGIN_SYNC") == "true"):
+            marker = DATA_DIR / ".health-fault-injected"
+            if not marker.exists():
+                marker.write_text("once", encoding="utf-8")
+                self.keyboard_manager.on_record_start = lambda: threading.Event().wait(300)
+                self.keyboard_manager.start_recording()
         self.status_controller.start()
 
 

@@ -448,10 +448,11 @@ class FinalTextInsertionTests(unittest.TestCase):
             ("Do anything", 0, 0),
         )
 
-    def test_no_target_blind_pastes_to_foreground(self):
-        """When AX target capture fails (e.g. WeChat 4.x hides AX), still paste."""
+    def test_missing_target_retains_text_without_touching_clipboard(self):
+        """An unknown foreground app must never receive dictated text."""
         manager = self.make_manager()
         manager.capture_output_target = lambda: None
+        manager.show_error = lambda _message: None
 
         pastes = []
 
@@ -468,13 +469,9 @@ class FinalTextInsertionTests(unittest.TestCase):
         ):
             inserted = manager.type_text("盲粘测试", None)
 
-        self.assertTrue(inserted)
-        self.assertEqual(len(pastes), 1)
-        self.assertEqual(pastes[0][0], "盲粘测试")
-        # Blind paste uses a longer settle window because the foreground app
-        # is unknown and async consumers (WeChat composer, Electron) need it.
-        self.assertGreaterEqual(pastes[0][1]["settle_seconds"], 0.5)
-        self.assertEqual(manager.recovery_texts(), [])
+        self.assertFalse(inserted)
+        self.assertEqual(pastes, [])
+        self.assertEqual(manager.recovery_texts(), ["盲粘测试"])
 
     def test_blind_paste_failure_falls_to_recovery(self):
         manager = self.make_manager()
@@ -496,6 +493,7 @@ class FinalTextInsertionTests(unittest.TestCase):
     def test_blind_paste_normalizes_line_breaks(self):
         manager = self.make_manager()
         manager.capture_output_target = lambda: None
+        manager.show_error = lambda _message: None
 
         pastes = []
 
@@ -512,7 +510,19 @@ class FinalTextInsertionTests(unittest.TestCase):
         ):
             manager.type_text("第一段\n第二段\r\n结尾", None)
 
-        self.assertEqual(pastes[-1], "第一段 第二段 结尾")
+        self.assertEqual(pastes, [])
+        self.assertEqual(manager.recovery_texts(), ["第一段 第二段 结尾"])
+
+    def test_explicitly_missing_recording_target_is_not_recaptured_at_commit(self):
+        manager = self.make_manager()
+        manager.show_error = lambda _message: None
+        with patch.object(manager, "capture_output_target") as capture, patch(
+            "src.keyboard.listener.paste_text_preserving_clipboard"
+        ) as paste:
+            self.assertFalse(manager.type_text("safe recovery", target=None))
+        capture.assert_not_called()
+        paste.assert_not_called()
+        self.assertEqual(manager.recovery_texts(), ["safe recovery"])
 
     def test_blind_paste_exception_retains_for_recovery(self):
         manager = self.make_manager()

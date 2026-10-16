@@ -1,4 +1,4 @@
-"""macOS 状态栏控制器，显示 Whisper-Input 的运行状态。"""
+"""macOS app controller for the resident Dock entry and settings window."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from Cocoa import (
     NSApplication,
     NSApplicationActivateAllWindows,
     NSApplicationActivateIgnoringOtherApps,
-    NSApplicationActivationPolicyAccessory,
+    NSApplicationActivationPolicyRegular,
     NSImage,
     NSRunningApplication,
     NSSquareStatusItemLength,
@@ -61,6 +61,11 @@ _STATE_VISUALS = {
 
 def _service_label() -> str:
     return "豆包" if os.getenv("TRANSCRIPTION_SERVICE", "qwen").lower() == "doubao" else "千问"
+
+
+def _menu_bar_enabled() -> bool:
+    """Keep the legacy menu-bar entry opt-in instead of making it the only UI."""
+    return os.getenv("SHOW_MENU_BAR_ICON", "false").lower() == "true"
 
 
 def _write_status_log(message: str) -> None:
@@ -253,12 +258,22 @@ class _ApplicationDelegate(NSObject):
     """Make a second Finder/Dock launch reopen the already-running settings."""
 
     def applicationShouldHandleReopen_hasVisibleWindows_(self, _app, _visible) -> bool:
+        _write_status_log("dock reopen requested")
         self.controller._open_settings()
         return True
 
+    def applicationShouldTerminate_(self, _app):
+        # Dock Quit / Cmd-Q is intentional, unlike a signal from the supervisor.
+        from src.login_item import SUPERVISOR_PAUSE_FILE
+        try:
+            SUPERVISOR_PAUSE_FILE.write_text("paused-by-user", encoding="utf-8")
+        except OSError:
+            pass
+        return 1  # NSTerminateNow
+
 
 class StatusBarController:
-    """管理状态栏图标和提示信息。"""
+    """Keep the app resident in the Dock and own its optional menu-bar item."""
 
     def __init__(
         self,
@@ -280,10 +295,10 @@ class StatusBarController:
         self._load_custom_icons()
 
     def start(self) -> None:
-        """启动状态栏控件并进入事件循环。"""
+        """Start the resident AppKit application and enter its event loop."""
         AppHelper.callAfter(self._setup)
-        # 状态栏按钮需要完整的 NSApplication 事件循环；console run loop
-        # 只能刷新 UI，无法可靠分发真实鼠标点击事件。
+        # A full NSApplication event loop is required for Dock reopen events,
+        # the optional status item, and the settings helper lifecycle.
         AppHelper.runEventLoop()
 
     def update_state(
@@ -304,7 +319,7 @@ class StatusBarController:
         AppHelper.callAfter(_apply)
 
     def open_settings(self) -> None:
-        """Open or raise settings from Finder relaunch or the menu bar."""
+        """Open or raise settings from Finder, the Dock, or the optional menu bar."""
         self._open_settings()
 
     # ------------------------------------------------------------------
@@ -313,22 +328,27 @@ class StatusBarController:
 
     def _setup(self) -> None:
         app = NSApplication.sharedApplication()
-        # Accessory is the supported policy for a menu-bar-only app: it keeps
-        # the Dock clean (LSUIElement is also true) while allowing AppKit to
-        # create and retain a reliable NSStatusItem on different macOS builds.
-        app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
+        # The Dock is the stable primary entry point. A menu-bar item can be
+        # hidden by macOS when space is tight, so it must never be the user's
+        # only way back into settings.
+        app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
         self._application_delegate = _ApplicationDelegate.alloc().init()
         self._application_delegate.controller = self
         app.setDelegate_(self._application_delegate)
 
-        self._install_status_item()
-        self._schedule_status_health_check()
+        if _menu_bar_enabled():
+            self._install_status_item()
+            self._schedule_status_health_check()
+        else:
+            _write_status_log("dock entry ready; menu bar disabled")
         if self._open_settings_on_start:
             AppHelper.callLater(
                 0.8,
                 _launch_settings_window,
                 self._on_restart,
             )
+        if os.getenv("DOCK_ENTRY_SELF_TEST", "false").lower() == "true":
+            AppHelper.callLater(1.2, self._open_settings)
 
     def _install_status_item(self) -> None:
         """Create one retained, fixed-size status item and wire its action."""

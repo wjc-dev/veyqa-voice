@@ -9,16 +9,20 @@ normal app restarts.  This avoids the old pattern where launchd supervised
 from __future__ import annotations
 
 import os
+import json
+import plistlib
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.runtime_paths import DATA_DIR, IS_FROZEN
+from src.runtime_paths import DATA_DIR, IS_FROZEN, app_bundle_path
+from src.diagnostics import DiagnosticsStore
 from src.utils.logger import logger
 
 
 AGENT_PLIST_NAME = "com.wjcdev.veyqa.agent.plist"
 SUPERVISOR_PAUSE_FILE = DATA_DIR / ".supervisor-paused"
+REGISTRATION_FILE = DATA_DIR / "login-item-registration.json"
 _STATUS_NAMES = {
     0: "not_registered",
     1: "enabled",
@@ -44,6 +48,18 @@ class LoginItemResult:
 
 def _status_name(value: int) -> str:
     return _STATUS_NAMES.get(int(value), f"unknown_{int(value)}")
+
+
+def _registration_identity() -> str:
+    bundle = app_bundle_path()
+    if bundle is None:
+        return ""
+    with (bundle / "Contents/Info.plist").open("rb") as handle:
+        build = plistlib.load(handle).get("CFBundleVersion", "")
+    stat = bundle.stat()
+    # Replacing a .app can leave SMAppService attached to the old bundle inode,
+    # even when its status is still 'enabled'. Include reinstall as well as upgrade.
+    return f"{bundle}:{build}:{stat.st_dev}:{stat.st_ino}"
 
 
 def resume_supervisor_for_manual_launch(arguments: list[str]) -> None:
@@ -111,12 +127,25 @@ def sync_login_item(enabled: bool) -> LoginItemResult:
         changed = False
 
         if enabled:
+            identity = _registration_identity()
+            try:
+                previous = json.loads(REGISTRATION_FILE.read_text()).get("identity", "")
+            except (OSError, ValueError, AttributeError):
+                previous = ""
+            if identity and identity != previous and before in {"enabled", "requires_approval"}:
+                ok, error = service.unregisterAndReturnError_(None)
+                if not ok:
+                    return LoginItemResult(before, error=str(error or "更新后台服务失败"))
+                before = "not_registered"
+                changed = True
             if before not in {"enabled", "requires_approval"}:
                 ok, error = service.registerAndReturnError_(None)
                 if not ok:
                     return LoginItemResult(before, error=str(error or "注册失败"))
                 changed = True
             after = _status_name(service.status())
+            if identity and after in {"enabled", "requires_approval"}:
+                DiagnosticsStore(REGISTRATION_FILE).update(identity=identity)
             if after == "enabled":
                 _retire_legacy_agents()
                 if _legacy_app_is_running():

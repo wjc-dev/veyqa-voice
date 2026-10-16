@@ -18,7 +18,7 @@ cp "$PROJECT_DIR/native_settings/VoiceInputSettings-Info.plist" \
 
 CLANG_MODULE_CACHE_PATH="$PROJECT_DIR/build/clang-module-cache" \
 SWIFT_MODULECACHE_PATH="$PROJECT_DIR/build/swift-module-cache" \
-xcrun swiftc -parse-as-library \
+xcrun swiftc -parse-as-library -target arm64-apple-macos13.0 \
   -framework SwiftUI -framework AppKit \
   -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist \
   -Xlinker "$PROJECT_DIR/native_settings/VoiceInputSettings-Info.plist" \

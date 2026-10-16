@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="${0:A:h}"
-VERSION="0.2.0"
+VERSION="0.2.2"
 OUTPUT_DIR="${1:-$PROJECT_DIR/dist-internal}"
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
 WORK_DIR="$PROJECT_DIR/.package-build/$RUN_ID"
@@ -43,6 +43,7 @@ zsh "$PROJECT_DIR/build-native-settings.command"
 
 xcrun swiftc -O -target arm64-apple-macos13.0 \
   -framework AppKit \
+  "$PROJECT_DIR/native_settings/SupervisorHealth.swift" \
   "$PROJECT_DIR/native_settings/VeyqaSupervisor.swift" \
   -o "$PROJECT_DIR/build/VeyqaSupervisor"
 

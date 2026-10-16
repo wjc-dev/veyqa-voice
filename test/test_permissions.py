@@ -1,11 +1,58 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from src.permissions import PermissionMonitor, required_permissions_granted
 
 
 class PermissionLogicTests(unittest.TestCase):
+    def test_unchanged_permissions_are_not_written_again(self):
+        with tempfile.TemporaryDirectory() as directory:
+            monitor = PermissionMonitor(version="test", hotkey_backend="passive",
+                                        status_path=Path(directory) / "permissions.json")
+            with (
+                patch("src.permissions._microphone_status", return_value="granted"),
+                patch("src.permissions._accessibility_status", return_value="granted") as access,
+                patch("src.permissions._input_monitoring_status", return_value="granted"),
+                patch.object(monitor, "_atomic_write", wraps=monitor._atomic_write) as write,
+            ):
+                monitor.refresh()
+                for _ in range(10):
+                    monitor.refresh()
+                self.assertEqual(write.call_count, 1)
+                access.return_value = "missing"
+                self.assertFalse(monitor.refresh()["all_required_granted"])
+                self.assertEqual(write.call_count, 2)
+
+    def test_background_checks_slow_down_but_settings_and_requests_stay_responsive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            monitor = PermissionMonitor(version="test", hotkey_backend="registered",
+                                        status_path=Path(directory) / "permissions.json",
+                                        request_path=Path(directory) / "request.json")
+            monitor._last_refresh = 0
+            with (
+                patch("src.permissions.time.monotonic", return_value=2) as clock,
+                patch.object(monitor, "_settings_active", return_value=False) as active,
+                patch.object(monitor, "refresh") as refresh,
+                patch.object(monitor, "_consume_request") as consume,
+            ):
+                monitor._poll()
+                refresh.assert_not_called()
+                clock.return_value = 30
+                monitor._poll()
+                self.assertEqual(refresh.call_count, 1)
+                clock.return_value = 32
+                active.return_value = True
+                monitor._poll()
+                self.assertEqual(refresh.call_count, 2)
+                active.return_value = False
+                monitor.request_path.write_text("{}")
+                clock.return_value = 34
+                monitor._poll()
+                consume.assert_called_once()
+                self.assertEqual(refresh.call_count, 3)
+
     def test_input_monitoring_is_required_for_modifier_only_hotkeys(self):
         self.assertFalse(
             required_permissions_granted(

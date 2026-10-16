@@ -14,8 +14,9 @@ from .runtime_paths import DIAGNOSTICS_FILE
 
 
 class DiagnosticsStore:
-    def __init__(self, path: Optional[Path] = None) -> None:
+    def __init__(self, path: Optional[Path] = None, *, durable: bool = True) -> None:
         self.path = path or DIAGNOSTICS_FILE
+        self.durable = durable
         self._lock = threading.RLock()
 
     def update(self, **values: Any) -> None:
@@ -40,7 +41,8 @@ class DiagnosticsStore:
                 json.dump(data, handle, ensure_ascii=False, indent=2)
                 handle.write("\n")
                 handle.flush()
-                os.fsync(handle.fileno())
+                if self.durable:
+                    os.fsync(handle.fileno())
             os.chmod(temporary_name, 0o600)
             os.replace(temporary_name, self.path)
         finally:

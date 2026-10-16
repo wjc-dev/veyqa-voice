@@ -7,6 +7,43 @@ from src import login_item
 
 
 class LoginItemTests(unittest.TestCase):
+    def test_upgrade_refreshes_stale_enabled_registration_once(self):
+        service = MagicMock()
+        service.status.return_value = 1
+        service.registerAndReturnError_.return_value = (True, None)
+        service.unregisterAndReturnError_.return_value = (True, None)
+        framework = MagicMock()
+        framework.SMAppService.agentServiceWithPlistName_.return_value = service
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(login_item, "IS_FROZEN", True),
+            patch.object(login_item, "_registration_identity", return_value="app:202:new-inode"),
+            patch.object(login_item, "REGISTRATION_FILE", Path(directory) / "registration.json"),
+            patch.dict("sys.modules", {"ServiceManagement": framework}),
+            patch.object(login_item, "_retire_legacy_agents"),
+            patch.object(login_item, "_legacy_app_is_running", return_value=False),
+        ):
+            self.assertTrue(login_item.sync_login_item(True).changed)
+            self.assertFalse(login_item.sync_login_item(True).changed)
+        service.unregisterAndReturnError_.assert_called_once_with(None)
+        service.registerAndReturnError_.assert_called_once_with(None)
+
+    def test_upgrade_does_not_register_over_failed_unregister(self):
+        service = MagicMock()
+        service.status.return_value = 1
+        service.unregisterAndReturnError_.return_value = (False, "unavailable")
+        framework = MagicMock()
+        framework.SMAppService.agentServiceWithPlistName_.return_value = service
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(login_item, "IS_FROZEN", True),
+            patch.object(login_item, "_registration_identity", return_value="new"),
+            patch.object(login_item, "REGISTRATION_FILE", Path(directory) / "registration.json"),
+            patch.dict("sys.modules", {"ServiceManagement": framework}),
+        ):
+            self.assertEqual(login_item.sync_login_item(True).error, "unavailable")
+        service.registerAndReturnError_.assert_not_called()
+
     def test_manual_launch_clears_explicit_supervisor_pause(self):
         with tempfile.TemporaryDirectory() as directory:
             marker = Path(directory) / ".supervisor-paused"

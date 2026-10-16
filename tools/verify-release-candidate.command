@@ -1,8 +1,18 @@
 #!/bin/zsh
 set -euo pipefail
 
+# This workflow launches temporary, ad-hoc-signed executables and can trigger
+# endpoint-security dialogs. Never silently do that on a user's work Mac.
+if [[ "${VEYQA_ALLOW_GUI_SMOKE_TESTS:-false}" != "true" ]]; then
+  print -u2 "Stopped: this verifier launches temporary native apps and test executables."
+  print -u2 "On managed Macs, obtain an approved test environment first; do not bypass endpoint protection."
+  print -u2 "Source-only checks: .venv/bin/python -m pytest test/ --ignore=test/test_native_settings_core.py"
+  print -u2 "Only in an approved environment, explicitly opt in with VEYQA_ALLOW_GUI_SMOKE_TESTS=true."
+  exit 2
+fi
+
 PROJECT_DIR="${0:A:h:h}"
-VERSION="0.2.0"
+VERSION="0.2.2"
 OUTPUT_DIR="${1:-$PROJECT_DIR/dist-internal}"
 ZIP_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64.zip"
 PKG_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64.pkg"
@@ -79,7 +89,7 @@ dump_smoke_logs() {
 
 cd "$PROJECT_DIR"
 print "[1/7] Running unit tests"
-"$PROJECT_DIR/.venv/bin/python" -m pytest test/
+env -u VOICE_INPUT_DISABLE_LOGIN_SYNC "$PROJECT_DIR/.venv/bin/python" -m pytest test/
 
 print "[2/7] Building isolated internal artifacts"
 zsh "$PROJECT_DIR/build-internal-dmg.command" "$OUTPUT_DIR"
@@ -161,26 +171,36 @@ LAUNCH_AT_LOGIN=false
 AUDIO_ARCHIVE_ENABLED=false" > "$cycle_data/.env"
   chmod 600 "$cycle_data/.env"
 
-  VOICE_INPUT_DATA_DIR="$cycle_data" \
-  VOICE_INPUT_DISABLE_LOGIN_SYNC=true \
-    "$APP_PATH/Contents/MacOS/VeyqaVoice" --background-login \
-      >"$cycle_data/console.log" 2>&1 &
-  APP_PID=$!
   local registered=false
-  for _attempt in {1..60}; do
-    if ! kill -0 "$APP_PID" >/dev/null 2>&1; then
-      print -u2 "Veyqa Voice exited before registering hotkey $label"
-      exit 1
-    fi
-    if [[ -f "$cycle_log" ]] \
-        && grep -q "系统注册型录音快捷键已启用" "$cycle_log"; then
-      registered=true
-      break
-    fi
-    sleep 0.5
+  for startup_attempt in {1..3}; do
+    : > "$cycle_data/console.log"
+    rm -f "$cycle_log"
+    VOICE_INPUT_DATA_DIR="$cycle_data" \
+    VOICE_INPUT_DISABLE_LOGIN_SYNC=true \
+      "$APP_PATH/Contents/MacOS/VeyqaVoice" --background-login \
+        >"$cycle_data/console.log" 2>&1 &
+    APP_PID=$!
+    for _attempt in {1..60}; do
+      if ! kill -0 "$APP_PID" >/dev/null 2>&1; then
+        wait "$APP_PID" >/dev/null 2>&1 || true
+        APP_PID=""
+        break
+      fi
+      if [[ -f "$cycle_log" ]] \
+          && grep -q "系统注册型录音快捷键已启用" "$cycle_log"; then
+        registered=true
+        break
+      fi
+      sleep 0.5
+    done
+    [[ "$registered" == "true" ]] && break
+    terminate_test_pid "$APP_PID"
+    APP_PID=""
+    print -u2 "Retrying cold start for hotkey $label ($startup_attempt/3)"
   done
   [[ "$registered" == "true" ]] || {
-    print -u2 "Timed out registering hotkey $label"
+    print -u2 "Veyqa Voice could not register hotkey $label after three cold starts"
+    sed -n '1,160p' "$cycle_data/console.log" >&2 || true
     exit 1
   }
 
@@ -233,10 +253,10 @@ run_hotkey_cycle "control-option-space" \
 run_hotkey_cycle "control-shift-k" \
   "keycode:40;mods:control+shift" "⌃⇧K" 40 393216
 
-print "[6/7] Running menu-bar/settings smoke test without login-item mutation"
+print "[6/7] Running Dock/settings smoke test without login-item mutation"
 VOICE_INPUT_DATA_DIR="$DATA_DIR" \
 VOICE_INPUT_DISABLE_LOGIN_SYNC=true \
-STATUS_BAR_SELF_TEST=true \
+DOCK_ENTRY_SELF_TEST=true \
   "$APP_PATH/Contents/MacOS/VeyqaVoice" >"$VERIFY_DIR/app.log" 2>&1 &
 APP_PID=$!
 
@@ -250,7 +270,7 @@ for _attempt in {1..60}; do
     exit 1
   fi
   if [[ -f "$status_log" ]] \
-      && grep -q "status item ready" "$status_log" \
+      && grep -q "dock entry ready; menu bar disabled" "$status_log" \
       && grep -q "settings process started" "$status_log" \
       && grep -Eq "settings process warming up|reused settings process" "$status_log" \
       && [[ -f "$runtime_log" ]] \
@@ -261,7 +281,7 @@ for _attempt in {1..60}; do
   sleep 0.5
 done
 [[ "$ready" == "true" ]] || {
-  print -u2 "Timed out waiting for menu-bar/settings smoke evidence"
+  print -u2 "Timed out waiting for Dock/settings smoke evidence"
   dump_smoke_logs
   exit 1
 }
@@ -279,7 +299,35 @@ if [[ -n "$SETTINGS_EXECUTABLE" ]] \
   exit 1
 fi
 
-print "[7/7] Artifact SHA-256"
+print "[7/8] Verifying automatic recovery from a stalled recording start"
+recovery_data="$VERIFY_DIR/automatic-recovery"
+mkdir -p "$recovery_data"
+print -r -- 'QWEN_API_KEY=
+GLOBAL_HOTKEY_BACKEND=off
+LAUNCH_AT_LOGIN=false' > "$recovery_data/.env"
+VOICE_INPUT_DATA_DIR="$recovery_data" \
+VOICE_INPUT_DISABLE_LOGIN_SYNC=true \
+VEYQA_HEALTH_SELF_TEST=true \
+  "$APP_PATH/Contents/MacOS/VeyqaVoice" --background-login >"$recovery_data/console.log" 2>&1 &
+APP_PID=$!
+recovered=false
+for _attempt in {1..90}; do
+  if [[ -f "$recovery_data/logs/app.log" ]] \
+      && [[ "$(grep -c '语音输入已启动' "$recovery_data/logs/app.log")" -ge 2 ]]; then
+    recovered=true
+    break
+  fi
+  sleep 0.5
+done
+[[ "$recovered" == "true" ]] || {
+  print -u2 "Automatic recovery did not restart the stalled runtime"
+  exit 1
+}
+kill -0 "$APP_PID"
+"$PROJECT_DIR/.venv/bin/python" -c 'import json,sys; from pathlib import Path; p=Path(sys.argv[1]); assert len(json.loads((p/"automatic-restarts.json").read_text())) == 1; assert "QWEN_API_KEY=\n" in (p/".env").read_text(); print("automatic_recovery=passed; configuration_preserved=yes")' "$recovery_data"
+stop_test_processes
+
+print "[8/8] Artifact SHA-256"
 for artifact in "$PKG_PATH" "$ZIP_PATH" "$DMG_PATH"; do
   if [[ -f "$artifact" ]]; then
     shasum -a 256 "$artifact"
