@@ -109,23 +109,6 @@ final class SettingsAppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-enum SettingsPane: String, CaseIterable, Identifiable {
-    case general = "通用"
-    case qwen = "千问"
-    case corrections = "共享纠错"
-    case recovery = "恢复与诊断"
-
-    var id: String { rawValue }
-    var icon: String {
-        switch self {
-        case .general: return "gearshape"
-        case .qwen: return "sparkles"
-        case .corrections: return "text.badge.checkmark"
-        case .recovery: return "lifepreserver"
-        }
-    }
-}
-
 struct CorrectionRule: Codable, Identifiable, Hashable {
     var wrong: String
     var correct: String
@@ -152,13 +135,6 @@ struct CorrectionFile: Codable {
 struct CorrectionEvent: Codable {
     var wrong: String
     var correct: String
-    var timestamp: String
-}
-
-struct RecoveryEntry: Codable, Identifiable, Hashable {
-    var id: String
-    var text: String
-    var reason: String
     var timestamp: String
 }
 
@@ -291,6 +267,8 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var permissionProcessRunning = false
     private var diagnosticsGate = SnapshotChangeGate()
     private var permissionsGate = SnapshotChangeGate()
+    private var recoveriesGate = SnapshotChangeGate()
+    private let recoveryQueue = DispatchQueue(label: "veyqa.recovery-edit", qos: .utility)
     private var correctionEvents: [CorrectionEvent] = []
     @Published var notice: String?
     @Published var errorMessage: String?
@@ -394,10 +372,14 @@ final class SettingsModel: ObservableObject {
     }
 
     func reloadRecoveries() {
-        guard let data = try? Data(contentsOf: recoveryURL),
-              let entries = try? JSONDecoder().decode([RecoveryEntry].self, from: data)
-        else {
+        let contents = try? Data(contentsOf: recoveryURL)
+        guard recoveriesGate.changed(contents) else { return }
+        guard let data = contents else {
             recoveries = []
+            return
+        }
+        guard let entries = try? JSONDecoder().decode([RecoveryEntry].self, from: data) else {
+            errorMessage = "恢复记录无法读取，原文件未被修改。请勿清理运行数据。"
             return
         }
         recoveries = entries
@@ -479,13 +461,17 @@ final class SettingsModel: ObservableObject {
     }
 
     func deleteRecoveries(ids: Set<String>) {
-        recoveries.removeAll { ids.contains($0.id) }
-        persistRecoveries()
-    }
-
-    func clearRecoveries() {
-        recoveries = []
-        persistRecoveries()
+        let url = recoveryURL
+        recoveryQueue.async {
+            do {
+                try RecoveryFile.delete(ids: ids, at: url)
+                DispatchQueue.main.async { self.reloadRecoveries() }
+            } catch {
+                DispatchQueue.main.async {
+                    self.errorMessage = "无法更新恢复记录，请稍后重试。原记录未被清空。"
+                }
+            }
+        }
     }
 
     func copyRecovery(_ entry: RecoveryEntry) {
@@ -493,14 +479,6 @@ final class SettingsModel: ObservableObject {
         pasteboard.clearContents()
         pasteboard.setString(entry.text, forType: .string)
         notice = "恢复文字已由你主动复制到剪贴板。"
-    }
-
-    private func persistRecoveries() {
-        do {
-            try Self.privateWrite(JSONEncoder.pretty.encode(recoveries), to: recoveryURL)
-        } catch {
-            errorMessage = "无法更新恢复记录：\(error.localizedDescription)"
-        }
     }
 
     func deleteCorrections(ids: Set<String>) {
@@ -767,16 +745,6 @@ final class SettingsModel: ObservableObject {
     static func bool(_ value: String?, fallback: Bool) -> Bool {
         guard let value else { return fallback }
         return value.lowercased() == "true"
-    }
-
-    static func defaultQwenAPIHost(region: String, apiKey: String) -> String {
-        if apiKey.hasPrefix("sk-sp-") {
-            return "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
-        }
-        if region == "singapore" {
-            return "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-        }
-        return "https://dashscope.aliyuncs.com/compatible-mode/v1"
     }
 
     static func label(for spec: String) -> String {
@@ -1579,18 +1547,19 @@ struct RecoverySettingsView: View {
     @ObservedObject var model: SettingsModel
     @State private var selection = Set<String>()
     @State private var confirmingClear = false
+    @State private var pendingClearIDs = Set<String>()
 
     var body: some View {
         VStack(spacing: 0) {
             Form {
                 Section("未写入文字") {
-                    Text("只有在录音期间焦点改变、目标输入框拒绝写入或千问连接中断时，最多保留最近 5 条。最终文字会短暂进入系统剪贴板，粘贴后恢复原内容。")
+                    Text("输入位置改变、写入失败、识别中断或可控自动恢复时，最多保留最近 5 条已识别文字。片段可能不完整，请确认后复制；不自动发送，也不因此保存录音。")
                         .foregroundStyle(.secondary)
                         .font(.callout)
                 }
                 Section("诊断") {
                     LabeledContent("版本") { Text(model.diagnostics.version ?? "未知") }
-                    LabeledContent("状态") { Text(model.diagnostics.state ?? "未运行") }
+                    LabeledContent("状态") { Text(stateLabel(model.diagnostics.state)) }
                     LabeledContent("麦克风") { Text(model.diagnostics.microphone ?? "未知") }
                     LabeledContent("采样率") {
                         Text(model.diagnostics.sampleRate.map { "\($0) Hz" } ?? "未知")
@@ -1683,15 +1652,28 @@ struct RecoverySettingsView: View {
                 } label: { Label("删除", systemImage: "trash") }
                 .disabled(selection.isEmpty)
                 Spacer()
-                Button("清空", role: .destructive) { confirmingClear = true }
+                Button("清空当前列表", role: .destructive) {
+                    pendingClearIDs = Set(model.recoveries.map(\.id))
+                    confirmingClear = true
+                }
                     .disabled(model.recoveries.isEmpty)
             }
             .padding(12)
         }
         .navigationTitle("恢复与诊断")
         .onAppear { model.reloadRecoveries() }
-        .confirmationDialog("确定清空全部恢复记录？", isPresented: $confirmingClear) {
-            Button("清空", role: .destructive) { model.clearRecoveries() }
+        .confirmationDialog("删除当前列表中的恢复文字？新收到的记录会保留。", isPresented: $confirmingClear) {
+            Button("清空当前列表", role: .destructive) { model.deleteRecoveries(ids: pendingClearIDs) }
+        }
+    }
+
+    private func stateLabel(_ state: String?) -> String {
+        switch state {
+        case "IDLE": return "就绪，按快捷键开始"
+        case "RECORDING": return "正在启动麦克风"
+        case "STREAMING": return "正在听写"
+        case "PROCESSING": return "正在完成识别"
+        default: return state ?? "未运行"
         }
     }
 
@@ -1704,6 +1686,9 @@ struct RecoverySettingsView: View {
         case "committed": return "已写入"
         case "cancelled": return "已取消"
         case "network_error": return "网络错误"
+        case "unexpected_error": return "识别意外中断，请重试"
+        case "incomplete": return "未收到完整结果，请查看恢复文字"
+        case "recovered": return "已保留识别片段，请确认后复制"
         case "not_committed": return "未写入（可恢复）"
         case "no_safe_result": return "未检测到可提交语音"
         default: return outcome
@@ -1777,6 +1762,7 @@ struct SettingsRootView: View {
             guard NSApp.isActive else { return }
             model.reloadDiagnostics()
             model.reloadPermissions()
+            model.reloadRecoveries()
             evaluatePermissionGate()
         }
         .sheet(isPresented: $showPermissions) {
@@ -1789,7 +1775,7 @@ struct SettingsRootView: View {
         .sheet(isPresented: $showVocabulary) {
             VocabularyEditorView(vocabulary: $model.customVocabulary)
         }
-        .alert("设置已保存", isPresented: Binding(
+        .alert("已完成", isPresented: Binding(
             get: { model.notice != nil },
             set: { if !$0 { model.notice = nil } }
         )) {
@@ -1797,7 +1783,7 @@ struct SettingsRootView: View {
         } message: {
             Text(model.notice ?? "")
         }
-        .alert("无法保存", isPresented: Binding(
+        .alert("操作未完成", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
         )) {

@@ -63,6 +63,21 @@ Left/right Option, Command, Control, or Fn can also be used alone. Modifier-only
 
 Public distribution still requires a stable Developer ID signature for the App/PKG and Apple notarization. The repository's `internal` artifacts are ad-hoc-signed test builds, not a universal public release.
 
+The default fast path adds no second LLM rewriting call and never auto-sends.
+Abnormal session exits release recording resources. Controlled recovery attempts
+to retain already-recognized safe text (up to five entries), without enabling
+audio archives. Recovery edits use a shared process lock and delete only selected
+IDs, preserving newer entries. Unrecognized audio, abrupt process termination,
+and storage failures are not guaranteed recoverable.
+
+Ad-hoc signing ties identity to a particular build, so privacy grants may need to
+be renewed after updates. Stable development/distribution identities and compatible
+designated requirements are the long-term solution; Developer ID and development
+signatures do not share that identity by default. Internal scripts still use ad-hoc
+signing. Do not reset TCC or bypass endpoint protection for routine tests.
+Permission checks now request only missing, required grants; registered combinations
+do not request Input Monitoring. See [Apple's explanation](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+
 Idle use: closing Settings releases its process. Unchanged snapshots do not
 redraw the UI or rewrite permission files. Background permission checks slow to
 30 seconds (about 2 seconds with Settings open); health checks stay at 2 seconds,

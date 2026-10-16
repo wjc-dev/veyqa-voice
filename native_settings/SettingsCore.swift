@@ -1,4 +1,39 @@
 import Foundation
+import Darwin
+
+struct RecoveryEntry: Codable, Identifiable, Hashable {
+    var id: String
+    var text: String
+    var reason: String
+    var timestamp: String
+}
+
+enum RecoveryFile {
+    /// Match Python RecoveryStore's stable sidecar lock; never rewrite a stale UI list.
+    static func delete(ids: Set<String>, at url: URL) throws {
+        guard !ids.isEmpty else { return }
+        let directory = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let lockURL = directory.appendingPathComponent(".\(url.lastPathComponent).lock")
+        let fd = Darwin.open(lockURL.path, O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0o600)
+        guard fd >= 0 else { throw POSIXError(.EIO) }
+        defer { Darwin.close(fd) }
+        let deadline = ProcessInfo.processInfo.systemUptime + 2
+        while flock(fd, LOCK_EX | LOCK_NB) != 0 {
+            guard errno == EWOULDBLOCK else { throw POSIXError(.EIO) }
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw NSError(domain: "RecoveryFile", code: 1,
+                              userInfo: [NSLocalizedDescriptionKey: "恢复记录正在更新，请稍后重试。"])
+            }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let current = try JSONDecoder().decode([RecoveryEntry].self, from: Data(contentsOf: url))
+        let remaining = current.filter { !ids.contains($0.id) }
+        guard remaining.count != current.count else { return }
+        try SettingsEnvironment.privateWrite(JSONEncoder().encode(remaining), to: url)
+    }
+}
 
 /// Avoid publishing identical on-disk snapshots back into SwiftUI every tick.
 struct SnapshotChangeGate {

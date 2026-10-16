@@ -7,6 +7,22 @@ from src.permissions import PermissionMonitor, required_permissions_granted
 
 
 class PermissionLogicTests(unittest.TestCase):
+    def test_request_all_only_requests_missing_required_permissions(self):
+        for backend, input_required in (("registered", False), ("passive", True)):
+            with self.subTest(backend=backend), tempfile.TemporaryDirectory() as directory:
+                monitor = PermissionMonitor(version="test", hotkey_backend=backend,
+                                            status_path=Path(directory) / "permissions.json")
+                with (
+                    patch.object(monitor, "_request_microphone") as mic,
+                    patch.object(monitor, "_request_accessibility") as access,
+                    patch.object(monitor, "_request_input_monitoring") as keyboard,
+                    patch.object(monitor, "_current_status", side_effect=lambda name: "granted" if name == "microphone" else "missing"),
+                ):
+                    monitor._request("all", open_settings=False)
+                mic.assert_not_called()
+                access.assert_called_once()
+                self.assertEqual(keyboard.call_count, int(input_required))
+
     def test_unchanged_permissions_are_not_written_again(self):
         with tempfile.TemporaryDirectory() as directory:
             monitor = PermissionMonitor(version="test", hotkey_backend="passive",

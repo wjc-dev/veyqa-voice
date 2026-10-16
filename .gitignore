@@ -50,6 +50,7 @@ corrections.json
 personal_context.txt
 custom_vocabulary.txt
 recovery.json
+.recovery.json.lock
 diagnostics.json
 health.json
 automatic-restarts.json

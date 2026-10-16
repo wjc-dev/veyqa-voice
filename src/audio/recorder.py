@@ -178,6 +178,7 @@ class AudioRecorder:
             self.record_start_time = None
             self._device_error_detected = False
             self._cancel_auto_stop_timer()
+            self._reset_recorded_audio()
             stream_to_close = self.stream
             self.stream = None
 

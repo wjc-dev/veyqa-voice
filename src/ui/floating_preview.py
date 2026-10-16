@@ -313,31 +313,52 @@ class FloatingPreviewWindow:
         self._height = 58.0
 
     def show(self) -> None:
-        def _show() -> None:
-            if self._panel is None:
-                self._create_panel()
-            self._animation_generation += 1
-            if _FOLLOW_CARET:
-                self._position_near_caret()
-            else:
-                self._position_fixed()
-            if self._text_label is not None:
-                self._text_label.setStringValue_("")
-            self._start_animation()
-            self._panel.setAlphaValue_(0.0)
-            self._panel.orderFrontRegardless()
-            self._is_visible = True
+        AppHelper.callAfter(self._show_now)
 
-            def animations(context) -> None:
-                context.setDuration_(0.24)
-                self._panel.animator().setAlphaValue_(1.0)
+    def _show_now(self) -> None:
+        """Main-thread rendering shared by dictation and brief static notices."""
+        if self._panel is None:
+            self._create_panel()
+        self._animation_generation += 1
+        if _FOLLOW_CARET:
+            self._position_near_caret()
+        else:
+            self._position_fixed()
+        if self._text_label is not None:
+            self._text_label.setStringValue_("")
+        self._start_animation()
+        self._panel.setAlphaValue_(0.0)
+        self._panel.orderFrontRegardless()
+        self._is_visible = True
 
-            NSAnimationContext.runAnimationGroup_completionHandler_(animations, None)
+        def animations(context) -> None:
+            context.setDuration_(0.24)
+            self._panel.animator().setAlphaValue_(1.0)
 
-        AppHelper.callAfter(_show)
+        NSAnimationContext.runAnimationGroup_completionHandler_(animations, None)
 
-    def hide(self) -> None:
+    def show_notice(self, message: str, *, is_relevant) -> None:
+        """Nonactivating, static, and short-lived; never dismiss a newer recording."""
+        def display() -> None:
+            if not is_relevant():
+                return
+            self._show_now()
+            self._stop_animation()
+            self._text_label.setStringValue_(message)
+            generation = self._animation_generation
+
+            def dismiss() -> None:
+                if generation == self._animation_generation:
+                    self.hide(expected_generation=generation)
+
+            AppHelper.callLater(4, dismiss)
+
+        AppHelper.callAfter(display)
+
+    def hide(self, *, expected_generation: int | None = None) -> None:
         def _hide() -> None:
+            if expected_generation is not None and expected_generation != self._animation_generation:
+                return
             if self._panel is None:
                 return
             self._animation_generation += 1

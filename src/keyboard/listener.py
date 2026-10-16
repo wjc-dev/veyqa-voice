@@ -506,15 +506,21 @@ class KeyboardManager:
             return [entry.get("text", "") for entry in persisted.load()]
         return list(self._recovery_texts)
 
-    def retain_recovery_text(self, text: str, reason: str) -> None:
+    def retain_recovery_text(self, text: str, reason: str) -> bool:
         """Retain a partial result without risking a commit to the wrong app."""
         text = sanitize_inline_text(text)
         if text:
             self._recovery_texts.appendleft(text)
             store = getattr(self, "recovery_store", None)
             if store is not None:
-                store.add(text, reason)
+                try:
+                    store.add(text, reason)
+                except (OSError, ValueError):
+                    logger.error("恢复记录写盘失败；文字暂存内存")
+                    self.show_error("恢复文字暂时无法保存，请勿退出应用")
+                    return False
         self.show_error(reason)
+        return bool(text)
 
     def type_text(self, text, error_message=None, target=_UNSET_TARGET) -> bool:
         """Commit one final transcription through a compatibility paste.
@@ -600,40 +606,12 @@ class KeyboardManager:
         )
 
     def _retain_failed_text(self, text: str, reason: str) -> bool:
-        if text:
-            self._recovery_texts.appendleft(text)
-            store = getattr(self, "recovery_store", None)
-            if store is not None:
-                store.add(text, reason)
-        logger.error("%s；结果已保留在本次运行的恢复记录中", reason)
-        self.show_error(reason)
+        self.retain_recovery_text(text, reason + "；请到恢复页复制文字")
         return False
 
     def _target_is_focused(self, target) -> bool:
         checker = getattr(self.correction_learner, "target_is_focused", None)
         return bool(checker and checker(target))
-
-    def _prefer_value_write(self, target) -> bool:
-        checker = getattr(self.correction_learner, "prefers_value_write", None)
-        if checker:
-            return bool(checker(target))
-        checker = getattr(self.correction_learner, "_is_openai_desktop_target", None)
-        return bool(checker and checker(target))
-
-    def _wait_for_inserted_text(
-        self,
-        target,
-        start: int,
-        text: str,
-        *,
-        attempts: int = 8,
-    ) -> bool:
-        for _ in range(attempts):
-            snapshot = self.correction_learner.snapshot(target)
-            if snapshot is not None and snapshot[0][start:start + len(text)] == text:
-                return True
-            time.sleep(0.025)
-        return False
 
     def _should_prepend_segment_space(self, target, snapshot, text: str) -> bool:
         previous = getattr(self, "_last_voice_insertion", None)

@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 import uuid
+from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -94,6 +95,7 @@ class VoiceSession:
     total_audio_ms: int = 0
     voiced_audio_ms: int = 0
     final_committed: bool = False
+    recovery_saved: bool = False
     outcome: str = "recording"
     lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
 
@@ -202,7 +204,9 @@ class VoiceAssistant:
     def _recover_runtime(self, reason: str) -> None:
         session = self._current_session
         if session is not None:
-            session.cancelled = True
+            with session.lock:
+                self._retain_session_preview(session, reason)
+                session.cancelled = True
         allowed = allow_automatic_restart()
         self.diagnostics.update(last_error=reason, recovery_status=(
             "正在自动恢复" if allowed else "恢复次数过多，请检查音频设备后重新启动"
@@ -244,18 +248,60 @@ class VoiceAssistant:
         with self._session_lock:
             return self._current_session is session
 
-    def _finish_session(self, session: VoiceSession) -> None:
-        with session.lock:
-            if session.completed:
-                return
-            session.completed = True
-        if not self._is_current(session):
-            return
+    def _finish_session(self, session: VoiceSession, *, notice: str = "") -> None:
+        # Serialize ownership and cleanup together: an old callback must never
+        # close the next session's microphone or reset its keyboard state.
         with self._session_lock:
-            if self._current_session is session:
+            if self._current_session is not session:
+                return
+            with session.lock:
+                if session.completed:
+                    return
+                session.completed = True
+            try:
+                self.audio_recorder.reset_streaming_state(reason="会话结束")
+            finally:
                 self._current_session = None
-        self.floating_preview.hide()
-        self.keyboard_manager.reset_state()
+                self._finished_session_id = session.session_id
+                self.floating_preview.hide()
+                self.keyboard_manager.reset_state()
+                if notice:
+                    session_id = session.session_id
+                    self.floating_preview.show_notice(notice, is_relevant=lambda: (
+                        self._current_session is None
+                        and self._finished_session_id == session_id
+                        and not getattr(self.keyboard_manager, "is_recording", False)
+                    ))
+
+    def _retain_session_preview(self, session: VoiceSession, reason: str) -> bool:
+        # Previews only enter this field after the speech/context safety gates.
+        # Never save cancelled content or duplicate a result handled by type_text.
+        with session.lock:
+            if (session.cancelled or session.final_emitted or session.recovery_saved
+                    or not session.latest_preview):
+                return False
+            try:
+                saved = self.keyboard_manager.retain_recovery_text(
+                    session.latest_preview, reason + "；已识别片段可在恢复页复制"
+                )
+                session.recovery_saved = saved is not False
+            except Exception:
+                logger.error("无法保存本轮恢复文字")
+            return session.recovery_saved
+
+    def _fail_session(self, session: VoiceSession, reason: str, outcome: str) -> None:
+        if not self._is_current(session) or session.cancelled:
+            return
+        notice = reason
+        try:
+            if self._retain_session_preview(session, reason):
+                notice = "已保留识别片段，请打开恢复页复制"
+            else:
+                self.keyboard_manager.show_error(reason)
+            self.diagnostics.update(last_error=reason)
+            self._record_session_diagnostics(session, outcome)
+        finally:
+            self._finish_session(session, notice=notice)
 
     def _record_session_diagnostics(self, session: VoiceSession, outcome: str) -> None:
         """Persist non-content quality signals for troubleshooting.
@@ -342,7 +388,7 @@ class VoiceAssistant:
             logger.error("启动录音失败: %s", exc)
             self.diagnostics.update(last_error="麦克风启动失败")
             self.keyboard_manager.show_error("麦克风启动失败")
-            self._finish_session(session)
+            self._finish_session(session, notice="麦克风启动失败，请检查设备与权限")
             return
 
         if session.cancelled or not self._is_current(session):
@@ -373,10 +419,12 @@ class VoiceAssistant:
             loop.run_until_complete(self._run_streaming(session))
         except Exception as exc:  # noqa: BLE001
             logger.error("%s流式线程异常: %s", self.engine_label, exc, exc_info=True)
-            if self._is_current(session) and not session.cancelled:
-                self.keyboard_manager.show_error(f"{self.engine_label}连接异常")
-                self._finish_session(session)
+            self._fail_session(session, f"{self.engine_label}识别意外中断", "unexpected_error")
+        else:
+            # Providers must complete explicitly; a silent return is not success.
+            self._fail_session(session, "识别未返回完整结果，请重试", "incomplete")
         finally:
+            loop.run_until_complete(loop.shutdown_asyncgens())
             loop.close()
             if self._streaming_thread is threading.current_thread():
                 self._streaming_thread = None
@@ -387,6 +435,7 @@ class VoiceAssistant:
             return
 
         self.floating_preview.show()
+        self.floating_preview.update_text("正在听写…")
         total_audio_ms = 0.0
         voiced_audio_ms = 0.0
         voice_gate_open = False
@@ -444,7 +493,11 @@ class VoiceAssistant:
                     logger.warning("已忽略本轮重复的最终回调")
                     return False
                 session.final_emitted = True
-            self._save_transcription_cache(session, text)
+            try:
+                self._save_transcription_cache(session, text)
+            except Exception:
+                # Optional archives must not prevent the actual dictation.
+                logger.warning("本地转写存档失败，继续写入文字")
             inserted = self.keyboard_manager.type_text(
                 text,
                 target=session.output_target,
@@ -485,11 +538,18 @@ class VoiceAssistant:
                 with session.lock:
                     committed = session.final_committed
                     had_preview = session.preview_count > 0
-                outcome = "committed" if committed else (
-                    "no_safe_result" if not had_preview else "not_committed"
-                )
-                self._record_session_diagnostics(session, outcome)
-                self._finish_session(session)
+                recovered = self._retain_session_preview(session, "未收到完整识别结果")
+                outcome = "committed" if committed else "recovered" if recovered else (
+                    "no_safe_result" if not had_preview else "not_committed")
+                notice = "" if committed else (
+                    "未检测到可用语音，请检查麦克风" if outcome == "no_safe_result"
+                    else "文字未写入，请打开恢复页查看")
+                try:
+                    if outcome == "no_safe_result":
+                        self.keyboard_manager.show_warning("未检测到可用语音，请检查麦克风后重试")
+                    self._record_session_diagnostics(session, outcome)
+                finally:
+                    self._finish_session(session, notice=notice)
 
         def on_error(error: str) -> None:
             nonlocal stream_failed
@@ -497,57 +557,42 @@ class VoiceAssistant:
                 return
             stream_failed = True
             logger.error("%s流式识别失败: %s", self.engine_label, error)
-            self.diagnostics.update(last_error=f"{self.engine_label}识别失败")
-            with session.lock:
-                recovery = session.latest_preview
-            if recovery and output_is_safe(recovery):
-                self.keyboard_manager.retain_recovery_text(
-                    recovery, f"{self.engine_label}连接中断"
-                )
-            else:
-                self.keyboard_manager.show_error(f"{self.engine_label}识别失败")
-            self.audio_recorder.reset_streaming_state(
-                reason=f"{self.engine_label}流式错误"
-            )
-            self._record_session_diagnostics(session, "network_error")
-            self._finish_session(session)
+            self._fail_session(session, f"{self.engine_label}连接中断，请检查网络或服务配置", "network_error")
 
         async def audio_chunks_with_levels():
             nonlocal total_audio_ms, voiced_audio_ms, voice_gate_open
-            async for chunk in self.audio_recorder.stream_audio_chunks(
+            async with aclosing(self.audio_recorder.stream_audio_chunks(
                 chunk_duration_ms=100,
                 target_sample_rate=16000,
-            ):
-                if not active():
-                    return
-                samples = np.frombuffer(chunk, dtype=np.int16)
-                if samples.size:
-                    rms = float(np.sqrt(np.mean(samples.astype(np.float32) ** 2)))
-                    chunk_ms = samples.size / 16.0
-                    total_audio_ms += chunk_ms
-                    if rms >= voice_rms_threshold:
-                        voiced_audio_ms += chunk_ms
-                    voice_gate_open = has_sufficient_speech(
-                        total_audio_ms,
-                        voiced_audio_ms,
-                        minimum_total_ms,
-                        minimum_voiced_ms,
-                    )
-                    with session.lock:
-                        session.total_audio_ms = int(total_audio_ms)
-                        session.voiced_audio_ms = int(voiced_audio_ms)
-                    normalized = max(0.0, min(1.0, (rms - 35.0) / 850.0))
-                    self.floating_preview.update_level(normalized ** 0.5 if normalized else 0.0)
-                yield chunk
+            )) as chunks:
+                async for chunk in chunks:
+                    if not active():
+                        return
+                    samples = np.frombuffer(chunk, dtype=np.int16)
+                    if samples.size:
+                        rms = float(np.sqrt(np.mean(samples.astype(np.float32) ** 2)))
+                        chunk_ms = samples.size / 16.0
+                        total_audio_ms += chunk_ms
+                        if rms >= voice_rms_threshold:
+                            voiced_audio_ms += chunk_ms
+                        voice_gate_open = has_sufficient_speech(
+                            total_audio_ms,
+                            voiced_audio_ms,
+                            minimum_total_ms,
+                            minimum_voiced_ms,
+                        )
+                        with session.lock:
+                            session.total_audio_ms = int(total_audio_ms)
+                            session.voiced_audio_ms = int(voiced_audio_ms)
+                        normalized = max(0.0, min(1.0, (rms - 35.0) / 850.0))
+                        self.floating_preview.update_level(normalized ** 0.5 if normalized else 0.0)
+                    yield chunk
 
-        await processor.process_audio_stream(
-            audio_chunks_with_levels(),
-            on_preview_text,
-            on_final_text,
-            on_complete,
-            on_error,
-            sample_rate=16000,
-        )
+        async with aclosing(audio_chunks_with_levels()) as chunks:
+            await processor.process_audio_stream(
+                chunks, on_preview_text, on_final_text, on_complete, on_error,
+                sample_rate=16000,
+            )
 
     def stop_streaming(self) -> None:
         with self._session_lock:
@@ -556,6 +601,7 @@ class VoiceAssistant:
             self.keyboard_manager.reset_state()
             return
         logger.info("停止本轮%s录音", self.engine_label)
+        self.floating_preview.update_text("正在完成识别…")
         audio = self.audio_recorder.stop_streaming_recording()
         self._archive_buffer(session, audio)
 

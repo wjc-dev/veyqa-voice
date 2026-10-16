@@ -52,6 +52,9 @@ class _Archive:
 
 
 class _Preview:
+    def __init__(self):
+        self.notices = []
+
     def show(self):
         pass
 
@@ -63,6 +66,9 @@ class _Preview:
 
     def update_text(self, _text):
         pass
+
+    def show_notice(self, text, **_kwargs):
+        self.notices.append(text)
 
 
 class _Status:
@@ -220,6 +226,115 @@ class VoiceSessionTests(unittest.TestCase):
         self.assertEqual(assistant.keyboard_manager.typed, [])
         self.assertEqual(assistant.diagnostics.values["last_session_outcome"], "cancelled")
         self.assertFalse(assistant.diagnostics.values["last_session_committed"])
+
+    def test_processor_setup_failure_releases_microphone(self):
+        class BrokenContext(_Qwen):
+            def recognition_context(self):
+                raise RuntimeError("synthetic setup failure")
+
+        assistant = self.make_assistant()
+        assistant.processor = BrokenContext()
+        assistant.start_streaming()
+        self.wait_for_thread(assistant)
+        self.assertFalse(assistant.audio_recorder.recording)
+        self.assertIsNone(assistant._current_session)
+        self.assertEqual(assistant.diagnostics.values["last_session_outcome"], "unexpected_error")
+        self.assertTrue(assistant.floating_preview.notices)
+
+    def test_unexpected_exception_retains_safe_preview_once(self):
+        class BrokenStream(_Qwen):
+            async def process_audio_stream(self, chunks, preview, *_callbacks, **_kwargs):
+                for _ in range(2):
+                    await anext(chunks)
+                preview("原话仍然在这里")
+                raise RuntimeError("synthetic stream failure")
+
+        assistant = self.make_assistant()
+        assistant.processor = BrokenStream()
+        assistant.start_streaming()
+        self.wait_for_thread(assistant)
+        self.assertFalse(assistant.audio_recorder.recording)
+        self.assertEqual([text for text, _ in assistant.keyboard_manager.recovered], ["原话仍然在这里"])
+        self.assertEqual(assistant.keyboard_manager.typed, [])
+
+    def test_completion_without_final_recovers_preview_and_releases_mic(self):
+        class IncompleteStream(_Qwen):
+            async def process_audio_stream(self, chunks, preview, final, complete, error, **_kwargs):
+                for _ in range(2):
+                    await anext(chunks)
+                preview("已经识别的片段")
+                complete()
+                complete()
+
+        assistant = self.make_assistant()
+        assistant.processor = IncompleteStream()
+        assistant.start_streaming()
+        self.wait_for_thread(assistant)
+        self.assertFalse(assistant.audio_recorder.recording)
+        self.assertEqual(len(assistant.keyboard_manager.recovered), 1)
+        self.assertEqual(assistant.diagnostics.values["last_session_outcome"], "recovered")
+
+    def test_return_without_callbacks_does_not_leave_recording(self):
+        class EmptyStream(_Qwen):
+            async def process_audio_stream(self, *_args, **_kwargs):
+                return
+
+        assistant = self.make_assistant()
+        assistant.processor = EmptyStream()
+        assistant.start_streaming()
+        self.wait_for_thread(assistant)
+        self.assertFalse(assistant.audio_recorder.recording)
+        self.assertIsNone(assistant._current_session)
+
+    def test_automatic_restart_saves_preview_before_replacing_process(self):
+        assistant = self.make_assistant()
+        session = app_main.VoiceSession("test", None, latest_preview="重启前的原话")
+        assistant._current_session = session
+        def verify_saved(**_kwargs):
+            self.assertEqual([x[0] for x in assistant.keyboard_manager.recovered], ["重启前的原话"])
+        with patch.object(app_main, "allow_automatic_restart", return_value=True), \
+             patch.object(assistant, "_restart_application", side_effect=verify_saved) as restart:
+            assistant._recover_runtime("设备超时")
+        restart.assert_called_once()
+        self.assertTrue(session.cancelled)
+
+    def test_cancelled_or_already_emitted_text_is_not_recovered_on_restart(self):
+        assistant = self.make_assistant()
+        with patch.object(app_main, "allow_automatic_restart", return_value=False):
+            for flags in ({"cancelled": True}, {"final_emitted": True}):
+                assistant._current_session = app_main.VoiceSession(
+                    "test", None, latest_preview="不应重复保存", **flags
+                )
+                assistant._recover_runtime("设备超时")
+        self.assertEqual(assistant.keyboard_manager.recovered, [])
+
+    def test_old_session_cleanup_does_not_stop_new_microphone(self):
+        assistant = self.make_assistant()
+        old = app_main.VoiceSession("old", None)
+        current = app_main.VoiceSession("current", None)
+        assistant._current_session = current
+        assistant.audio_recorder.recording = True
+        assistant._finish_session(old)
+        self.assertTrue(assistant.audio_recorder.recording)
+        self.assertIs(assistant._current_session, current)
+
+    def test_user_cancel_never_retains_partial_text(self):
+        assistant = self.make_assistant()
+        session = app_main.VoiceSession("test", None, latest_preview="取消后不应保留")
+        assistant._current_session = session
+        assistant.audio_recorder.recording = True
+        assistant.cancel_streaming()
+        self.assertFalse(assistant.audio_recorder.recording)
+        self.assertEqual(assistant.keyboard_manager.recovered, [])
+        self.assertEqual(assistant.floating_preview.notices, [])
+
+    def test_archive_failure_does_not_discard_final_text(self):
+        assistant = self.make_assistant()
+        with patch.object(assistant, "_save_transcription_cache", side_effect=OSError("disk full")):
+            assistant.start_streaming()
+            assistant.stop_streaming()
+            self.wait_for_thread(assistant)
+        self.assertEqual(len(assistant.keyboard_manager.typed), 1)
 
 
 if __name__ == "__main__":

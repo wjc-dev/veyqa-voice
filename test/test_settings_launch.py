@@ -13,6 +13,9 @@ class SettingsLaunchTests(unittest.TestCase):
         self.assertIn("applicationShouldTerminateAfterLastWindowClosed", swift)
         self.assertIn("guard NSApp.isActive else { return }", swift)
         self.assertIn("guard diagnosticsGate.changed(contents) else { return }", swift)
+        self.assertIn("guard recoveriesGate.changed(contents) else { return }", swift)
+        self.assertIn("RecoveryFile.delete(ids: ids, at: url)", swift)
+        self.assertNotIn("persistRecoveries()", swift)
 
     def test_status_log_rotates_and_logging_failure_is_nonfatal(self):
         with tempfile.TemporaryDirectory() as directory:

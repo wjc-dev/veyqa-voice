@@ -229,12 +229,13 @@ class PermissionMonitor:
             self._request_lock.release()
 
     def _request(self, permission: str, *, open_settings: bool) -> None:
-        requested = (
-            ["microphone", "accessibility", "input_monitoring"]
-            if permission == "all"
-            else [permission]
-        )
+        required = ["microphone", "accessibility"]
+        if self.hotkey_backend == "passive":
+            required.append("input_monitoring")
+        requested = required if permission == "all" else [permission]
         for item in requested:
+            if item not in required or self._current_status(item) == "granted":
+                continue
             if item == "microphone":
                 self._request_microphone()
             elif item == "accessibility":
@@ -244,6 +245,7 @@ class PermissionMonitor:
         if (
             open_settings
             and permission != "all"
+            and permission in required
             and self._current_status(permission) != "granted"
         ):
             self._open_settings(permission)

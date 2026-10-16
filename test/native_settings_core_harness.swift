@@ -105,6 +105,17 @@ struct SettingsCoreHarness {
         defer { try? FileManager.default.removeItem(at: directory) }
         let envURL = directory.appendingPathComponent(".env")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let recoveryURL = directory.appendingPathComponent("recovery.json")
+        let entries = [
+            RecoveryEntry(id: "new", text: "刚刚恢复", reason: "失败", timestamp: "now"),
+            RecoveryEntry(id: "old", text: "旧文字", reason: "失败", timestamp: "before"),
+        ]
+        try SettingsEnvironment.privateWrite(JSONEncoder().encode(entries), to: recoveryURL)
+        try RecoveryFile.delete(ids: ["old"], at: recoveryURL)
+        let kept = try JSONDecoder().decode([RecoveryEntry].self, from: Data(contentsOf: recoveryURL))
+        require(kept.map(\.id) == ["new"], "stale selection preserves unseen recovery")
+        let recoveryLock = directory.appendingPathComponent(".recovery.json.lock")
+        require(FileManager.default.fileExists(atPath: recoveryLock.path), "shared Python/Swift lock path")
         try Data("# preserve this comment\nVOICE_HOTKEY=right_option\n".utf8).write(to: envURL)
 
         try SettingsEnvironment.update(envURL, updates: [

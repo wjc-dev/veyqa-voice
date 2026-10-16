@@ -8,6 +8,16 @@ from src.audio.recorder import AudioRecorder
 
 
 class StreamingAudioTests(unittest.IsolatedAsyncioTestCase):
+    def test_reset_releases_buffered_audio_without_opening_device(self):
+        recorder = AudioRecorder()
+        recorder._recorded_chunks = [np.ones((16000, 1), dtype=np.float32)]
+        recorder.audio_queue.put(recorder._recorded_chunks[0])
+        recorder.recording = True
+        recorder.reset_streaming_state()
+        self.assertFalse(recorder.recording)
+        self.assertEqual(recorder._recorded_chunks, [])
+        self.assertTrue(recorder.audio_queue.empty())
+
     async def test_48khz_chunks_resample_continuously_to_16khz(self):
         recorder = AudioRecorder.__new__(AudioRecorder)
         recorder.sample_rate = 48000

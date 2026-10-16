@@ -11,9 +11,44 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from src.ui import floating_preview as fp
+
+
+class NoticeTests(unittest.TestCase):
+    def test_notice_stops_animation_and_old_timer_cannot_hide_next_recording(self):
+        preview = fp.FloatingPreviewWindow()
+        preview._text_label = Mock()
+        preview._show_now = Mock(side_effect=lambda: setattr(preview, "_animation_generation", 10))
+        preview._stop_animation = Mock()
+        preview.hide = Mock()
+        with patch.object(fp.AppHelper, "callAfter", side_effect=lambda fn: fn()), \
+             patch.object(fp.AppHelper, "callLater") as later:
+            preview.show_notice("文字已保留", is_relevant=lambda: True)
+        preview._text_label.setStringValue_.assert_called_with("文字已保留")
+        preview._stop_animation.assert_called_once()
+        dismiss = later.call_args.args[1]
+        preview._animation_generation += 1
+        dismiss()
+        preview.hide.assert_not_called()
+
+    def test_late_notice_does_not_replace_new_recording(self):
+        preview = fp.FloatingPreviewWindow()
+        preview._show_now = Mock()
+        with patch.object(fp.AppHelper, "callAfter", side_effect=lambda fn: fn()):
+            preview.show_notice("旧会话失败", is_relevant=lambda: False)
+        preview._show_now.assert_not_called()
+
+    def test_queued_hide_checks_generation_when_it_actually_runs(self):
+        preview = fp.FloatingPreviewWindow()
+        preview._panel = Mock()
+        preview._animation_generation = 10
+        with patch.object(fp.AppHelper, "callAfter") as queued:
+            preview.hide(expected_generation=10)
+        preview._animation_generation = 11
+        queued.call_args.args[0]()
+        preview._panel.animator.assert_not_called()
 
 
 class _Point(SimpleNamespace):
