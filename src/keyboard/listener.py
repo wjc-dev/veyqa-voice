@@ -553,10 +553,9 @@ class KeyboardManager:
             snapshot = self.correction_learner.snapshot(target)
             if snapshot is None:
                 return self._retain_failed_text(text, "当前输入框不可读取")
-            text = self._trim_recent_voice_overlap(target, snapshot, text)
-            if not text:
-                logger.warning("已忽略与上一轮重叠的近期语音结果")
-                return True
+            # Each call is a distinct completed voice turn. Repeated wording is
+            # legitimate; duplicate callbacks are gated by VoiceSession, not by
+            # comparing content with a previous turn.
             if self._should_prepend_segment_space(target, snapshot, text):
                 text = " " + text
 
@@ -574,7 +573,6 @@ class KeyboardManager:
                 "target": target,
                 "end": desired_caret,
                 "text": text,
-                "committed_at": time.monotonic(),
             }
             logger.info("文本输入完成（%d 个字符）", len(text))
             return True
@@ -635,41 +633,6 @@ class KeyboardManager:
             not current[selection_start - 1:selection_start].isspace()
             and not text[:1].isspace()
         )
-
-    def _trim_recent_voice_overlap(self, target, snapshot, text: str) -> str:
-        """Avoid re-inserting the overlapping part of an adjacent voice turn."""
-        previous = getattr(self, "_last_voice_insertion", None)
-        if not previous or snapshot is None or not text:
-            return text
-        committed_at = previous.get("committed_at")
-        if committed_at is None or time.monotonic() - committed_at > 10.0:
-            return text
-        same_target = getattr(self.correction_learner, "same_target", None)
-        if not same_target or not same_target(previous.get("target"), target):
-            return text
-
-        current, start, end = snapshot
-        previous_text = str(previous.get("text") or "")
-        previous_end = previous.get("end")
-        if (
-            start != end
-            or start != previous_end
-            or not previous_text
-            or not current[:start].endswith(previous_text)
-        ):
-            return text
-
-        left = previous_text.lstrip()
-        right = text.lstrip()
-        maximum = min(len(left), len(right))
-        overlap = 0
-        for size in range(maximum, 3, -1):
-            if left[-size:] == right[:size]:
-                overlap = size
-                break
-        if overlap < 4 or overlap / max(1, min(len(left), len(right))) < 0.6:
-            return text
-        return right[overlap:].lstrip()
 
     @staticmethod
     def _modifier_mask(names) -> int:

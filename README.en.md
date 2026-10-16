@@ -1,8 +1,8 @@
 # Veyqa Voice
 
-> Status (2026-10-16): the source tree is a **0.2.2 development candidate**.
-> Homebrew still installs **0.2.0**, without these new fixes. Final package
-> validation, Developer ID signing, and notarization are not complete.
+> Status (2026-10-16): **0.2.2 Preview** is a beta, not a zero-defect guarantee.
+> Public packages remain ad-hoc signed and unnotarized. Locally pinned certificate
+> builds are separate. See the [verification record](docs/release-candidate-verification.md).
 
 Stability update: bounded automatic recovery for stalled recording/recognition,
 functional heartbeats, and hotkey release reconciliation. Qwen setup now needs
@@ -73,8 +73,24 @@ and storage failures are not guaranteed recoverable.
 Ad-hoc signing ties identity to a particular build, so privacy grants may need to
 be renewed after updates. Stable development/distribution identities and compatible
 designated requirements are the long-term solution; Developer ID and development
-signatures do not share that identity by default. Internal scripts still use ad-hoc
-signing. Do not reset TCC or bypass endpoint protection for routine tests.
+signatures do not share that identity by default. A free local option is a dedicated,
+user-approved self-signed code-signing certificate in Keychain. Save its exact SHA-1
+fingerprint in `~/Library/Application Support/Veyqa Build/signing-identity.sha1`:
+build scripts reuse it and fail closed if missing. The private key stays out of Git.
+Initial identity changes may still require permission approval.
+
+Pinned builds go to `dist-local/` with a `-local` filename suffix and are for that
+Mac only. `VEYQA_SIGNING_IDENTITY=- zsh build-internal-dmg.command` explicitly builds
+ad-hoc test packages in `dist-internal/` without changing the saved identity.
+Do not overwrite a locally signed daily-use app with the public Homebrew package:
+changing identity may require reauthorization. Scripts do not create certificates,
+change trust, or implement Developer ID notarization/Installer signing. Do not
+reset TCC or bypass endpoint protection. Test local builds at their fixed install
+path, not via the temporary-app verifier.
+
+Separate dictation turns preserve repeated and overlapping wording. Only duplicate
+final callbacks within the same session are suppressed; no extra rewriting call
+or waiting period is added.
 Permission checks now request only missing, required grants; registered combinations
 do not request Input Monitoring. See [Apple's explanation](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
 

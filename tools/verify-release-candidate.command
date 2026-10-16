@@ -12,6 +12,13 @@ if [[ "${VEYQA_ALLOW_GUI_SMOKE_TESTS:-false}" != "true" ]]; then
 fi
 
 PROJECT_DIR="${0:A:h:h}"
+source "$PROJECT_DIR/packaging/signing.zsh"
+veyqa_configure_signing
+if [[ "$VEYQA_SIGNING_PROFILE" != "internal" ]]; then
+  print -u2 "Stopped: local-signed builds must be tested at the fixed installation path, not as temporary duplicate Apps."
+  print -u2 "This legacy internal verifier requires VEYQA_SIGNING_IDENTITY=- in an approved test environment."
+  exit 2
+fi
 VERSION="0.2.2"
 OUTPUT_DIR="${1:-$PROJECT_DIR/dist-internal}"
 ZIP_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64.zip"

@@ -2,6 +2,8 @@
 set -euo pipefail
 
 PROJECT_DIR="${0:A:h}"
+source "$PROJECT_DIR/packaging/signing.zsh"
+veyqa_configure_signing
 cd "$PROJECT_DIR"
 mkdir -p build/swift-module-cache build/clang-module-cache
 SETTINGS_APP="$PROJECT_DIR/build/VeyqaSettings.app"
@@ -26,7 +28,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macos13.0 \
   native_settings/VoiceInputSettings.swift \
   -o "$SETTINGS_EXECUTABLE"
 
-/usr/bin/codesign --force --sign - --timestamp=none "$SETTINGS_APP"
+veyqa_sign "$SETTINGS_APP"
 /usr/bin/codesign --verify --deep --strict "$SETTINGS_APP"
 
 print "已生成：$SETTINGS_APP"

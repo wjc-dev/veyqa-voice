@@ -1,5 +1,6 @@
 import unittest
 import tempfile
+import plistlib
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -7,6 +8,35 @@ from src import login_item
 
 
 class LoginItemTests(unittest.TestCase):
+    def test_local_signing_uses_separate_service_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory) / "Veyqa Voice.app"
+            (bundle / "Contents").mkdir(parents=True)
+            (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps({"VeyqaSigningProfile": "local"}))
+            with patch.object(login_item, "app_bundle_path", return_value=bundle):
+                self.assertEqual(login_item._agent_plist_name(), "com.wjcdev.veyqa.local.agent.plist")
+
+    def test_local_migration_unregisters_old_identity_before_registering(self):
+        events = []
+        old, current = MagicMock(), MagicMock()
+        old.status.return_value = 1
+        old.unregisterAndReturnError_.side_effect = lambda _: (events.append("unregister_old") is None, None)
+        current.status.side_effect = [0, 1]
+        current.registerAndReturnError_.side_effect = lambda _: (events.append("register_local") is None, None)
+        framework = MagicMock()
+        framework.SMAppService.agentServiceWithPlistName_.side_effect = lambda name: (
+            old if name == login_item.AGENT_PLIST_NAME else current)
+        with (
+            patch.object(login_item, "IS_FROZEN", True),
+            patch.object(login_item, "_agent_plist_name", return_value=login_item.LOCAL_AGENT_PLIST_NAME),
+            patch.object(login_item, "_registration_identity", return_value=""),
+            patch.dict("sys.modules", {"ServiceManagement": framework}),
+            patch.object(login_item, "_retire_legacy_agents"),
+            patch.object(login_item, "_legacy_app_is_running", return_value=False),
+        ):
+            self.assertEqual(login_item.sync_login_item(True).status, "enabled")
+        self.assertEqual(events, ["unregister_old", "register_local"])
+
     def test_upgrade_refreshes_stale_enabled_registration_once(self):
         service = MagicMock()
         service.status.return_value = 1

@@ -21,6 +21,7 @@ from src.utils.logger import logger
 
 
 AGENT_PLIST_NAME = "com.wjcdev.veyqa.agent.plist"
+LOCAL_AGENT_PLIST_NAME = "com.wjcdev.veyqa.local.agent.plist"
 SUPERVISOR_PAUSE_FILE = DATA_DIR / ".supervisor-paused"
 REGISTRATION_FILE = DATA_DIR / "login-item-registration.json"
 _STATUS_NAMES = {
@@ -44,6 +45,19 @@ class LoginItemResult:
     status: str
     changed: bool = False
     error: str = ""
+
+
+def _agent_plist_name() -> str:
+    bundle = app_bundle_path()
+    if bundle is not None:
+        try:
+            with (bundle / "Contents/Info.plist").open("rb") as handle:
+                info = plistlib.load(handle)
+            if info.get("VeyqaSigningProfile") == "local":
+                return LOCAL_AGENT_PLIST_NAME
+        except (OSError, ValueError):
+            pass
+    return AGENT_PLIST_NAME
 
 
 def _status_name(value: int) -> str:
@@ -122,7 +136,17 @@ def sync_login_item(enabled: bool) -> LoginItemResult:
     try:
         import ServiceManagement as SM
 
-        service = SM.SMAppService.agentServiceWithPlistName_(AGENT_PLIST_NAME)
+        plist_name = _agent_plist_name()
+        if plist_name == LOCAL_AGENT_PLIST_NAME:
+            # BTM can retain a launch constraint from an older ad-hoc identity.
+            # A distinct local service has its own normal system approval and
+            # constraint; never reset BTM globally or disable its checks.
+            previous_service = SM.SMAppService.agentServiceWithPlistName_(AGENT_PLIST_NAME)
+            if _status_name(previous_service.status()) in {"enabled", "requires_approval"}:
+                ok, error = previous_service.unregisterAndReturnError_(None)
+                if not ok:
+                    return LoginItemResult("error", error=str(error or "停用旧签名后台服务失败"))
+        service = SM.SMAppService.agentServiceWithPlistName_(plist_name)
         before = _status_name(service.status())
         changed = False
 

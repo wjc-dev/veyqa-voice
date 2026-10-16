@@ -67,7 +67,7 @@ app = BUNDLE(
         "CFBundleDisplayName": "Veyqa Voice",
         "CFBundleName": "Veyqa Voice",
         "CFBundleShortVersionString": "0.2.2",
-        "CFBundleVersion": "202",
+        "CFBundleVersion": "205",
         "LSMinimumSystemVersion": "13.0",
         "LSUIElement": False,
         "NSHighResolutionCapable": True,

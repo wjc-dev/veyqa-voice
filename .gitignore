@@ -59,6 +59,7 @@ login-item-registration.json
 .health-fault-injected
 
 .claude
+dist-local/
 
 # 忽略 trash 目录
 trash/

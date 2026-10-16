@@ -2,7 +2,7 @@
 
 [English](./README.en.md) · 简体中文
 
-> 版本状态（2026-10-16）：当前源码为 **0.2.2 开发候选版**；Homebrew 安装包仍是 **0.2.0**，不包含本轮稳定性、低占用与简化配置改动。新版安装包的最终验收、签名与公证尚未完成，请勿把源码测试通过视为正式版发布。
+> 版本状态（2026-10-16）：**0.2.2 Preview** 是测试版，不承诺零缺陷。公开安装包仍为 ad-hoc 签名、未经 Apple 公证；本机固定证书构建与公开包分开。实际验收范围和限制见 [验证记录](docs/release-candidate-verification.md)。
 
 macOS 上的语音速记工具。按住快捷键说话,松开,文字落到光标处。
 
@@ -58,12 +58,16 @@ brew install --cask wjc-dev/veyqa/veyqa-voice
 
 恢复列表只在数据变化时刷新，删除按选中的记录 ID 操作，不覆盖后来新增的文字。短暂的浮窗提示不抢输入焦点，也不会关闭下一次录音。
 
+每次独立听写都保留完整原话，不再根据上一轮的相同或重叠内容删字；同一轮识别的重复最终回调仍只提交一次。
+
 ### 为什么调试更新后会重新授权？
 
 当前 internal 构建使用 ad-hoc 签名，身份与具体代码版本绑定，换构建后可能无法复用隐私授权；只固定 App 名称、Bundle ID 或安装路径并不能解决。见 [Apple 关于签名身份与隐私授权的说明](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)。
 
 - 长期方案：开发构建持续使用一致的 Apple Development 身份，公开分发使用 Developer ID；保持各自兼容的 designated requirement。开发/发布签名默认不同，不要轮流覆盖同一日用 App 并假定权限能共享。
-- 日常调试先运行不启动 App 的单元测试和 Swift 类型检查；需要端到端测试时，在获准环境使用固定的开发 App 身份，独立于日用安装包。现有脚本仍为 internal 临时签名构建，不自动创建证书或绕过防护。
+- 免费的本机开发方案：用户自行创建并批准专用自签名代码签名证书，将其 SHA-1 指纹保存到 `~/Library/Application Support/Veyqa Build/signing-identity.sha1`。打包脚本会复用该身份，证书缺失就停止，不自动退回 ad-hoc；私钥留在钥匙串，不进入仓库。首次切换身份可能仍需授权，不能保证所有系统版本永不重新询问。
+- 固定身份构建输出到 `dist-local/`，文件名带 `-local`，仅供本机使用。`VEYQA_SIGNING_IDENTITY=- zsh build-internal-dmg.command` 显式生成 `dist-internal/` ad-hoc 测试包，不修改本机签名选择。不要用 Homebrew 公开包覆盖固定签名的日用 App，否则身份改变可能再次要求授权。
+- 日常调试先运行不启动 App 的单元测试和 Swift 类型检查；需要端到端测试时，只在获准环境执行。脚本不创建证书、不修改信任或绕过防护；固定身份包必须在固定安装路径测试，不能交给临时 App 验收脚本。此本机签名流程不包含 Developer ID、公证或 Installer 签名。
 - 「检查并授权」只请求尚未授予的必要权限。普通组合键不需要输入监控；左右 Option、Command、Control 或 Fn 单键仍需要。不会自动更改已有快捷键。
 - 首次授权仍须用户确认；不会修改 TCC 数据库、重置已有权限或关闭系统/终端安全防护。公证也不等于预先授予隐私权限。
 

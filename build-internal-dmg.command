@@ -2,8 +2,14 @@
 set -euo pipefail
 
 PROJECT_DIR="${0:A:h}"
+source "$PROJECT_DIR/packaging/signing.zsh"
+veyqa_configure_signing
 VERSION="0.2.2"
-OUTPUT_DIR="${1:-$PROJECT_DIR/dist-internal}"
+OUTPUT_DIR="${1:-$PROJECT_DIR/dist-$VEYQA_SIGNING_PROFILE}"
+BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-205}"
+[[ "$BUILD_NUMBER" == <-> ]] || { print -u2 "Invalid build number"; exit 1; }
+ARTIFACT_SUFFIX=""
+[[ "$VEYQA_SIGNING_PROFILE" == "local" ]] && ARTIFACT_SUFFIX="-local"
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
 WORK_DIR="$PROJECT_DIR/.package-build/$RUN_ID"
 PYINSTALLER_WORK="$WORK_DIR/pyinstaller"
@@ -12,9 +18,9 @@ ICONSET="$WORK_DIR/AppIcon.iconset"
 STAGING="$WORK_DIR/dmg"
 CLANG_CACHE="$WORK_DIR/clang-module-cache"
 APP_PATH="$PYINSTALLER_DIST/Veyqa Voice.app"
-DMG_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64.dmg"
-ZIP_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64.zip"
-PKG_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64.pkg"
+DMG_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64${ARTIFACT_SUFFIX}.dmg"
+ZIP_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64${ARTIFACT_SUFFIX}.zip"
+PKG_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64${ARTIFACT_SUFFIX}.pkg"
 
 cleanup() {
   # Generated .app bundles must not remain under the source tree. LaunchServices
@@ -73,25 +79,18 @@ ditto "$PROJECT_DIR/build/VeyqaSettings.app" \
   "$APP_PATH/Contents/Helpers/VeyqaSettings.app"
 cp "$PROJECT_DIR/packaging/com.wjcdev.veyqa.agent.plist" \
   "$APP_PATH/Contents/Library/LaunchAgents/com.wjcdev.veyqa.agent.plist"
+if [[ "$VEYQA_SIGNING_PROFILE" == "local" ]]; then
+  cp "$PROJECT_DIR/packaging/com.wjcdev.veyqa.agent.plist" \
+    "$APP_PATH/Contents/Library/LaunchAgents/com.wjcdev.veyqa.local.agent.plist"
+  /usr/libexec/PlistBuddy -c 'Set :Label com.wjcdev.veyqa.local.agent' \
+    "$APP_PATH/Contents/Library/LaunchAgents/com.wjcdev.veyqa.local.agent.plist"
+fi
 cp "$PROJECT_DIR/build/VeyqaSupervisor" \
   "$APP_PATH/Contents/Resources/VeyqaSupervisor"
 
-while IFS= read -r -d '' FILE; do
-  if [[ -x "$FILE" || "$FILE" == *.dylib || "$FILE" == *.so ]]; then
-    /usr/bin/codesign --force --sign - --timestamp=none "$FILE"
-  fi
-done < <(find "$APP_PATH/Contents" -type f -print0)
-
-/usr/bin/codesign --force --sign - --timestamp=none \
-  "$APP_PATH/Contents/Helpers/VeyqaSettings.app"
-
-/usr/bin/codesign --force --sign - --timestamp=none \
-  --entitlements "$PROJECT_DIR/packaging/voice_input.entitlements" \
-  "$APP_PATH/Contents/MacOS/VeyqaVoice"
-/usr/bin/codesign --force --sign - --timestamp=none \
-  --entitlements "$PROJECT_DIR/packaging/voice_input.entitlements" \
-  "$APP_PATH"
-/usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_PATH/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :VeyqaSigningProfile string $VEYQA_SIGNING_PROFILE" "$APP_PATH/Contents/Info.plist"
+veyqa_sign_app "$APP_PATH" "$PROJECT_DIR/packaging/voice_input.entitlements"
 
 /usr/bin/pkgbuild \
   --component "$APP_PATH" \

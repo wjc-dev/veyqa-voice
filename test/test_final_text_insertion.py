@@ -248,23 +248,24 @@ class FinalTextInsertionTests(unittest.TestCase):
         self.assertEqual(manager.correction_learner.current_text, "已有文字第一段 第二段")
         self.assertEqual(manager.pasted_texts[-1], " 第二段")
 
-    def test_recent_exact_duplicate_voice_segment_is_not_inserted_twice(self):
+    def test_separate_identical_voice_turns_are_all_inserted(self):
         manager = self.make_manager()
         with patch("src.keyboard.listener.time.sleep", return_value=None):
-            self.assertTrue(manager.type_text("你现在是可以用的吗", None))
-            self.assertTrue(manager.type_text("你现在是可以用的吗", None))
+            for _ in range(3):
+                self.assertTrue(manager.type_text("你现在是可以用的吗", None))
 
-        self.assertEqual(manager.correction_learner.current_text, "已有文字你现在是可以用的吗")
-        self.assertEqual(len(manager.pasted_texts), 1)
+        self.assertEqual(manager.correction_learner.current_text,
+                         "已有文字你现在是可以用的吗 你现在是可以用的吗 你现在是可以用的吗")
+        self.assertEqual(len(manager.pasted_texts), 3)
 
-    def test_recent_overlapping_voice_segment_only_appends_new_suffix(self):
+    def test_separate_overlapping_voice_turns_preserve_every_word(self):
         manager = self.make_manager()
         with patch("src.keyboard.listener.time.sleep", return_value=None):
             manager.type_text("你现在可以", None)
             manager.type_text("现在可以继续吗", None)
 
-        self.assertEqual(manager.correction_learner.current_text, "已有文字你现在可以 继续吗")
-        self.assertEqual(manager.pasted_texts[-1], " 继续吗")
+        self.assertEqual(manager.correction_learner.current_text, "已有文字你现在可以 现在可以继续吗")
+        self.assertEqual(manager.pasted_texts[-1], " 现在可以继续吗")
 
     def test_moving_caret_does_not_add_voice_segment_separator(self):
         manager = self.make_manager()
