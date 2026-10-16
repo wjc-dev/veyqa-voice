@@ -4,7 +4,7 @@ set -euo pipefail
 PROJECT_DIR="${0:A:h}"
 PROJECT_PARENT="${PROJECT_DIR:h}"
 VERSION_DATE="$(date +%Y-%m-%d)"
-PACKAGE_NAME="Veyqa-Voice-v0.2.3"
+PACKAGE_NAME="Veyqa-Voice-v0.2.4"
 OUTPUT_DIR="${VOICE_INPUT_PACKAGE_OUTPUT_DIR:-$PROJECT_PARENT}"
 OUTPUT_PATH="${OUTPUT_DIR}/${PACKAGE_NAME}-macOS-source-${VERSION_DATE}.tar.gz"
 STAGING_DIR="$(mktemp -d)"
@@ -21,12 +21,19 @@ mkdir -p "$OUTPUT_DIR" "$STAGING_DIR/$PACKAGE_NAME"
 rsync -a \
   --exclude='.git/' \
   --exclude='.env' \
+  --exclude='.env.*' \
+  --exclude='.env_*' \
   --exclude='.venv/' \
   --exclude='build/' \
   --exclude='.package-build/' \
   --exclude='dist-internal/' \
   --exclude='dist-local/' \
   --exclude='outputs/' \
+  --exclude='trash/' \
+  --exclude='report*/' \
+  --exclude='.codegraph/' \
+  --exclude='docs/release-candidate-verification.md' \
+  --exclude='docs/superpowers/specs/' \
   --exclude='.settings-open' \
   --exclude='.settings-instance' \
   --exclude='.shortcut-capture' \

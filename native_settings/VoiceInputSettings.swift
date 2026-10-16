@@ -1381,10 +1381,75 @@ struct GeneralSettingsView: View {
 
 }
 
+/// A single credential control for both engines. Never logs or auto-copies secrets.
+struct CredentialField: View {
+    let title: String
+    @Binding var text: String
+    @State private var isRevealed = false
+    @State private var copyStatus = ""
+
+    init(_ title: String, text: Binding<String>) {
+        self.title = title
+        self._text = text
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Group {
+                if isRevealed {
+                    TextField(title, text: $text)
+                } else {
+                    SecureField(title, text: $text)
+                }
+            }
+            .textFieldStyle(.roundedBorder)
+            .autocorrectionDisabled()
+            Button { isRevealed.toggle() } label: {
+                Image(systemName: isRevealed ? "eye.slash" : "eye")
+            }
+            .buttonStyle(.borderless)
+            .help(isRevealed ? "隐藏 \(title)" : "显示 \(title)")
+            .accessibilityLabel(isRevealed ? "隐藏 \(title)" : "显示 \(title)")
+            Button(action: copyCredential) {
+                Image(systemName: copyStatus == "已复制" ? "checkmark" : "doc.on.doc")
+            }
+            .buttonStyle(.borderless)
+            .disabled(text.isEmpty)
+            .help(copyStatus.isEmpty ? "复制 \(title)" : copyStatus)
+            .accessibilityLabel(copyStatus.isEmpty ? "复制 \(title)" : copyStatus)
+            if !copyStatus.isEmpty {
+                Text(copyStatus).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .onDisappear { conceal() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            conceal()
+        }
+        .onChange(of: text) { _ in copyStatus = "" }
+        .task(id: copyStatus) {
+            guard !copyStatus.isEmpty else { return }
+            do {
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+                copyStatus = ""
+            } catch { /* The view disappeared or feedback changed. */ }
+        }
+    }
+
+    private func conceal() {
+        isRevealed = false
+        copyStatus = ""
+    }
+
+    private func copyCredential() {
+        guard !text.isEmpty else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        copyStatus = pasteboard.setString(text, forType: .string) ? "已复制" : "复制失败"
+    }
+}
+
 struct EngineSettingsView: View {
     @ObservedObject var model: SettingsModel
-    @State private var showQwenKey = false
-    @State private var showDoubaoToken = false
 
     var body: some View {
         Form {
@@ -1404,15 +1469,7 @@ struct EngineSettingsView: View {
                     Text("当前模型：Qwen Audio 3.0 ASR Streaming")
                         .foregroundStyle(.secondary)
                         .font(.callout)
-                    Group {
-                        if showQwenKey {
-                            TextField("API Key", text: $model.qwenAPIKey)
-                        } else {
-                            SecureField("API Key", text: $model.qwenAPIKey)
-                        }
-                    }
-                    .textFieldStyle(.roundedBorder)
-                    Toggle("显示 API Key", isOn: $showQwenKey)
+                    CredentialField("API Key", text: $model.qwenAPIKey)
                     Text("1. 获取百炼 API Key　2. 粘贴到上方　3. 检查连接后保存")
                         .foregroundStyle(.secondary)
                         .font(.callout)
@@ -1451,15 +1508,7 @@ struct EngineSettingsView: View {
                 Section("豆包 Seed ASR 2.0") {
                     TextField("App ID", text: $model.doubaoAppKey)
                         .textFieldStyle(.roundedBorder)
-                    Group {
-                        if showDoubaoToken {
-                            TextField("Access Token", text: $model.doubaoAccessKey)
-                        } else {
-                            SecureField("Access Token", text: $model.doubaoAccessKey)
-                        }
-                    }
-                    .textFieldStyle(.roundedBorder)
-                    Toggle("显示 Access Token", isOn: $showDoubaoToken)
+                    CredentialField("Access Token", text: $model.doubaoAccessKey)
                     TextField("热词表 ID（可选加强）", text: $model.doubaoBoostingTableID)
                         .textFieldStyle(.roundedBorder)
                     Link("打开火山引擎语音应用", destination: URL(string: "https://console.volcengine.com/speech/app")!)

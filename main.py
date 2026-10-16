@@ -58,7 +58,7 @@ from src.ui.status_bar import StatusBarController
 from src.utils.logger import logger
 
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 __author__ = "Mor-Li"
 __description__ = "Qwen and Doubao realtime voice input for macOS"
 

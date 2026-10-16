@@ -1,6 +1,6 @@
 # 开发与维护
 
-本文保留原 README 中的实现、调试与构建信息。用户安装和使用请看 [README](../README.md)，历史测试证据见 [验证记录](release-candidate-verification.md)。
+用户安装和使用请看 [README](../README.md)。本文面向贡献者；历史开发验收记录仅在维护者本地归档，不作为公开产品说明。
 
 ## 本地开发
 

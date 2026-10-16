@@ -122,5 +122,13 @@ test("website is accessible static content, not a credential collection form", (
   assert.match(html, /role="status"\s+aria-live="polite"/);
   assert.match(html, /textarea\s+readonly/);
   assert.doesNotMatch(html, /<form|<input|https?:[^"']+\.(?:js|css)["']/i);
-  assert.ok(html.includes("/releases/tag/v0.2.3"));
+  assert.ok(html.includes("/releases/tag/v0.2.4"));
+});
+
+test("security instructions separate a personal exception from malware and managed-device blocks", () => {
+  for (const text of ["仍要打开", "隐私与安全性", "恶意软件", "文件损坏", "公司安全软件", "不代替我点击安全例外"]) {
+    assert.ok(prompt.includes(text), text);
+  }
+  assert.ok(html.includes('href="https://support.apple.com/zh-cn/102445"'));
+  assert.doesNotMatch(prompt, /spctl\s+--|xattr\s+-/);
 });

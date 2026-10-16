@@ -19,7 +19,7 @@ if [[ "$VEYQA_SIGNING_PROFILE" != "internal" ]]; then
   print -u2 "This legacy internal verifier requires VEYQA_SIGNING_IDENTITY=- in an approved test environment."
   exit 2
 fi
-VERSION="0.2.3"
+VERSION="0.2.4"
 OUTPUT_DIR="${1:-$PROJECT_DIR/dist-internal}"
 ZIP_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64.zip"
 PKG_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64.pkg"
