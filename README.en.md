@@ -1,158 +1,39 @@
 # Veyqa Voice
 
-> Status (2026-10-16): **0.2.2 Preview** is a beta, not a zero-defect guarantee.
-> Public packages remain ad-hoc signed and unnotarized. Locally pinned certificate
-> builds are separate. See the [verification record](docs/release-candidate-verification.md).
+**Say it. Type it.** A voice input key for your Mac.
 
-Stability update: bounded automatic recovery for stalled recording/recognition,
-functional heartbeats, and hotkey release reconciliation. Qwen setup now needs
-only an API key by default; advanced endpoints remain optional. Audio is sent
-to your selected cloud ASR provider. Local recording archives are off by default.
-If the input target cannot be verified, results remain in Recovery for manual copy.
-The current public channel is an ad-hoc signed, unnotarized beta.
+[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.3) · [简体中文](README.md)
 
-For local-agent installation instructions, see the Chinese README's
-“让本地 Agent 帮你安装” section. Never paste API keys into an agent conversation.
-
-English · [简体中文](./README.md)
-
-Push-to-talk voice dictation for macOS. Hold a hotkey, speak, release — text lands at the caret.
-
-It does not replace your system input method. Pinyin, Wubi, or Rime keep working; voice is one keystroke away when you need it.
-
-## Why
-
-- Love Sogou / Rime / Wubi but occasionally want voice — don't switch IMEs just to get dictation
-- Bring your own credentials for Qwen Audio 3.0 ASR or Doubao Seed ASR 2.0
-- Hold to talk, release to commit. No marked-text underline, no flow disruption
-- Floating preview anchored at the bottom-center, never steals focus
-- Dock-resident, with a native SwiftUI settings window one click away
-- Audio is sent to your selected cloud ASR provider; local archives are off by default and logs do not capture recognized content
-- MIT licensed, derived from ErlichLiu's Whisper-Input
+- Hold right Option to speak. Release to insert text — never auto-send.
+- Keep your input method. No AI rewriting by default.
+- Choose Qwen or Doubao with your own API credentials.
 
 ## Install
 
-With Homebrew:
+Requires **Apple Silicon and macOS 13+**.
 
 ```bash
 brew install --cask wjc-dev/veyqa/veyqa-voice
 ```
 
-Alternatively, grab the latest Veyqa Voice installer and drag Veyqa Voice to Applications. On first launch grant Microphone and Accessibility permissions as prompted.
+Or download the app and drag it to Applications. A local AI agent can help: [copy the setup prompt on our website](https://wjc-dev.github.io/voxtype/#agent).
 
-Requires macOS 13+ on Apple Silicon.
+## Start dictating
 
-## Configure
+1. Open the app. Qwen is the default: get an API key, enter it yourself, and check the connection. Doubao is also available.
+2. Approve **Microphone, Accessibility, and Input Monitoring** when prompted, then save and restart.
+3. Focus a text field, **hold right Option, speak, then release**. Click the Dock icon to open Settings.
 
-The simplified interface below is part of the 0.2.2 development candidate.
-Homebrew 0.2.0 still uses the original provider and credential settings.
+Shortcuts and hold/toggle mode are customizable. Updates preserve your credentials and settings. Right Option is the default for new users starting with 0.2.3.
 
-1. Open Veyqa Voice. Qwen is the default: get an API key, paste it, then click Check Connection. Region and custom endpoints are optional advanced settings; existing settings are preserved. Doubao is still available.
-2. The default hotkey is `⌃⌥Space`. macOS registers this exact combination, so it does not need Input Monitoring permission and can report a registration conflict. Settings can record other modifier-plus-key combinations.
-3. Save and restart. Focus any input field, hold the hotkey, speak, release.
+## Before you start
 
-Left/right Option, Command, Control, or Fn can also be used alone. Modifier-only shortcuts require a read-only keyboard monitor and Input Monitoring permission, and are more likely to conflict with macOS, remote-desktop tools, Karabiner, or managed-device security software. Prefer a combination for general reliability.
+**0.2.3 Preview** is not Apple-notarized. macOS may require security confirmation. Follow your administrator's policy on managed Macs; do not disable security protections.
 
-## Background reliability and recovery
+Audio is sent to your selected cloud ASR provider, which bills API usage separately. Local audio archives are off by default. Never share API keys in chat or with an agent.
 
-- Packaged builds register a small supervisor through the macOS 13+ Service Management API. It relaunches a missing Veyqa Voice process, but cools down for five minutes after three failures in 60 seconds to prevent a crash loop.
-- A Quartz shortcut listener is health-checked and re-enabled when macOS disables it. Managed Macs that reject the read-only event tap fall back to an AppKit compatibility monitor.
-- Stalled recording startup and recognition finalization trigger bounded recovery. The native supervisor also checks a process heartbeat; upgrading or reinstalling refreshes stale login-item registrations.
-- The Dock icon is the stable primary entry point. Clicking it raises the existing settings window without starting a second voice service. The legacy menu-bar item is off by default so macOS cannot hide the app's only entry point.
-- The Recovery & Diagnostics page reports login-item status, permissions, shortcut backend, and the latest session. A running legacy Voice Input process is reported during migration so two shortcut listeners are not left active silently.
-
-Public distribution still requires a stable Developer ID signature for the App/PKG and Apple notarization. The repository's `internal` artifacts are ad-hoc-signed test builds, not a universal public release.
-
-The default fast path adds no second LLM rewriting call and never auto-sends.
-Abnormal session exits release recording resources. Controlled recovery attempts
-to retain already-recognized safe text (up to five entries), without enabling
-audio archives. Recovery edits use a shared process lock and delete only selected
-IDs, preserving newer entries. Unrecognized audio, abrupt process termination,
-and storage failures are not guaranteed recoverable.
-
-Ad-hoc signing ties identity to a particular build, so privacy grants may need to
-be renewed after updates. Stable development/distribution identities and compatible
-designated requirements are the long-term solution; Developer ID and development
-signatures do not share that identity by default. A free local option is a dedicated,
-user-approved self-signed code-signing certificate in Keychain. Save its exact SHA-1
-fingerprint in `~/Library/Application Support/Veyqa Build/signing-identity.sha1`:
-build scripts reuse it and fail closed if missing. The private key stays out of Git.
-Initial identity changes may still require permission approval.
-
-Pinned builds go to `dist-local/` with a `-local` filename suffix and are for that
-Mac only. `VEYQA_SIGNING_IDENTITY=- zsh build-internal-dmg.command` explicitly builds
-ad-hoc test packages in `dist-internal/` without changing the saved identity.
-Do not overwrite a locally signed daily-use app with the public Homebrew package:
-changing identity may require reauthorization. Scripts do not create certificates,
-change trust, or implement Developer ID notarization/Installer signing. Do not
-reset TCC or bypass endpoint protection. Test local builds at their fixed install
-path, not via the temporary-app verifier.
-
-Separate dictation turns preserve repeated and overlapping wording. Only duplicate
-final callbacks within the same session are suppressed; no extra rewriting call
-or waiting period is added.
-Permission checks now request only missing, required grants; registered combinations
-do not request Input Monitoring. See [Apple's explanation](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
-
-Idle use: closing Settings releases its process. Unchanged snapshots do not
-redraw the UI or rewrite permission files. Background permission checks slow to
-30 seconds (about 2 seconds with Settings open); health checks stay at 2 seconds,
-with an atomic, non-fsync heartbeat about every 10 seconds. No microphone or
-cloud-recognition session remains open while idle. Use `tools/measure_idle.py`
-with explicit PIDs to measure one-core CPU percentage and RSS; hardware and OS
-conditions affect results.
-
-## Run from source
-
-```bash
-git clone https://github.com/wjc-dev/voxtype.git
-cd voxtype
-uv venv --python 3.13 .venv
-uv pip install -r requirements-dev.txt
-cp env.example .env          # fill in your Qwen or Doubao credentials
-.venv/bin/python main.py
-```
-
-Requires macOS 13+, Apple Silicon, Xcode Command Line Tools, Python 3.13.
-
-## Build .dmg / .pkg
-
-```bash
-zsh ./build-internal-dmg.command
-```
-
-Output in `dist-internal/`.
-
-For source-only checks, run `.venv/bin/python -m pytest test/ --ignore=test/test_native_settings_core.py`.
-The full verifier below launches temporary ad-hoc native executables and may trigger endpoint-security alerts on managed Macs. It is opt-in: use an approved test environment, never disable or bypass protection. It rebuilds, validates signatures/versions, and smoke-tests the Dock and Settings without installing the app or registering a login item.
-
-```bash
-VEYQA_ALLOW_GUI_SMOKE_TESTS=true zsh ./tools/verify-release-candidate.command
-```
-
-## Project layout
-
-```
-main.py            Entry point
-settings_ui.py     Settings panel
-src/
-  audio/           Microphone capture
-  transcription/   Qwen + Doubao engines
-  keyboard/        Global hotkeys, text insertion
-  ui/              Dock/app entry, floating preview
-native_settings/   SwiftUI native settings helper
-packaging/         PyInstaller spec, icons
-test/              Unit tests
-```
-
-## Contributing
-
-Issues and PRs welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md). PRs must pass `.venv/bin/python -m pytest test/`.
-
-## Security
-
-Report vulnerabilities per [SECURITY.md](./SECURITY.md).
+[Feedback](https://github.com/wjc-dev/voxtype/issues) · [Developer guide](docs/development.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ## License
 
-[MIT](./LICENSE). Derived from [ErlichLiu/Whisper-Input](https://github.com/ErlichLiu) and [Mor-Li/Whisper-Input-Next](https://github.com/Mor-Li); original copyright notices preserved.
+[MIT](LICENSE). Derived from [ErlichLiu/Whisper-Input](https://github.com/ErlichLiu) and [Mor-Li/Whisper-Input-Next](https://github.com/Mor-Li); original copyright notices are preserved.

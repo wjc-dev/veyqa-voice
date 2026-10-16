@@ -41,6 +41,9 @@ struct SettingsCoreHarness {
         require(HotkeyConfig.backend(for: first!) == "registered", "combo backend")
         require(HotkeyConfig.backend(for: "right_option") == "passive", "preset backend")
         require(HotkeyConfig.isSupported("right_option"), "modifier-only preset")
+        require(HotkeyConfig.defaultSpec == "right_option", "new user right Option default")
+        require(HotkeyConfig.missingSpec(hasExistingConfig: false) == "right_option", "new config fallback")
+        require(HotkeyConfig.missingSpec(hasExistingConfig: true) == first, "legacy missing key preserved")
         require(
             HotkeyConfig.registeredSpec(keyCode: 49, modifiers: []) == nil,
             "missing modifier rejected"

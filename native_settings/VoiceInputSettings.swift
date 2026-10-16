@@ -230,10 +230,10 @@ final class SettingsModel: ObservableObject {
 
     @Published var punctuationMode = "spaces"
     @Published var disfluencyMode = "off"
-    @Published var hotkeySpec = "keycode:49;mods:control+option"
-    @Published var hotkeyLabel = "⌃⌥Space"
+    @Published var hotkeySpec = HotkeyConfig.defaultSpec
+    @Published var hotkeyLabel = HotkeyConfig.defaultLabel
     @Published var hotkeyMode = "hold"
-    @Published var hotkeyBackend = "registered"
+    @Published var hotkeyBackend = HotkeyConfig.backend(for: HotkeyConfig.defaultSpec)
     @Published var launchAtLogin = true
 
     @Published var transcriptionService = "qwen"
@@ -318,9 +318,12 @@ final class SettingsModel: ObservableObject {
             ?? (Self.bool(environment["DISFLUENCY_FILTER_ENABLED"], fallback: false)
                 ? "conservative" : "off")
         hotkeyMode = environment["FN_HOTKEY_MODE"] ?? "hold"
-        let storedHotkey = environment["VOICE_HOTKEY"]
+        let configuredHotkey = environment["VOICE_HOTKEY"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let storedHotkey = (configuredHotkey?.isEmpty == false ? configuredHotkey : nil)
             ?? ((environment["SINGLE_FN_HOTKEY"] ?? "false") == "true"
-                ? "fn" : HotkeyConfig.defaultSpec)
+                ? "fn" : HotkeyConfig.missingSpec(hasExistingConfig:
+                    FileManager.default.fileExists(atPath: envURL.path)))
         hotkeySpec = HotkeyConfig.isSupported(storedHotkey)
             ? storedHotkey : HotkeyConfig.defaultSpec
         hotkeyLabel = hotkeySpec == storedHotkey

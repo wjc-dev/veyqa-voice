@@ -20,7 +20,7 @@ from typing import Callable, Optional
 
 from ..correction_learning import CorrectionLearner
 from ..clipboard_paste import paste_text_preserving_clipboard
-from ..runtime_paths import DATA_DIR
+from ..runtime_paths import DATA_DIR, ENV_FILE
 from ..recovery import RecoveryStore
 from ..text_processing import sanitize_inline_text
 from ..utils.logger import logger
@@ -301,8 +301,15 @@ def _process_name(pid: int) -> str:
 class KeyboardManager:
     """Own one global shortcut and commit final text exactly once."""
 
-    DEFAULT_VOICE_HOTKEY = "keycode:49;mods:control+option"
-    DEFAULT_VOICE_HOTKEY_LABEL = "⌃⌥Space"
+    DEFAULT_VOICE_HOTKEY = "right_option"
+    DEFAULT_VOICE_HOTKEY_LABEL = "右 Option（⌥）"
+
+    @classmethod
+    def _missing_hotkey_default(cls) -> str:
+        # New installs seed an explicit key. An older .env without that key
+        # must retain its previous effective default, without rewriting secrets.
+        return "keycode:49;mods:control+option" if ENV_FILE.is_file() else cls.DEFAULT_VOICE_HOTKEY
+
     VALID_REGISTERED_MODIFIERS = {
         "command",
         "shift",
@@ -332,10 +339,8 @@ class KeyboardManager:
         self._last_voice_insertion = None
         self._recovery_texts = deque(maxlen=5)
 
-        self.voice_hotkey = (
-            os.getenv("VOICE_HOTKEY", self.DEFAULT_VOICE_HOTKEY).strip().lower()
-            or self.DEFAULT_VOICE_HOTKEY
-        )
+        default_hotkey = self._missing_hotkey_default()
+        self.voice_hotkey = os.getenv("VOICE_HOTKEY", default_hotkey).strip().lower() or default_hotkey
         self.voice_hotkey_label = os.getenv("VOICE_HOTKEY_LABEL", "").strip()
         self._hotkey_mode = os.getenv("FN_HOTKEY_MODE", "hold").strip().lower()
         if self._hotkey_mode not in {"hold", "toggle"}:
@@ -343,7 +348,7 @@ class KeyboardManager:
         self._voice_hotkey_pressed = False
         self._voice_hotkey_spec = self._parse_voice_hotkey(self.voice_hotkey)
         if self._voice_hotkey_spec is None:
-            logger.warning("快捷键配置无效，已恢复为 ⌃⌥Space")
+            logger.warning("快捷键配置无效，已恢复为 %s", self.DEFAULT_VOICE_HOTKEY_LABEL)
             self.voice_hotkey = self.DEFAULT_VOICE_HOTKEY
             self.voice_hotkey_label = self.DEFAULT_VOICE_HOTKEY_LABEL
             self._voice_hotkey_spec = self._parse_voice_hotkey(

@@ -72,8 +72,11 @@ enum QwenConnection {
 }
 
 enum HotkeyConfig {
-    static let defaultSpec = "keycode:49;mods:control+option"
-    static let defaultLabel = "⌃⌥Space"
+    static let defaultSpec = "right_option"
+    static let defaultLabel = "右 Option（⌥）"
+    static func missingSpec(hasExistingConfig: Bool) -> String {
+        hasExistingConfig ? "keycode:49;mods:control+option" : defaultSpec
+    }
     static let modifierOnlySpecs: Set<String> = [
         "fn",
         "left_option", "right_option",
