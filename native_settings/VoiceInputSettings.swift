@@ -159,6 +159,9 @@ struct DiagnosticSnapshot: Codable {
     var loginItemStatus: String?
     var loginItemError: String?
     var recoveryStatus: String?
+    var settingsRevision: String?
+    var settingsStatus: String?
+    var microphoneTestStatus: String?
 
     enum CodingKeys: String, CodingKey {
         case version, engine, state, microphone, hotkey
@@ -177,6 +180,9 @@ struct DiagnosticSnapshot: Codable {
         case loginItemStatus = "login_item_status"
         case loginItemError = "login_item_error"
         case recoveryStatus = "recovery_status"
+        case settingsRevision = "settings_revision"
+        case settingsStatus = "settings_status"
+        case microphoneTestStatus = "microphone_test_status"
     }
 }
 
@@ -241,6 +247,11 @@ final class SettingsModel: ObservableObject {
     @Published var qwenAPIKey = ""
     @Published var checkingConnection = false
     @Published var connectionStatus = ""
+    @Published var connectionVerified = false
+    @Published var onboardingComplete = true
+    @Published var saveStatus = ""
+    private var pendingSaveID: String?
+    private var closeAfterApply = false
     private var connectionID = UUID()
     private var connectionTask: URLSessionWebSocketTask?
     private var connectionSession: URLSession?
@@ -342,6 +353,8 @@ final class SettingsModel: ObservableObject {
         recentMemoryEnabled = Self.bool(environment["QWEN_RECENT_MEMORY_ENABLED"], fallback: false)
         doubaoAppKey = environment["DOUBAO_APP_KEY"] ?? ""
         doubaoAccessKey = environment["DOUBAO_ACCESS_KEY"] ?? ""
+        onboardingComplete = Self.bool(environment["SETUP_COMPLETED"], fallback:
+            !qwenAPIKey.isEmpty || !doubaoAccessKey.isEmpty)
         doubaoBoostingTableID = environment["DOUBAO_BOOSTING_TABLE_ID"] ?? ""
         // Automatic edit observation remains an internal experiment until a
         // future review/confirmation UI can make every learned rule explicit.
@@ -543,6 +556,7 @@ final class SettingsModel: ObservableObject {
     }
 
     func cancelConnectionCheck() {
+        connectionVerified = false
         connectionID = UUID()
         connectionTask?.cancel(with: .goingAway, reason: nil)
         connectionSession?.invalidateAndCancel()
@@ -581,6 +595,7 @@ final class SettingsModel: ObservableObject {
             guard self.connectionID == id else { return }
             self.cancelConnectionCheck()
             self.connectionStatus = message
+            self.connectionVerified = message.hasPrefix("连接成功")
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
             finish("检查超时。请检查网络；海外 Key 请在高级设置中选择对应地区。")
@@ -617,7 +632,7 @@ final class SettingsModel: ObservableObject {
         }
     }
 
-    func saveAndRestart() {
+    func saveSettings(completeSetup: Bool = false) {
         qwenAPIKey = qwenAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if transcriptionService == "qwen" {
             guard qwenAPIKey.count >= 20,
@@ -651,6 +666,7 @@ final class SettingsModel: ObservableObject {
         disfluencyMode = "off"
 
         var updates: [String: String] = [
+            "SETUP_COMPLETED": String(onboardingComplete || completeSetup),
             "TRANSCRIPTION_SERVICE": transcriptionService,
             "PUNCTUATION_MODE": punctuationMode,
             "DISFLUENCY_FILTER_ENABLED": "false",
@@ -697,16 +713,36 @@ final class SettingsModel: ObservableObject {
             }
             environment.merge(updates) { _, new in new }
             if isBundled {
-                try Self.privateWrite(Data("restart".utf8), to: dataURL.appendingPathComponent(".restart-request"))
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    exit(42)
-                }
+                let revision = UUID().uuidString
+                pendingSaveID = revision
+                closeAfterApply = completeSetup
+                saveStatus = "已保存，正在等待生效…"
+                try Self.privateWrite(Data(revision.utf8), to: dataURL.appendingPathComponent(".settings-apply-request"))
             } else {
                 notice = "设置已保存，后台语音服务已经重启。"
             }
         } catch {
             errorMessage = "保存失败：\(error.localizedDescription)"
         }
+    }
+
+    func checkAppliedSettings() {
+        guard let pendingSaveID, diagnostics.settingsRevision == pendingSaveID else { return }
+        switch diagnostics.settingsStatus {
+        case "applied":
+            saveStatus = "已生效，下次听写使用新设置"
+            self.pendingSaveID = nil
+            if closeAfterApply { NSApp.terminate(nil) }
+        case "pending": saveStatus = "已保存，本次听写结束后生效"
+        case "error": saveStatus = "已保存，但未能应用，请检查设置后重试"
+        default: break
+        }
+    }
+
+    func testMicrophone() {
+        do {
+            try Self.privateWrite(Data("test".utf8), to: dataURL.appendingPathComponent(".microphone-test-request"))
+        } catch { errorMessage = "无法开始麦克风测试，请重试。" }
     }
 
     func restartAndRecheckPermissions() {
@@ -1330,7 +1366,7 @@ struct GeneralSettingsView: View {
                     Text("按住说话，松开结束").tag("hold")
                     Text("按一下开始，再按一下结束").tag("toggle")
                 }
-                Text("修改后点击右上角“保存并重启”才会生效。")
+                Text("按住模式：说话时不要松开。切换模式：按一下开始，再按一下结束。修改后点击“保存”。")
                     .foregroundStyle(.secondary)
                     .font(.callout)
             }
@@ -1350,7 +1386,7 @@ struct GeneralSettingsView: View {
                             : "管理 \(model.customVocabularyCount) 个词…")
                     }
                 }
-                Text("词汇会在本机保存，并按当前引擎支持的方式随识别请求发送。修改后请保存并重启。")
+                Text("词汇在本机保存，并按引擎支持的方式随识别请求发送。保存后从下一次听写生效。")
                     .foregroundStyle(.secondary)
                     .font(.callout)
             }
@@ -1459,7 +1495,7 @@ struct EngineSettingsView: View {
                     Text("豆包").tag("doubao")
                 }
                 .pickerStyle(.segmented)
-                Text("两种引擎共用快捷键、标点、光标写入和本机纠错。切换后需要保存并重启。")
+                Text("使用自己的 API 凭证。保存后从下一次听写生效，不中断当前录音。")
                     .foregroundStyle(.secondary)
                     .font(.callout)
             }
@@ -1523,6 +1559,7 @@ struct EngineSettingsView: View {
         .onChange(of: model.qwenAPIKey) { _ in model.cancelConnectionCheck() }
         .onChange(of: model.qwenAPIHost) { _ in model.cancelConnectionCheck() }
         .onChange(of: model.qwenRegion) { _ in model.cancelConnectionCheck() }
+        .onChange(of: model.qwenWorkspace) { _ in model.cancelConnectionCheck() }
     }
 }
 
@@ -1775,37 +1812,68 @@ struct SettingsRootView: View {
     @State private var showPermissions = false
     @State private var showVocabulary = false
     @State private var evaluatedPermissionGate = false
+    @State private var selectedTab = "general"
     private let permissionTimer = Timer.publish(
         every: 2.0, tolerance: 0.5, on: .main, in: .common
     ).autoconnect()
 
     var body: some View {
-        TabView {
+        VStack(spacing: 8) {
+        if !model.onboardingComplete {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("首次使用：连接语音服务 → 确认权限 → 试一下麦克风").font(.headline)
+                Text("在下方获取并粘贴 Key、检查连接。Key 只保存在你的电脑上，不要发给别人。")
+                    .font(.callout).foregroundStyle(.secondary)
+                HStack {
+                    Label(model.allRequiredPermissionsGranted ? "权限已就绪" : "需要权限", systemImage: "checkmark.shield")
+                    Button("测试麦克风（2 秒）") { model.testMicrophone() }
+                        .disabled(!model.allRequiredPermissionsGranted)
+                    Spacer()
+                    Button("完成，开始使用") { model.saveSettings(completeSetup: true) }
+                        .disabled(!model.allRequiredPermissionsGranted
+                                  || model.diagnostics.microphoneTestStatus != "passed"
+                                  || (model.transcriptionService == "qwen" && !model.connectionVerified))
+                }
+                if let status = model.diagnostics.microphoneTestStatus {
+                    Text(status == "passed" ? "麦克风已收到声音。完成后点击文本框，再用语音快捷键。" : status)
+                        .font(.callout)
+                }
+            }.padding().background(Color.accentColor.opacity(0.07)).cornerRadius(10)
+        }
+        TabView(selection: $selectedTab) {
             GeneralSettingsView(
                 model: model,
                 showPermissions: $showPermissions,
                 showVocabulary: $showVocabulary
             )
                 .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
+                .tag("general")
             EngineSettingsView(model: model)
                 .tabItem { Label("引擎", systemImage: "waveform.badge.magnifyingglass") }
+                .tag("engine")
             RecoverySettingsView(model: model)
                 .tabItem { Label("恢复与诊断", systemImage: "lifepreserver") }
+                .tag("recovery")
+        }
+        if !model.saveStatus.isEmpty {
+            Text(model.saveStatus).font(.callout).foregroundStyle(.secondary)
+        }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    model.saveAndRestart()
+                    model.saveSettings()
                 } label: {
-                    Text("保存并重启")
+                    Text("保存")
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut("s", modifiers: .command)
             }
         }
         .padding(.top, 8)
-        .frame(width: 660, height: 500)
+        .frame(width: 700, height: model.onboardingComplete ? 500 : 660)
         .onAppear {
+            if !model.onboardingComplete { selectedTab = "engine" }
             model.reloadDiagnostics()
             model.reloadPermissions()
             evaluatePermissionGate()
@@ -1815,6 +1883,7 @@ struct SettingsRootView: View {
             model.reloadDiagnostics()
             model.reloadPermissions()
             model.reloadRecoveries()
+            model.checkAppliedSettings()
             evaluatePermissionGate()
         }
         .sheet(isPresented: $showPermissions) {
@@ -1879,6 +1948,5 @@ struct VoiceInputSettingsApp: App {
     private func bringSettingsToFront() {
         let activate: () -> Void = { raiseSettingsWindows() }
         DispatchQueue.main.async(execute: activate)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: activate)
     }
 }

@@ -2,7 +2,7 @@
 
 **Say it. Type it.** A voice input key for your Mac.
 
-[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.4) · [简体中文](README.md)
+[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.5) · [简体中文](README.md)
 
 - Hold right Option to speak. Release to insert text — never auto-send.
 - Keep your input method. No AI rewriting by default.
@@ -21,14 +21,14 @@ Or download the app and drag it to Applications. A local AI agent can help: [cop
 ## Start dictating
 
 1. Open the app. Qwen is the default: get an API key, enter it yourself, and check the connection. Doubao is also available.
-2. Approve **Microphone, Accessibility, and Input Monitoring** when prompted, then save and restart.
+2. Approve **Microphone, Accessibility, and Input Monitoring** when prompted, test the microphone, then finish setup. Later changes only need **Save**, without restarting.
 3. Focus a text field, **hold right Option, speak, then release**. Click the Dock icon to open Settings.
 
 Shortcuts and hold/toggle mode are customizable. New installs default to right Option; updates preserve credentials and settings. Credential fields include show/hide and copy buttons.
 
 ## Before you start
 
-**0.2.4 Preview** is not Apple-notarized. If macOS blocks the first launch because the developer cannot be verified or the app is not notarized, first confirm that the download is official and that you trust its source. You may then choose **System Settings → Privacy & Security → Open Anyway**, and confirm **Open** yourself. This is an app-specific exception, not a reason to disable system protection. [Apple's guidance](https://support.apple.com/en-us/102445)
+**0.2.5 Preview** is not Apple-notarized. If macOS blocks the first launch because the developer cannot be verified or the app is not notarized, first confirm that the download is official and that you trust its source. You may then choose **System Settings → Privacy & Security → Open Anyway**, and confirm **Open** yourself. This is an app-specific exception, not a reason to disable system protection. [Apple's guidance](https://support.apple.com/en-us/102445)
 
 Stop and report the issue if macOS warns of malware or damage, or if company security software blocks the app. Follow your administrator's policy; do not force it to run.
 

@@ -114,6 +114,9 @@ class _Keyboard:
     def capture_output_target(self):
         return self.target
 
+    def frontmost_is_settings(self):
+        return False
+
     def mark_streaming(self):
         pass
 

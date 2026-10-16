@@ -13,6 +13,12 @@ from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+# Same signed executable, private pipes only; never initialize the app/UI in a worker.
+if __name__ == "__main__" and "--audio-worker" in sys.argv:
+    from src.audio.worker import run_worker
+    run_worker()
+    raise SystemExit(0)
+
 import numpy as np
 from dotenv import load_dotenv
 
@@ -37,7 +43,7 @@ ensure_runtime_layout()
 load_dotenv(ENV_FILE, override=True)
 
 from src.audio.archive import AudioArchiveManager
-from src.audio.recorder import AudioRecorder
+from src.audio.isolated_recorder import IsolatedAudioRecorder as AudioRecorder
 from src.diagnostics import DiagnosticsStore
 from src.runtime_health import RuntimeHealth, allow_automatic_restart
 from src.keyboard.inputState import InputState
@@ -56,9 +62,10 @@ from src.transcription.qwen_streaming import QwenStreamingProcessor
 from src.ui.floating_preview import FloatingPreviewWindow
 from src.ui.status_bar import StatusBarController
 from src.utils.logger import logger
+from src.setup_feedback import empty_result_notice
 
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 __author__ = "Mor-Li"
 __description__ = "Qwen and Doubao realtime voice input for macOS"
 
@@ -75,7 +82,9 @@ def _should_open_settings_on_start(
         return True
     if "--background-login" in arguments or restarting:
         return False
-    return not processor_present or is_frozen
+    # Configured launches stay quiet. The Dock remains the explicit settings
+    # entry point; a delayed helper launch must not steal a new dictation.
+    return not processor_present
 
 
 @dataclass
@@ -124,13 +133,13 @@ class VoiceAssistant:
         self._session_lock = threading.RLock()
         self._current_session: Optional[VoiceSession] = None
         self._streaming_thread: Optional[threading.Thread] = None
+        self._microphone_test_active = False
 
         self.floating_preview = FloatingPreviewWindow()
 
-        configured = bool(processor and processor.is_available())
         self.keyboard_manager = KeyboardManager(
-            on_record_start=self.start_streaming if configured else self._start_unconfigured,
-            on_record_stop=self.stop_streaming if configured else self._stop_unconfigured,
+            on_record_start=self.start_streaming,
+            on_record_stop=self.stop_streaming,
             on_record_cancel=self.cancel_streaming,
             on_state_change=self._on_state_change,
         )
@@ -220,10 +229,87 @@ class VoiceAssistant:
     def _tick_health(self) -> None:
         from PyObjCTools import AppHelper
         self.health.tick_main()
+        self._apply_pending_settings()
+        self._check_microphone_test_request()
         if (DATA_DIR / ".restart-request").exists():
             self._restart_application()
             return
         AppHelper.callLater(2, self._tick_health)
+
+    def _apply_pending_settings(self):
+        request = DATA_DIR / ".settings-apply-request"
+        if not request.exists():
+            return
+        revision = ""
+        try:
+            revision = request.read_text().strip()
+            if not revision or len(revision) > 80:
+                return
+            if (self._current_session is not None or self._microphone_test_active
+                    or (self._streaming_thread and self._streaming_thread.is_alive())
+                    or getattr(self.keyboard_manager, "_transition_started_at", None) is not None):
+                self.diagnostics.update(settings_revision=revision, settings_status="pending")
+                return
+            # Serialize with hotkey start; a current utterance keeps its original config.
+            with self.keyboard_manager._recording_lock:
+                if self.keyboard_manager.is_recording:
+                    return
+                load_dotenv(ENV_FILE, override=True)
+                service = os.getenv("TRANSCRIPTION_SERVICE", "qwen").lower()
+                processor = DoubaoStreamingProcessor() if service == "doubao" else QwenStreamingProcessor()
+                self.processor = processor if processor.is_available() else None
+                self.service = "doubao" if service == "doubao" else "qwen"
+                self.engine_label = "豆包" if self.service == "doubao" else "千问"
+                self.punctuation_mode = os.getenv("PUNCTUATION_MODE", "auto")
+                self.archive_enabled = os.getenv("AUDIO_ARCHIVE_ENABLED", "false").lower() == "true"
+                self.keyboard_manager.reload_configuration()
+                self.permission_monitor.hotkey_backend = self.keyboard_manager._hotkey_backend
+                login = sync_login_item(os.getenv("LAUNCH_AT_LOGIN", "true").lower() == "true")
+                self.diagnostics.update(settings_revision=revision, settings_status="applied",
+                                        engine=self.service, hotkey=self.keyboard_manager.voice_hotkey_label,
+                                        login_item_status=login.status, login_item_error=login.error)
+            # Do not consume a newer save which arrived while this one was applied.
+            if request.read_text().strip() == revision:
+                request.unlink(missing_ok=True)
+        except Exception:
+            logger.exception("设置应用失败，主程序继续运行")
+            self.diagnostics.update(settings_revision=revision, settings_status="error")
+            # Retry only on a new user save, not once every health tick.
+            if request.exists() and request.read_text().strip() == revision:
+                request.unlink(missing_ok=True)
+
+    def _check_microphone_test_request(self):
+        request = DATA_DIR / ".microphone-test-request"
+        if not request.exists() or self._microphone_test_active:
+            return
+        if self._current_session is not None or self.keyboard_manager.is_recording:
+            self.diagnostics.update(microphone_test_status="请先结束当前听写")
+            request.unlink(missing_ok=True)
+            return
+        request.unlink(missing_ok=True)
+        self._microphone_test_active = True
+        self.diagnostics.update(microphone_test_status="正在测试，请说一句话（不会上传）")
+
+        def test():
+            recorder = AudioRecorder()
+            try:
+                error = recorder.start_streaming_recording()
+                if error:
+                    self.diagnostics.update(microphone_test_status=error)
+                    return
+                time.sleep(2)
+                audio = recorder.stop_streaming_recording()
+                import soundfile as sf
+                signal, _rate = sf.read(audio) if audio else (np.array([]), 16000)
+                audible = bool(signal.size and float(np.sqrt(np.mean(signal ** 2))) > 0.002)
+                self.diagnostics.update(microphone_test_status="passed" if audible else "未收到声音，请检查系统声音输入设备和音量")
+            except Exception:
+                self.diagnostics.update(microphone_test_status="麦克风测试未完成，请检查设备后重试")
+            finally:
+                recorder.reset_streaming_state()
+                self._microphone_test_active = False
+
+        threading.Thread(target=test, daemon=True, name="microphone-test").start()
 
     def _on_state_change(self, state: InputState) -> None:
         self._current_state = state
@@ -238,8 +324,10 @@ class VoiceAssistant:
             logger.debug("更新状态栏失败: %s", exc)
 
     def _start_unconfigured(self) -> None:
-        self.keyboard_manager.show_warning(f"请先在设置中填写{self.engine_label}凭证")
-        self.status_controller.open_settings()
+        notice = f"尚未完成配置，请点击 Dock 图标设置{self.engine_label}，完成后再开始听写"
+        self.keyboard_manager.show_warning(notice)
+        self.floating_preview.show_notice(notice)
+        self.keyboard_manager.reset_state()
 
     def _stop_unconfigured(self) -> None:
         self.keyboard_manager.reset_state()
@@ -354,8 +442,17 @@ class VoiceAssistant:
 
     def start_streaming(self) -> None:
         """Start a new ASR session after the event-tap transition is serialized."""
+        if getattr(self, "_microphone_test_active", False):
+            self.floating_preview.show_notice("麦克风正在测试，请稍候再开始听写")
+            self.keyboard_manager.reset_state()
+            return
         if not self.processor or not self.processor.is_available():
             self._start_unconfigured()
+            return
+        if getattr(self.keyboard_manager, "frontmost_is_settings", lambda: False)():
+            notice = "请先点击要输入的文本框，再使用语音快捷键"
+            self.floating_preview.show_notice(notice)
+            self.keyboard_manager.reset_state()
             return
         with self._session_lock:
             # Cancellation can arrive after dequeue but before the session exists.
@@ -386,9 +483,10 @@ class VoiceAssistant:
                 raise RuntimeError(str(error))
         except Exception as exc:  # noqa: BLE001
             logger.error("启动录音失败: %s", exc)
-            self.diagnostics.update(last_error="麦克风启动失败")
-            self.keyboard_manager.show_error("麦克风启动失败")
-            self._finish_session(session, notice="麦克风启动失败，请检查设备与权限")
+            reason = str(exc) or "麦克风启动失败，请检查设备与权限"
+            self.diagnostics.update(last_error=reason)
+            self.keyboard_manager.show_error(reason)
+            self._finish_session(session, notice=reason)
             return
 
         if session.cancelled or not self._is_current(session):
@@ -529,11 +627,15 @@ class VoiceAssistant:
             self.floating_preview.update_text(preview)
 
         def on_final_text(text: str) -> None:
-            if not stream_failed:
+            if not stream_failed and not getattr(self.audio_recorder, "capture_error", ""):
                 emit_final(text)
 
         def on_complete() -> None:
             if active():
+                capture_error = getattr(self.audio_recorder, "capture_error", "")
+                if capture_error:
+                    self._fail_session(session, capture_error, "device_error")
+                    return
                 logger.info("%s流式识别完成", self.engine_label)
                 with session.lock:
                     committed = session.final_committed
@@ -541,12 +643,15 @@ class VoiceAssistant:
                 recovered = self._retain_session_preview(session, "未收到完整识别结果")
                 outcome = "committed" if committed else "recovered" if recovered else (
                     "no_safe_result" if not had_preview else "not_committed")
-                notice = "" if committed else (
-                    "未检测到可用语音，请检查麦克风" if outcome == "no_safe_result"
-                    else "文字未写入，请打开恢复页查看")
+                notice = "" if committed else "文字未写入，请打开恢复页查看"
+                if outcome == "no_safe_result":
+                    outcome, notice = empty_result_notice(
+                        session.total_audio_ms, session.voiced_audio_ms,
+                        getattr(self.keyboard_manager, "_hotkey_mode", "hold"),
+                        self.keyboard_manager.voice_hotkey_label or "语音快捷键")
                 try:
-                    if outcome == "no_safe_result":
-                        self.keyboard_manager.show_warning("未检测到可用语音，请检查麦克风后重试")
+                    if not committed:
+                        self.keyboard_manager.show_warning(notice)
                     self._record_session_diagnostics(session, outcome)
                 finally:
                     self._finish_session(session, notice=notice)
@@ -557,7 +662,11 @@ class VoiceAssistant:
                 return
             stream_failed = True
             logger.error("%s流式识别失败: %s", self.engine_label, error)
-            self._fail_session(session, f"{self.engine_label}连接中断，请检查网络或服务配置", "network_error")
+            if any(token in error.lower() for token in ("401", "403", "鉴权", "unauthorized", "invalid_api_key")):
+                reason, outcome = "API Key 未通过验证，请在设置中检查 Key、地区和服务权限", "authentication_error"
+            else:
+                reason, outcome = f"{self.engine_label}连接中断，请检查网络后重试", "network_error"
+            self._fail_session(session, reason, outcome)
 
         async def audio_chunks_with_levels():
             nonlocal total_audio_ms, voiced_audio_ms, voice_gate_open

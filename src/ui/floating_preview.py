@@ -129,11 +129,15 @@ def _get_caret_position() -> Tuple[float, float, float, float]:
         raise RuntimeError("无法获取当前激活的应用")
 
     app_element = AXUIElementCreateApplication(front_app.processIdentifier())
+    from ApplicationServices import AXUIElementSetMessagingTimeout
+    AXUIElementSetMessagingTimeout(app_element, 0.2)
     error, focused = AXUIElementCopyAttributeValue(
         app_element, kAXFocusedUIElementAttribute, None
     )
     if error != 0 or focused is None:
         raise RuntimeError(f"无法获取焦点元素, error={error}")
+
+    AXUIElementSetMessagingTimeout(focused, 0.2)
 
     error, selected_range = AXUIElementCopyAttributeValue(
         focused, kAXSelectedTextRangeAttribute, None

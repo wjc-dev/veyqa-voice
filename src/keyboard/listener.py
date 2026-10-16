@@ -47,15 +47,24 @@ class _PassiveTapListener:
         self.tap_ref = None
         self.run_loop = None
         self.running = False
+        self._stopped = False
         self.recovery_count = 0
         self.last_poll_at = time.monotonic()
 
     def __enter__(self):
-        self.running = True
+        self.running = not self._stopped
         return self
 
     def __exit__(self, _exc_type, _exc, _traceback) -> None:
+        self.stop()
+
+    def stop(self):
+        self._stopped = True
         self.running = False
+        if self.tap_ref is not None:
+            from Quartz import CFMachPortInvalidate
+            CFMachPortInvalidate(self.tap_ref)
+            self.tap_ref = None
 
     def _deliver(self, _proxy, event_type, event, _refcon):
         # A listen-only event tap must always return the original event.  Even
@@ -86,6 +95,8 @@ class _PassiveTapListener:
         return True
 
     def join(self) -> None:
+        if self._stopped:
+            return
         from Quartz import (
             CFMachPortCreateRunLoopSource,
             CFRunLoopAddSource,
@@ -121,6 +132,9 @@ class _PassiveTapListener:
             self.running = False
             raise RuntimeError("macOS 未允许只读快捷键监听")
         self.tap_ref = tap
+        if self._stopped:
+            self.stop()
+            return
         source = CFMachPortCreateRunLoopSource(None, tap, 0)
         self.run_loop = CFRunLoopGetCurrent()
         CFRunLoopAddSource(self.run_loop, source, kCFRunLoopCommonModes)
@@ -279,9 +293,20 @@ class _RegisteredHotKeyListener:
             ctypes.byref(self._hotkey_ref),
         )
         if status != 0:
+            library.RemoveEventHandler.argtypes = [ctypes.c_void_p]
+            library.RemoveEventHandler(self._handler_ref)
             raise RuntimeError(f"快捷键已被其他应用占用或注册失败（{status}）")
         self._library = library
         self.running = True
+
+    def stop(self):
+        self.running = False
+        if self._library is not None:
+            self._library.UnregisterEventHotKey.argtypes = [ctypes.c_void_p]
+            self._library.RemoveEventHandler.argtypes = [ctypes.c_void_p]
+            self._library.UnregisterEventHotKey(self._hotkey_ref)
+            self._library.RemoveEventHandler(self._handler_ref)
+            self._library = None
 
 
 def _process_name(pid: int) -> str:
@@ -504,6 +529,43 @@ class KeyboardManager:
 
     def capture_output_target(self):
         return self.correction_learner.capture_target()
+
+    def frontmost_is_settings(self):
+        from AppKit import NSWorkspace
+        app = NSWorkspace.sharedWorkspace().frontmostApplication()
+        return bool(app and app.bundleIdentifier() == "com.wjcdev.veyqa.settings")
+
+    def reload_configuration(self):
+        """Called on the app loop, only between utterances."""
+        key = os.getenv("VOICE_HOTKEY", self.voice_hotkey).strip().lower()
+        spec = self._parse_voice_hotkey(key)
+        if spec is None:
+            raise ValueError("快捷键配置无效，请重新选择")
+        backend = self._backend_for_hotkey(spec, os.getenv("GLOBAL_HOTKEY_BACKEND", "passive"))
+        # Passive listeners already observe all key events. Reuse the tap when
+        # only its matching rule changes; do not create duplicate listeners.
+        changed = (backend != self._hotkey_backend or self._listener is None
+                   or (backend == "registered" and key != self.voice_hotkey))
+        if changed and self._listener is not None:
+            previous, self._listener = self._listener, None
+            previous.stop()
+        self.voice_hotkey = key
+        self._voice_hotkey_spec = spec
+        self.voice_hotkey_label = os.getenv("VOICE_HOTKEY_LABEL", "") or self._voice_hotkey_display_label()
+        self._hotkey_mode = "toggle" if os.getenv("FN_HOTKEY_MODE") == "toggle" else "hold"
+        self._voice_hotkey_pressed = False
+        self._hotkey_backend = backend
+        self._suppress_vks, self._suppress_modifier_mask = self._build_hotkey_suppression()
+        if changed:
+            self._listener = None
+            self._listener_generation = getattr(self, "_listener_generation", 0) + 1
+            generation = self._listener_generation
+            if backend == "registered":
+                if self.start_listening(generation) is False:
+                    raise RuntimeError("组合键注册失败，请选择其他快捷键")
+            else:
+                threading.Thread(target=self.start_listening, args=(generation,), daemon=True,
+                                 name="keyboard-listener").start()
 
     def recovery_texts(self) -> list[str]:
         persisted = getattr(self, "recovery_store", None)
@@ -859,7 +921,9 @@ class KeyboardManager:
         except Exception as exc:  # noqa: BLE001
             logger.debug("只读快捷键事件处理失败: %s", exc)
 
-    def start_listening(self) -> None:
+    def start_listening(self, generation=None):
+        if generation is not None and generation != getattr(self, "_listener_generation", 0):
+            return
         if self._hotkey_backend == "off":
             logger.info("全局快捷键已关闭；请打开设置重新选择快捷键")
             return
@@ -879,7 +943,8 @@ class KeyboardManager:
             except Exception as exc:  # noqa: BLE001
                 logger.error("系统注册型快捷键不可用: %s", exc)
                 self.show_warning("组合键注册失败；请在设置中选择其他快捷键")
-            return
+                return False
+            return True
 
         # Prefer a listen-only Quartz tap: it reports when macOS disables it
         # and can be health-checked.  Some managed Macs block event taps even
@@ -894,16 +959,18 @@ class KeyboardManager:
             with listener:
                 logger.info("全局录音快捷键已启用（Quartz 只读监听，可自动恢复）")
                 listener.join()
-            if listener.running:
-                return
-            raise RuntimeError("Quartz 只读监听意外结束")
+            return
         except Exception as exc:  # noqa: BLE001
+            if self._listener is not listener:
+                return
             logger.warning("Quartz 快捷键监听不可用，切换到 AppKit 兼容模式: %s", exc)
 
         fallback = _PassiveGlobalMonitorListener(self._nsevent_intercept)
         self._listener = fallback
 
         def install_monitor() -> None:
+            if self._listener is not fallback:
+                return
             try:
                 fallback.start()
                 logger.info(

@@ -1,7 +1,6 @@
 import io
 import asyncio
 import os
-import sounddevice as sd
 import numpy as np
 import queue
 import soundfile as sf
@@ -10,6 +9,16 @@ from ..utils.logger import logger
 import time
 import threading
 from typing import AsyncGenerator, Optional
+
+
+class _LazySoundDevice:
+    """Do not initialize PortAudio in the application process at import time."""
+    def __getattr__(self, name):
+        import sounddevice
+        return getattr(sounddevice, name)
+
+
+sd = _LazySoundDevice()
 
 # 允许的设备关键字（按优先级从高到低）
 # 只允许这些设备，其他设备不使用

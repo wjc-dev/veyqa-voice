@@ -27,6 +27,8 @@ class DiagnosticsStore:
                 data = {}
             if not isinstance(data, dict):
                 data = {}
+            if all(key in data and data[key] == value for key, value in values.items()):
+                return
             data.update(values)
             data["updated_at"] = datetime.now(timezone.utc).astimezone().isoformat(
                 timespec="seconds"

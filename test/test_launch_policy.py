@@ -16,7 +16,7 @@ class LaunchPolicyTests(unittest.TestCase):
                 )
             )
 
-    def test_manual_unconfigured_or_packaged_launch_opens_settings(self):
+    def test_only_unconfigured_launch_automatically_opens_settings(self):
         self.assertTrue(
             _should_open_settings_on_start(
                 processor_present=False,
@@ -25,7 +25,7 @@ class LaunchPolicyTests(unittest.TestCase):
                 restarting=False,
             )
         )
-        self.assertTrue(
+        self.assertFalse(
             _should_open_settings_on_start(
                 processor_present=True,
                 is_frozen=True,

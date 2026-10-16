@@ -122,7 +122,7 @@ test("website is accessible static content, not a credential collection form", (
   assert.match(html, /role="status"\s+aria-live="polite"/);
   assert.match(html, /textarea\s+readonly/);
   assert.doesNotMatch(html, /<form|<input|https?:[^"']+\.(?:js|css)["']/i);
-  assert.ok(html.includes("/releases/tag/v0.2.4"));
+  assert.ok(html.includes("/releases/tag/v0.2.5"));
 });
 
 test("security instructions separate a personal exception from malware and managed-device blocks", () => {

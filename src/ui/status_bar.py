@@ -344,11 +344,15 @@ class StatusBarController:
         if self._open_settings_on_start:
             AppHelper.callLater(
                 0.8,
-                _launch_settings_window,
-                self._on_restart,
+                self._open_startup_settings,
             )
         if os.getenv("DOCK_ENTRY_SELF_TEST", "false").lower() == "true":
             AppHelper.callLater(1.2, self._open_settings)
+
+    def _open_startup_settings(self):
+        # A delayed startup callback must never steal a dictation's target.
+        if self._current_state == InputState.IDLE:
+            _launch_settings_window(self._on_restart)
 
     def _install_status_item(self) -> None:
         """Create one retained, fixed-size status item and wire its action."""
