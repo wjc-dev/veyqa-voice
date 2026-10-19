@@ -3,14 +3,24 @@ import Darwin
 import Foundation
 import SwiftUI
 
+private func isSettingsWindow(_ window: NSWindow) -> Bool {
+    window.title == "语音输入设置" && window.styleMask.contains(.titled)
+}
+
 private func raiseSettingsWindows() {
     // The settings helper is an accessory of the menu-bar app, not a second
     // standalone application.  Keeping accessory policy prevents the raw
     // helper executable from creating a generic white icon in the Dock while
     // still allowing its settings window to become key and frontmost.
     NSApp.setActivationPolicy(.accessory)
+    NSApp.unhide(nil)
     NSApp.activate(ignoringOtherApps: true)
-    for window in NSApp.windows {
+    let windows = NSApp.windows.filter(isSettingsWindow)
+    if windows.isEmpty {
+        SettingsAppDelegate.openSettingsWindow?()
+        return
+    }
+    for window in windows {
         // The helper owns only one transient settings window.  Disabling
         // minimization prevents macOS from leaving generic executable/window
         // tiles in the Dock when the user is finished configuring the app.
@@ -23,7 +33,10 @@ private func raiseSettingsWindows() {
 }
 
 final class SettingsAppDelegate: NSObject, NSApplicationDelegate {
+    static var reopeningApp = false
+    static var openSettingsWindow: (() -> Void)?
     private var raiseSignal: DispatchSourceSignal?
+    private var closeObserver: NSObjectProtocol?
     private var instanceLockURL: URL?
     private var shortcutCaptureURL: URL?
 
@@ -38,6 +51,15 @@ final class SettingsAppDelegate: NSObject, NSApplicationDelegate {
         source.setEventHandler { raiseSettingsWindows() }
         source.resume()
         raiseSignal = source
+        closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: nil, queue: .main
+        ) { notification in
+            guard let window = notification.object as? NSWindow,
+                  isSettingsWindow(window), !Self.reopeningApp else { return }
+            // SwiftUI can retain invisible utility windows. They must not keep
+            // a windowless settings helper alive after the real window closes.
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        }
 
         let dataURL = URL(fileURLWithPath: root, isDirectory: true)
         shortcutCaptureURL = dataURL.appendingPathComponent(".shortcut-capture")
@@ -57,12 +79,17 @@ final class SettingsAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
         removeOwnedLock(instanceLockURL)
         removeOwnedLock(shortcutCaptureURL)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        !Self.reopeningApp
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        Self.reopeningApp ? .terminateCancel : .terminateNow
     }
 
     private func acquireInstanceLock(_ url: URL) -> Bool {
@@ -198,6 +225,7 @@ struct PermissionSnapshot: Codable {
     var inputMonitoring: String?
     var inputMonitoringRequired: Bool?
     var allRequiredGranted: Bool?
+    var hotkeyReady: Bool?
     var checkedByCurrentProcess: Bool?
     var updatedAt: String?
 
@@ -210,6 +238,7 @@ struct PermissionSnapshot: Codable {
         case inputMonitoring = "input_monitoring"
         case inputMonitoringRequired = "input_monitoring_required"
         case allRequiredGranted = "all_required_granted"
+        case hotkeyReady = "hotkey_ready"
         case checkedByCurrentProcess = "checked_by_current_process"
         case updatedAt = "updated_at"
     }
@@ -241,6 +270,16 @@ final class SettingsModel: ObservableObject {
     @Published var hotkeyMode = "hold"
     @Published var hotkeyBackend = HotkeyConfig.backend(for: HotkeyConfig.defaultSpec)
     @Published var launchAtLogin = true
+    @Published var showMenuBarIcon = false
+    @Published var reopeningApp = false {
+        didSet {
+            SettingsAppDelegate.reopeningApp = reopeningApp
+            for window in NSApp.windows {
+                window.standardWindowButton(.closeButton)?.isEnabled = !reopeningApp
+            }
+        }
+    }
+    @Published var reopenStatus = ""
 
     @Published var transcriptionService = "qwen"
 
@@ -345,6 +384,8 @@ final class SettingsModel: ObservableObject {
             ? (environment["VOICE_HOTKEY_LABEL"] ?? Self.label(for: hotkeySpec))
             : HotkeyConfig.defaultLabel
         hotkeyBackend = Self.backend(for: hotkeySpec)
+        launchAtLogin = Self.bool(environment["LAUNCH_AT_LOGIN"], fallback: isBundled)
+        showMenuBarIcon = Self.bool(environment["SHOW_MENU_BAR_ICON"], fallback: false)
 
         qwenRegion = environment["QWEN_REGION"] ?? "beijing"
         qwenAPIKey = environment["QWEN_API_KEY"] ?? ""
@@ -478,6 +519,10 @@ final class SettingsModel: ObservableObject {
 
     var allRequiredPermissionsGranted: Bool {
         permissionsMatchCurrentApp && permissions.allRequiredGranted == true
+    }
+
+    var readyForDictation: Bool {
+        allRequiredPermissionsGranted && permissions.hotkeyReady == true && !reopeningApp
     }
 
     func deleteRecoveries(ids: Set<String>) {
@@ -641,7 +686,7 @@ final class SettingsModel: ObservableObject {
 
     func saveSettings(completeSetup: Bool = false, advanceSetup: Bool = false) {
         guard !applyingSettings else { return }
-        if completeSetup && (!setupConnectionApplied || !allRequiredPermissionsGranted) {
+        if completeSetup && (!setupConnectionApplied || !readyForDictation) {
             errorMessage = "请先连接语音服务并完成权限授权。"
             return
         }
@@ -689,6 +734,7 @@ final class SettingsModel: ObservableObject {
             "GLOBAL_HOTKEY_BACKEND": hotkeyBackend,
             "SINGLE_FN_HOTKEY": "true",
             "LAUNCH_AT_LOGIN": String(launchAtLogin),
+            "SHOW_MENU_BAR_ICON": String(showMenuBarIcon),
             "QWEN_API_KEY": normalizedKey,
             "QWEN_API_HOST": qwenAPIHost,
             "QWEN_WORKSPACE_ID": qwenAPIHost.isEmpty ? qwenWorkspace : "",
@@ -780,18 +826,65 @@ final class SettingsModel: ObservableObject {
     }
 
     func restartAndRecheckPermissions() {
-        guard permissionProcessAlive else {
-            errorMessage = "当前 Veyqa Voice 主程序已经退出，请重新打开 App。"
+        guard isBundled, !reopeningApp else { return }
+        guard !["RECORDING", "STREAMING", "PROCESSING"].contains(diagnostics.state ?? "") else {
+            errorMessage = "请先完成当前听写，再重新打开。"
             return
         }
-        guard isBundled else {
-            reloadPermissions()
+        let url = URL(fileURLWithPath: appPath).standardizedFileURL
+        guard Bundle(url: url)?.bundleIdentifier == "com.wjcdev.veyqa" else {
+            errorMessage = "请从“应用程序”打开 Veyqa Voice。"
             return
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            try? Self.privateWrite(Data("restart".utf8), to: self.dataURL.appendingPathComponent(".restart-request"))
-            exit(42)
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: "com.wjcdev.veyqa")
+            .first { $0.bundleURL?.standardizedFileURL == url }
+        let marker = Data("permission-reopen-\(UUID().uuidString)".utf8)
+        do { try Self.privateWrite(marker, to: supervisorPauseURL) }
+        catch { errorMessage = "暂时无法重新打开，请稍后再试。"; return }
+        reopeningApp = true
+        reopenStatus = "正在重新打开，设置会保留在当前步骤…"
+        if let running { Darwin.kill(running.processIdentifier, SIGTERM) }
+        let deadline = Date().addingTimeInterval(10)
+        func openAfterExit() {
+            if let running, !running.isTerminated {
+                if Date() >= deadline {
+                    self.reopeningApp = false
+                    self.reopenStatus = "退出尚未完成，请结束听写后再试。"
+                    if (try? Data(contentsOf: self.supervisorPauseURL)) == marker {
+                        try? FileManager.default.removeItem(at: self.supervisorPauseURL)
+                    }
+                    return
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { openAfterExit() }
+                return
+            }
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = false
+            configuration.arguments = ["--background-login"]
+            var finished = false
+            func finish(_ success: Bool) {
+                guard !finished else { return }
+                finished = true
+                self.reopeningApp = false
+                if success {
+                    self.reopenStatus = "已重新打开，正在检查权限和快捷键…"
+                    self.reloadPermissions()
+                    self.requestPermission("all", openSettings: false)
+                } else {
+                    self.reopenStatus = "打开未完成，请点击“重新打开 App”再试。"
+                    if (try? Data(contentsOf: self.supervisorPauseURL)) == marker {
+                        try? FileManager.default.removeItem(at: self.supervisorPauseURL)
+                    }
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 15) { finish(false) }
+            NSWorkspace.shared.openApplication(at: url, configuration: configuration) { app, error in
+                DispatchQueue.main.async {
+                    finish(app != nil && error == nil)
+                }
+            }
         }
+        openAfterExit()
     }
 
     func quitVoiceInput() {
@@ -1222,6 +1315,23 @@ struct PermissionSetupView: View {
 
             DisclosureGroup("查看当前应用信息") { identityCard }
 
+            if model.readyForDictation {
+                Label("权限和快捷键已就绪，可以开始试用。", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            } else if !model.reopenStatus.isEmpty {
+                Text(model.reopenStatus).font(.callout).foregroundStyle(.secondary)
+            } else if model.allRequiredPermissionsGranted {
+                Text("权限已开启，正在连接快捷键。准备好后会自动继续。")
+                    .font(.callout).foregroundStyle(.secondary)
+                Button("重新连接快捷键") {
+                    try? SettingsModel.privateWrite(Data("retry".utf8),
+                        to: model.dataURL.appendingPathComponent(".listener-reconnect-request"))
+                }
+            } else {
+                Text("在系统设置中开启权限，返回后自动继续。若系统要求退出并重新打开，请按系统提示操作。")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+
             HStack {
                 Menu("更多") {
                     Button("关闭设置窗口") { NSApp.terminate(nil) }
@@ -1239,19 +1349,22 @@ struct PermissionSetupView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(!model.permissionProcessAlive)
-                Button("重启并重新检查") {
+                    Button(model.reopeningApp ? "正在打开…" : "重新打开 App") {
                     model.restartAndRecheckPermissions()
                 }
                 .buttonStyle(.bordered)
-                .disabled(!model.permissionProcessAlive)
+                .disabled(model.reopeningApp)
                 Button("继续") { onContinue() }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!model.allRequiredPermissionsGranted)
+                    .disabled(!model.readyForDictation)
             }
         }
         .padding(28)
         .frame(width: 650)
         .onAppear { model.reloadPermissions() }
+        .onChange(of: model.readyForDictation) { ready in
+            if ready { onContinue() }
+        }
         .interactiveDismissDisabled(!allowsDismiss && !model.allRequiredPermissionsGranted)
     }
 
@@ -1286,11 +1399,11 @@ struct PermissionSetupView: View {
             Text("可执行文件指纹：\(model.permissions.executableFingerprint ?? "—")")
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
-            Text("以上状态由该 PID 的主程序直接读取。旧版本即使同名且已授权，也不会让当前版本显示为已授权。")
+            Text("以上为当前应用的运行信息。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if !model.permissionProcessAlive {
-                Text("当前主程序已经退出。请关闭此窗口，再从“应用程序”或 Spotlight 重新打开 Veyqa Voice。")
+                Text("点击“重新打开 App”，继续当前设置。")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.red)
             }
@@ -1328,10 +1441,10 @@ struct VocabularyEditorView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("提高专有名词的识别准确率")
                         .font(.headline)
-                    Text("每行填写一个容易被误识别的人名、品牌名、产品名、项目代号或行业术语。只添加确实容易出错的词；过多常用词可能降低整体准确率。")
+                    Text("每行添加一个专有词汇，提升识别概率。例如 user_id、seller_id、订单ID、产品名或项目代号。")
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                    Text("千问会直接发送该词表；豆包会发送词汇提示和精确拼写规则。需要更强的豆包效果时，请在“引擎”中填写热词表 ID。")
+                    Text("词汇随识别请求发送给所选语音服务，保存后从下一次听写生效。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1420,7 +1533,7 @@ struct GeneralSettingsView: View {
                             : "管理 \(model.customVocabularyCount) 个词…")
                     }
                 }
-                Text("词汇在本机保存，并按引擎支持的方式随识别请求发送。保存后从下一次听写生效。")
+                Text("添加 user_id、seller_id 等字段名或专有词汇，提升识别概率。")
                     .foregroundStyle(.secondary)
                     .font(.callout)
             }
@@ -1428,6 +1541,9 @@ struct GeneralSettingsView: View {
             if model.isBundled {
                 Section("应用") {
                     Toggle("登录后自动启动", isOn: $model.launchAtLogin)
+                    Toggle("显示菜单栏图标", isOn: $model.showMenuBarIcon)
+                    Text("点击菜单栏或 Dock 图标，随时打开设置。")
+                        .font(.callout).foregroundStyle(.secondary)
                     HStack(spacing: 10) {
                         Label(
                             model.allRequiredPermissionsGranted ? "权限完整" : "权限需要处理",
@@ -1904,7 +2020,7 @@ struct FirstRunView: View {
 
     private var step: SetupStep {
         SetupStep.current(connectionApplied: model.setupConnectionApplied,
-                          permissionsGranted: model.allRequiredPermissionsGranted)
+                          permissionsGranted: model.readyForDictation)
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1916,7 +2032,7 @@ struct FirstRunView: View {
                 EngineSettingsView(model: model)
             case .permissions:
                 Text("语音服务设置已保存。接下来允许麦克风与键盘相关权限。")
-                Text("授权只在 macOS 系统设置中完成；我们不会读取其他按键内容。")
+                Text("在系统设置中打开权限，返回后会自动检查。")
                     .font(.callout).foregroundStyle(.secondary)
                 Button("开启所需权限") { showPermissions = true }
                     .buttonStyle(.borderedProminent)
@@ -1947,7 +2063,7 @@ struct FirstRunView: View {
                         model.saveSettings(completeSetup: true)
                     }.buttonStyle(.borderedProminent).disabled(model.applyingSettings)
                 }
-                Text("关闭后，先点击任意 App 的输入框，再用同一个快捷键说话。点击 Dock 图标可随时回来。")
+                Text("完成后点击任意 App 的输入框，即可使用语音快捷键。点击菜单栏或 Dock 图标可打开设置。")
                     .font(.callout).foregroundStyle(.secondary)
             }
         }.padding(20)
@@ -1955,6 +2071,7 @@ struct FirstRunView: View {
 }
 
 struct SettingsRootView: View {
+    @Environment(\.openWindow) private var openWindow
     @ObservedObject var model: SettingsModel
     @State private var showPermissions = false
     @State private var showVocabulary = false
@@ -2006,6 +2123,7 @@ struct SettingsRootView: View {
         .padding(.top, 8)
         .frame(width: 700, height: model.onboardingComplete ? 500 : 660)
         .onAppear {
+            SettingsAppDelegate.openSettingsWindow = { openWindow(id: "settings") }
             if !model.onboardingComplete { selectedTab = "engine" }
             model.reloadDiagnostics()
             model.reloadPermissions()
@@ -2066,7 +2184,7 @@ struct VoiceInputSettingsApp: App {
     @StateObject private var model = SettingsModel()
 
     var body: some Scene {
-        WindowGroup("语音输入设置") {
+        Window("语音输入设置", id: "settings") {
             SettingsRootView(model: model)
                 .onAppear {
                     bringSettingsToFront()

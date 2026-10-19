@@ -18,11 +18,7 @@ document.querySelectorAll("[data-copy]").forEach((button) => {
       if (!navigator.clipboard?.writeText)
         throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(text);
-      feedback(
-        button.dataset.copy === "agent-prompt"
-          ? "提示词已复制，粘贴给你的本地 Agent 即可。"
-          : "安装命令已复制。",
-      );
+      feedback("安装命令已复制。");
     } catch {
       const details = target.closest("details");
       if (details) details.open = true;

@@ -107,15 +107,18 @@ def _activate_settings_process(process: subprocess.Popen) -> bool:
     if ready_pid != process.pid:
         _write_status_log(f"settings process warming up pid={process.pid}")
         return True
-    # The native settings helper is a Swift executable rather than a bundled
-    # NSRunningApplication. Its SIGUSR1 handler is the most reliable way to
-    # raise the existing window even when macOS does not expose it here.
+    return _signal_and_activate_settings(process.pid)
+
+
+def _signal_and_activate_settings(pid: int, running=None) -> bool:
+    """Use the same raise/unhide path for owned and reattached helpers."""
     try:
-        os.kill(process.pid, signal.SIGUSR1)
+        os.kill(pid, signal.SIGUSR1)
     except OSError:
         return False
     try:
-        running = NSRunningApplication.runningApplicationWithProcessIdentifier_(process.pid)
+        if running is None:
+            running = NSRunningApplication.runningApplicationWithProcessIdentifier_(pid)
         if running is None:
             return True
         options = NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows
@@ -165,6 +168,19 @@ def _launch_settings_window(on_restart=None) -> int:
     log_dir = str(LOG_DIR)
     log_path = os.path.join(log_dir, "settings_ui.log")
     os.makedirs(log_dir, exist_ok=True)
+
+    # A permission relaunch leaves the existing settings window in place.
+    # Reattach by verified executable identity instead of spawning a duplicate.
+    try:
+        existing_pid = int((DATA_DIR / ".settings-instance").read_text().strip())
+        existing = NSRunningApplication.runningApplicationWithProcessIdentifier_(existing_pid)
+        if (existing_pid > 1 and existing is not None and existing.executableURL() is not None
+                and os.path.realpath(existing.executableURL().path()) == os.path.realpath(native_binary)):
+            if _signal_and_activate_settings(existing_pid, existing):
+                _write_status_log(f"reattached settings process pid={existing_pid}")
+                return existing_pid
+    except (OSError, ValueError):
+        pass
 
     executable = sys.executable
     arguments = [sys.executable, settings_script]
@@ -322,6 +338,18 @@ class StatusBarController:
         """Open or raise settings from Finder, the Dock, or the optional menu bar."""
         self._open_settings()
 
+    def apply_preferences(self) -> None:
+        """Apply the optional menu entry without restarting the resident app."""
+        def apply():
+            if _menu_bar_enabled():
+                if self._status_item is None:
+                    self._install_status_item()
+                self._schedule_status_health_check()
+            elif self._status_item is not None:
+                NSStatusBar.systemStatusBar().removeStatusItem_(self._status_item)
+                self._status_item = None
+        AppHelper.callAfter(apply)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -386,8 +414,8 @@ class StatusBarController:
             _write_status_log("status item creation failed: button unavailable")
             return
 
-        button.setTitle_(f"🎙 {_service_label()}")
-        button.setToolTip_("Voice Input - 点击打开设置")
+        button.setTitle_("◉")
+        button.setToolTip_("Veyqa Voice - 点击打开设置")
         button.setEnabled_(True)
         if self._menu_action_handler is None:
             self._menu_action_handler = _MenuActionHandler.alloc().init()
@@ -407,6 +435,8 @@ class StatusBarController:
 
         def _check() -> None:
             self._status_health_check_scheduled = False
+            if not _menu_bar_enabled():
+                return
             try:
                 item = self._status_item
                 button = item.button() if item is not None else None
@@ -420,11 +450,10 @@ class StatusBarController:
                             _write_status_log("status item visibility restored")
                     except Exception:  # noqa: BLE001
                         pass
-                    self._refresh()
             finally:
                 self._schedule_status_health_check()
 
-        AppHelper.callLater(3.0, _check)
+        AppHelper.callLater(30.0, _check)
 
     def _open_settings(self) -> None:
         _launch_settings_window(
@@ -462,7 +491,7 @@ class StatusBarController:
         if image is None:
             title = visual.fallback_text
 
-        tooltip = f"Voice Input - {visual.description}（点击打开设置）"
+        tooltip = f"Veyqa Voice - {visual.description}（点击打开设置）"
         if self._queue_length:
             tooltip += f" | 待处理任务 {self._queue_length}"
 

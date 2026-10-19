@@ -1,52 +1,49 @@
 # Veyqa Voice
 
-**Say it. Type it.** A voice input key for your Mac.
+**Lightweight voice input for Mac. Hold to speak, release to type.**
 
-[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.6) · [简体中文](README.md)
+[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.7) · [简体中文](README.md)
 
-[![Hold right Option, see a live preview, release to insert. Click to replay the product illustration.](website/product-preview.svg)](https://wjc-dev.github.io/voxtype/#demo)
+[![Veyqa Voice demo](website/product-preview.svg)](https://wjc-dev.github.io/voxtype/#demo)
 
-- Hold right Option to speak. Release to insert text — never auto-send.
-- Keep your input method. No AI rewriting by default.
-- Choose Qwen or Doubao with your own API credentials; your provider bills usage separately.
+- Works alongside your existing keyboard and input method.
+- Transcribes your words into the focused input field; you decide when to send.
+- Supports Qwen and Doubao. Add terms such as `user_id` and `seller_id` to improve recognition.
 
 ## Install
 
 Requires **Apple Silicon and macOS 13+**.
 
-**Recommended:** [Download the DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.6/Veyqa-Voice-v0.2.6-macOS-arm64.dmg), drag Veyqa Voice to Applications, and open it there. No Homebrew, Python, or developer tools are required.
+1. [Download and open the DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.7/Veyqa-Voice-v0.2.7-macOS-arm64.dmg).
+2. Follow the arrow: drag **Veyqa Voice into Applications**.
+3. Open Veyqa Voice from Applications to begin setup.
 
-Already use Homebrew? Alternatively:
+This Preview is not yet Apple-notarized. For an unidentified-developer prompt, see the [first-open guide](https://wjc-dev.github.io/voxtype/#safety).
+
+<details><summary>Install with Homebrew</summary>
 
 ```bash
 brew install --cask wjc-dev/veyqa/veyqa-voice
 ```
 
-A local AI agent can help: [copy the setup prompt on our website](https://wjc-dev.github.io/voxtype/#agent).
-
-## Start dictating
-
-1. **Connect:** Paste your own Qwen API key and select Connect and continue. A successful connection saves the settings automatically. Expand the in-app key guide or use [the official guide](https://help.aliyun.com/en/model-studio/get-api-key). Doubao is also available.
-2. **Allow permissions:** Follow the prompts for Microphone, Accessibility, and Input Monitoring.
-3. **Try dictation:** Click the trial text box, **hold right Option, speak, then release**. Once text appears, finish setup and use the same shortcut in other apps. Click the Dock icon to open Settings; later changes only need Save.
-
-New to API keys? Follow the [three-step visual guide](https://wjc-dev.github.io/voxtype/#api-key). Shortcuts and hold/toggle mode are customizable; updates preserve credentials and settings.
-
-## Before you start
-
-**0.2.6 Preview** is not Apple-notarized. Audio is sent to your selected cloud ASR provider. Local audio archives are off by default. Never share API keys in chat or with an agent.
-
-<details>
-<summary>macOS blocked the first launch?</summary>
-
-If the developer cannot be verified or the app is not notarized, first confirm that the download is official and that you trust its source. You may then choose **System Settings → Privacy & Security → Open Anyway**, and confirm **Open** yourself. This is an app-specific exception, not a reason to disable system protection. [Apple's guidance](https://support.apple.com/en-us/102445)
-
-Stop and report the issue if macOS warns of malware or damage, or if company security software blocks the app. Follow your administrator's policy; do not force it to run.
-
 </details>
 
-[Feedback](https://github.com/wjc-dev/voxtype/issues) · [Developer guide](docs/development.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+## Set up once
+
+1. Paste your own speech-service API Key and connect. Qwen is selected by default; [Key setup guide](https://wjc-dev.github.io/voxtype/#api-key).
+2. Grant microphone, Accessibility, and Input Monitoring permissions. Return to the app for automatic checks. Follow macOS prompts if it requests a relaunch.
+3. Click the trial text field, hold **right Option** to speak, then release. Finish setup and use it in other apps.
+
+Open settings from the menu bar or Dock. Adjust the shortcut, hold/toggle mode, and menu-bar visibility; save to apply. Updates preserve existing configuration.
+
+## Speech services
+
+The default **Qwen Audio 3.0 ASR Streaming** engine offers streaming recognition, multilingual and dialect support, and hotword enhancement. Doubao is also available.
+
+Your API Key stays on your Mac. Audio goes directly to the selected speech service, which bills your account for API usage. Local audio archives are off by default.
+
+[Issues](https://github.com/wjc-dev/voxtype/issues) · [Development](docs/development.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ## License
 
-[MIT](LICENSE). Derived from [ErlichLiu/Whisper-Input](https://github.com/ErlichLiu) and [Mor-Li/Whisper-Input-Next](https://github.com/Mor-Li); original copyright notices are preserved.
+[MIT](LICENSE). Derived from [ErlichLiu/Whisper-Input](https://github.com/ErlichLiu) and [Mor-Li/Whisper-Input-Next](https://github.com/Mor-Li), with original copyright notices retained.

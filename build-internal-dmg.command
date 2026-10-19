@@ -4,9 +4,9 @@ set -euo pipefail
 PROJECT_DIR="${0:A:h}"
 source "$PROJECT_DIR/packaging/signing.zsh"
 veyqa_configure_signing
-VERSION="0.2.6"
+VERSION="0.2.7"
 OUTPUT_DIR="${1:-$PROJECT_DIR/dist-$VEYQA_SIGNING_PROFILE}"
-BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-212}"
+BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-214}"
 [[ "$BUILD_NUMBER" == <-> ]] || { print -u2 "Invalid build number"; exit 1; }
 ARTIFACT_SUFFIX=""
 [[ "$VEYQA_SIGNING_PROFILE" == "local" ]] && ARTIFACT_SUFFIX="-local"
@@ -15,7 +15,6 @@ WORK_DIR="$PROJECT_DIR/.package-build/$RUN_ID"
 PYINSTALLER_WORK="$WORK_DIR/pyinstaller"
 PYINSTALLER_DIST="$WORK_DIR/dist"
 ICONSET="$WORK_DIR/AppIcon.iconset"
-STAGING="$WORK_DIR/dmg"
 CLANG_CACHE="$WORK_DIR/clang-module-cache"
 APP_PATH="$PYINSTALLER_DIST/Veyqa Voice.app"
 DMG_PATH="$OUTPUT_DIR/Veyqa-Voice-v${VERSION}-macOS-arm64${ARTIFACT_SUFFIX}.dmg"
@@ -32,7 +31,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$WORK_DIR" "$PYINSTALLER_WORK" "$PYINSTALLER_DIST" "$ICONSET" "$STAGING" "$OUTPUT_DIR" "$CLANG_CACHE" "$PROJECT_DIR/build"
+mkdir -p "$WORK_DIR" "$PYINSTALLER_WORK" "$PYINSTALLER_DIST" "$ICONSET" "$OUTPUT_DIR" "$CLANG_CACHE" "$PROJECT_DIR/build"
 export CLANG_MODULE_CACHE_PATH="$CLANG_CACHE"
 export SWIFT_MODULECACHE_PATH="$CLANG_CACHE"
 
@@ -98,23 +97,26 @@ veyqa_sign_app "$APP_PATH" "$PROJECT_DIR/packaging/voice_input.entitlements"
   --identifier "com.wjcdev.veyqa" \
   --version "$VERSION" \
   "$PKG_PATH"
-shasum -a 256 "$PKG_PATH" > "$PKG_PATH.sha256"
+(cd "$OUTPUT_DIR" && shasum -a 256 "${PKG_PATH:t}") > "$PKG_PATH.sha256"
 print "完成：$PKG_PATH"
 
 # Always provide the .app as a Finder-safe ZIP. This is the simplest artifact
 # to hand to a small trusted test group and preserves bundle metadata.
 ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
-shasum -a 256 "$ZIP_PATH" > "$ZIP_PATH.sha256"
+(cd "$OUTPUT_DIR" && shasum -a 256 "${ZIP_PATH:t}") > "$ZIP_PATH.sha256"
 print "完成：$ZIP_PATH"
 
-ditto "$APP_PATH" "$STAGING/Veyqa Voice.app"
-ln -s /Applications "$STAGING/Applications"
-
-if hdiutil create -volname "Veyqa Voice" -srcfolder "$STAGING" \
-  -ov -format UDZO "$DMG_PATH" >/dev/null; then
-  shasum -a 256 "$DMG_PATH" > "$DMG_PATH.sha256"
+if ! "$PROJECT_DIR/.venv/bin/python" -c 'import dmgbuild' >/dev/null 2>&1; then
+  print -u2 "Install packaging dependencies: uv pip install --python .venv/bin/python -r requirements-dev.txt"
+  exit 1
+fi
+xcrun swift "$PROJECT_DIR/packaging/generate_dmg_background.swift" "$WORK_DIR/dmg-background.png"
+if "$PROJECT_DIR/.venv/bin/python" "$PROJECT_DIR/packaging/build_dmg.py" \
+  "$APP_PATH" "$WORK_DIR/dmg-background.png" "$PROJECT_DIR/packaging/install-guide.html" "$DMG_PATH"; then
+  (cd "$OUTPUT_DIR" && shasum -a 256 "${DMG_PATH:t}") > "$DMG_PATH.sha256"
   print "完成：$DMG_PATH"
   print "校验：$(cat "$DMG_PATH.sha256")"
 else
   print -u2 "当前环境无法创建磁盘镜像；仍可使用已生成的 App ZIP 或 PKG。"
+  exit 1
 fi

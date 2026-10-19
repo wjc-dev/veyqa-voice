@@ -976,6 +976,18 @@ class KeyboardManager:
         except Exception as exc:  # noqa: BLE001
             logger.debug("只读快捷键事件处理失败: %s", exc)
 
+    def listener_ready(self) -> bool:
+        """Inspect the installed listener, not whether the user has pressed a key."""
+        listener = self._listener
+        if listener is None or not listener.running:
+            return False
+        if isinstance(listener, _PassiveTapListener):
+            from Quartz import CGEventTapIsEnabled
+            return listener.tap_ref is not None and bool(CGEventTapIsEnabled(listener.tap_ref))
+        if isinstance(listener, _PassiveGlobalMonitorListener):
+            return listener.monitor is not None
+        return isinstance(listener, _RegisteredHotKeyListener) and bool(listener._hotkey_ref.value)
+
     def start_listening(self, generation=None):
         if generation is None:
             generation = getattr(self, "_listener_generation", 0)

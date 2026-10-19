@@ -7,6 +7,54 @@ from src.ui import status_bar
 
 
 class SettingsLaunchTests(unittest.TestCase):
+    def test_menu_preference_applies_without_restarting(self):
+        controller = status_bar.StatusBarController.__new__(status_bar.StatusBarController)
+        controller._status_item = None
+        with patch.object(status_bar.AppHelper, "callAfter", side_effect=lambda f: f()), \
+                patch.object(status_bar, "_menu_bar_enabled", return_value=True) as enabled, \
+                patch.object(controller, "_install_status_item") as install, \
+                patch.object(controller, "_schedule_status_health_check") as schedule, \
+                patch.object(status_bar, "NSStatusBar") as bar:
+            controller.apply_preferences()
+            install.assert_called_once()
+            schedule.assert_called_once()
+            item = controller._status_item = MagicMock()
+            enabled.return_value = False
+            controller.apply_preferences()
+            bar.systemStatusBar().removeStatusItem_.assert_called_once_with(item)
+            self.assertIsNone(controller._status_item)
+
+    def test_disabled_menu_stops_its_health_check(self):
+        controller = status_bar.StatusBarController.__new__(status_bar.StatusBarController)
+        controller._status_health_check_scheduled = False
+        with patch.object(status_bar.AppHelper, "callLater") as later, \
+                patch.object(status_bar, "_menu_bar_enabled", return_value=False):
+            controller._schedule_status_health_check()
+            self.assertEqual(later.call_args.args[0], 30.0)
+            later.call_args.args[1]()
+            self.assertFalse(controller._status_health_check_scheduled)
+            self.assertEqual(later.call_count, 1)
+
+    def test_main_relaunch_reattaches_to_verified_settings_helper(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".settings-instance").write_text("24680")
+            binary = root / "Contents/Helpers/VeyqaSettings.app/Contents/MacOS/VeyqaSettings"
+            with patch.object(status_bar, "_settings_process", None), \
+                    patch.object(status_bar, "IS_FROZEN", True), \
+                    patch.object(status_bar, "DATA_DIR", root), \
+                    patch.object(status_bar, "LOG_DIR", root), \
+                    patch.object(status_bar, "app_bundle_path", return_value=root), \
+                    patch.object(status_bar, "NSRunningApplication") as running, \
+                    patch.object(status_bar.os, "kill") as signal, \
+                    patch.object(status_bar.subprocess, "Popen") as spawn:
+                running.runningApplicationWithProcessIdentifier_.return_value.executableURL.return_value.path.return_value = str(binary)
+                self.assertEqual(status_bar._launch_settings_window(), 24680)
+                signal.assert_called_once_with(24680, status_bar.signal.SIGUSR1)
+                running.runningApplicationWithProcessIdentifier_.return_value.unhide.assert_called_once()
+                running.runningApplicationWithProcessIdentifier_.return_value.activateWithOptions_.assert_called_once()
+                spawn.assert_not_called()
+
     def test_recovery_screen_is_reachable_and_settings_closes_after_last_window(self):
         swift = (Path(__file__).resolve().parents[1] / "native_settings/VoiceInputSettings.swift").read_text()
         self.assertIn("RecoverySettingsView(model: model)", swift)
@@ -16,6 +64,11 @@ class SettingsLaunchTests(unittest.TestCase):
         self.assertIn("guard recoveriesGate.changed(contents) else { return }", swift)
         self.assertIn("RecoveryFile.delete(ids: ids, at: url)", swift)
         self.assertNotIn("persistRecoveries()", swift)
+        self.assertIn('Window("语音输入设置", id: "settings")', swift)
+        self.assertIn('openWindow(id: "settings")', swift)
+        self.assertIn("NSApp.windows.filter(isSettingsWindow)", swift)
+        self.assertIn("NSWindow.willCloseNotification", swift)
+        self.assertIn("NSApp.unhide(nil)", swift)
 
     def test_status_log_rotates_and_logging_failure_is_nonfatal(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -95,7 +148,7 @@ class SettingsLaunchTests(unittest.TestCase):
         self.assertNotIn("企业兼容", swift)
         self.assertNotIn("企业电脑推荐", fallback)
         self.assertNotIn("Karabiner 用户", swift)
-        self.assertIn("重启并重新检查", swift)
+        self.assertIn("重新打开 App", swift)
 
     def test_status_controller_has_no_recording_callback(self):
         with self.assertRaises(TypeError):
@@ -153,6 +206,7 @@ class SettingsLaunchTests(unittest.TestCase):
 
         launch.assert_called_once()
 
+    @patch.dict(status_bar.os.environ, {"SHOW_MENU_BAR_ICON": "true"})
     def test_health_check_recreates_a_lost_status_item(self):
         with patch.object(status_bar.StatusBarController, "_load_custom_icons"):
             controller = status_bar.StatusBarController()
@@ -172,6 +226,7 @@ class SettingsLaunchTests(unittest.TestCase):
         install.assert_called_once_with()
         reschedule.assert_called_once_with()
 
+    @patch.dict(status_bar.os.environ, {"SHOW_MENU_BAR_ICON": "true"})
     def test_health_check_restores_hidden_status_item(self):
         with patch.object(status_bar.StatusBarController, "_load_custom_icons"):
             controller = status_bar.StatusBarController()
@@ -192,7 +247,7 @@ class SettingsLaunchTests(unittest.TestCase):
             health_check()
 
         item.setVisible_.assert_called_once_with(True)
-        refresh.assert_called_once_with()
+        refresh.assert_not_called()
 
 
 if __name__ == "__main__":

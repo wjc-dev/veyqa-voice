@@ -65,7 +65,7 @@ from src.utils.logger import logger
 from src.setup_feedback import empty_result_notice
 
 
-__version__ = "0.2.6"
+__version__ = "0.2.7"
 __author__ = "Mor-Li"
 __description__ = "Qwen and Doubao realtime voice input for macOS"
 
@@ -147,6 +147,7 @@ class VoiceAssistant:
         self.permission_monitor = PermissionMonitor(
             version=__version__,
             hotkey_backend=getattr(self.keyboard_manager, "_hotkey_backend", "passive"),
+            listener_ready=self.keyboard_manager.listener_ready,
         )
         self.status_controller = StatusBarController(
             on_restart=self._restart_application,
@@ -246,13 +247,17 @@ class VoiceAssistant:
             return
         current = (snapshot.get("accessibility"), snapshot.get("input_monitoring"))
         previous = getattr(self, "_last_permission_state", None)
-        if current == previous:
+        reconnect = DATA_DIR / ".listener-reconnect-request"
+        requested = reconnect.exists()
+        if current == previous and not requested:
             return
         if (self._current_session is not None or self.keyboard_manager.is_recording
                 or getattr(self.keyboard_manager, "_transition_started_at", None) is not None):
             return
         self._last_permission_state = current
-        if previous is not None and current == ("granted", "granted"):
+        reconnect.unlink(missing_ok=True)
+        if (previous is not None or requested) and current[0] == "granted" and (
+                self.keyboard_manager._hotkey_backend != "passive" or current[1] == "granted"):
             try:
                 self.keyboard_manager.reload_configuration(force_listener=True)
                 self.diagnostics.update(recovery_status="权限已更新，快捷键监听已重新启用")
@@ -290,6 +295,7 @@ class VoiceAssistant:
                 self.archive_enabled = os.getenv("AUDIO_ARCHIVE_ENABLED", "false").lower() == "true"
                 self.keyboard_manager.reload_configuration()
                 self.permission_monitor.hotkey_backend = self.keyboard_manager._hotkey_backend
+                self.status_controller.apply_preferences()
                 login = sync_login_item(os.getenv("LAUNCH_AT_LOGIN", "true").lower() == "true")
                 self.diagnostics.update(settings_revision=revision, settings_status="applied",
                                         engine=self.service, hotkey=self.keyboard_manager.voice_hotkey_label,

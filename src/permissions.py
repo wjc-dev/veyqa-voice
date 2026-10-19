@@ -117,12 +117,14 @@ class PermissionMonitor:
         status_path: Path | None = None,
         request_path: Path | None = None,
         interval: float = 2.0,
+        listener_ready=None,
     ) -> None:
         self.version = version
         self.hotkey_backend = hotkey_backend
         self.status_path = status_path or PERMISSIONS_FILE
         self.request_path = request_path or PERMISSION_REQUEST_FILE
         self.interval = max(0.25, interval)
+        self.listener_ready = listener_ready
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._request_lock = threading.Lock()
@@ -179,6 +181,7 @@ class PermissionMonitor:
                 input_monitoring_required=input_required,
             ),
             "checked_by_current_process": True,
+            "hotkey_ready": bool(self.listener_ready()) if self.listener_ready else False,
         }
         if snapshot != self._last_status or not self.status_path.exists():
             published = {**snapshot, "updated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")}

@@ -15,12 +15,12 @@ class PackagingIdentityTests(unittest.TestCase):
             ROOT / "native_settings" / "VoiceInputSettings-Info.plist"
         ).read_text(encoding="utf-8")
 
-        self.assertIn('__version__ = "0.2.6"', main)
-        self.assertIn('version="0.2.6"', spec)
-        self.assertIn('"CFBundleShortVersionString": "0.2.6"', spec)
-        self.assertIn('VERSION="0.2.6"', build)
-        self.assertIn('PACKAGE_NAME="Veyqa-Voice-v0.2.6"', source_package)
-        self.assertIn("<string>0.2.6</string>", settings_info)
+        self.assertIn('__version__ = "0.2.7"', main)
+        self.assertIn('version="0.2.7"', spec)
+        self.assertIn('"CFBundleShortVersionString": "0.2.7"', spec)
+        self.assertIn('VERSION="0.2.7"', build)
+        self.assertIn('PACKAGE_NAME="Veyqa-Voice-v0.2.7"', source_package)
+        self.assertIn("<string>0.2.7</string>", settings_info)
 
     def test_main_app_is_a_regular_dock_application(self):
         spec = (ROOT / "packaging" / "VoiceInput.spec").read_text(encoding="utf-8")
@@ -137,9 +137,9 @@ class PackagingIdentityTests(unittest.TestCase):
         )
 
         self.assertIn('Button("关闭设置窗口")', settings)
-        self.assertIn('Button("重启并重新检查")', settings)
+        self.assertIn('"重新打开 App"', settings)
         self.assertIn('return "当前主程序已退出"', settings)
-        self.assertIn("请关闭此窗口", settings)
+        self.assertIn("继续当前设置", settings)
 
 
 if __name__ == "__main__":

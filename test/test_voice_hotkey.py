@@ -22,6 +22,28 @@ from src.keyboard.listener import (
 
 
 class VoiceHotkeyTests(unittest.TestCase):
+    def test_listener_ready_checks_real_backend_handles(self):
+        from ctypes import c_void_p
+        manager = KeyboardManager.__new__(KeyboardManager)
+        manager._listener = None
+        self.assertFalse(manager.listener_ready())
+        for backend, field in ((_PassiveTapListener, "tap_ref"),
+                               (_PassiveGlobalMonitorListener, "monitor"),
+                               (_RegisteredHotKeyListener, "_hotkey_ref")):
+            listener = backend.__new__(backend)
+            listener.running = True
+            setattr(listener, field, c_void_p() if field == "_hotkey_ref" else None)
+            manager._listener = listener
+            self.assertFalse(manager.listener_ready())
+            setattr(listener, field, c_void_p(1) if field == "_hotkey_ref" else object())
+            with patch("Quartz.CGEventTapIsEnabled", return_value=True):
+                self.assertTrue(manager.listener_ready())
+            if field == "tap_ref":
+                with patch("Quartz.CGEventTapIsEnabled", return_value=False):
+                    self.assertFalse(manager.listener_ready())
+            listener.running = False
+            self.assertFalse(manager.listener_ready())
+
     def make_manager(self, value):
         manager = KeyboardManager.__new__(KeyboardManager)
         manager._recording_lock = threading.RLock()

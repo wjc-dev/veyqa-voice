@@ -18,6 +18,7 @@ def assistant():
         voice_hotkey_label="右 Option", _transition_started_at=None,
     )
     app.permission_monitor = SimpleNamespace(hotkey_backend="passive")
+    app.status_controller = Mock()
     app.diagnostics = Mock()
     return app
 
@@ -34,6 +35,7 @@ def test_save_applies_without_restart_and_acknowledges_revision(tmp_path):
         app._apply_pending_settings()
     restart.assert_not_called()
     app.keyboard_manager.reload_configuration.assert_called_once()
+    app.status_controller.apply_preferences.assert_called_once()
     assert not request.exists()
     assert app.diagnostics.update.call_args.kwargs["settings_status"] == "applied"
     assert app.diagnostics.update.call_args.kwargs["settings_revision"] == "save-1"
@@ -148,8 +150,13 @@ def test_notice_failure_still_resets_pressed_state():
     app.keyboard_manager.reset_state.assert_called_once()
 
 
-def test_first_permission_grant_rebinds_once_without_restarting():
+def test_first_permission_grant_rebinds_once_without_restarting(tmp_path):
     app = assistant()
+    with patch("main.DATA_DIR", tmp_path):
+        _check_first_permission_grant(app)
+
+
+def _check_first_permission_grant(app):
     app.permission_monitor.latest_snapshot = {"accessibility": "missing", "input_monitoring": "missing"}
     app._refresh_permission_listener()
     app.keyboard_manager.reload_configuration.assert_not_called()
@@ -163,3 +170,32 @@ def test_first_permission_grant_rebinds_once_without_restarting():
         app._refresh_permission_listener()
     app.keyboard_manager.reload_configuration.assert_called_once_with(force_listener=True)
     restart.assert_not_called()
+
+
+def test_registered_listener_recovers_without_input_monitoring(tmp_path):
+    app = assistant()
+    app._last_permission_state = ("missing", "missing")
+    app.keyboard_manager._hotkey_backend = "registered"
+    app.permission_monitor.latest_snapshot = {"accessibility": "granted", "input_monitoring": "missing"}
+    with patch("main.DATA_DIR", tmp_path):
+        app._refresh_permission_listener()
+        app._refresh_permission_listener()
+    app.keyboard_manager.reload_configuration.assert_called_once_with(force_listener=True)
+
+
+def test_manual_listener_reconnect_is_deferred_and_consumed_once(tmp_path):
+    app = assistant()
+    app._last_permission_state = ("granted", "granted")
+    app.permission_monitor.latest_snapshot = {"accessibility": "granted", "input_monitoring": "granted"}
+    request = tmp_path / ".listener-reconnect-request"
+    request.touch()
+    with patch("main.DATA_DIR", tmp_path):
+        app.keyboard_manager.is_recording = True
+        app._refresh_permission_listener()
+        assert request.exists()
+        app.keyboard_manager.reload_configuration.assert_not_called()
+        app.keyboard_manager.is_recording = False
+        app._refresh_permission_listener()
+        app._refresh_permission_listener()
+    assert not request.exists()
+    app.keyboard_manager.reload_configuration.assert_called_once_with(force_listener=True)

@@ -8,17 +8,17 @@
   const preview = document.getElementById("demo-preview");
   const status = document.getElementById("demo-status");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const sentence = "先把想法记下来，明天再把它变成现实。";
+  const sentence = "按 seller_id 汇总昨天的订单量。";
   let timer = null;
   let running = false;
   let visited = false;
   let step = 0;
   const frames = [
     ["ready", "", "准备听写", "01 / 按住右 Option", 700],
-    ["listening", "", "先把想法记下来", "02 / 说话时，预览逐步出现", 1100],
-    ["listening", "", sentence, "02 / 原话保留，不默认 AI 润色", 1300],
+    ["listening", "", "按 seller_id 汇总", "02 / 说话时，预览逐步出现", 1100],
+    ["listening", "", sentence, "02 / 直接转写，保留原话", 1300],
     ["processing", "", "正在完成识别…", "03 / 松开按键，完成识别", 600],
-    ["done", sentence, "已写入，未发送", "你的原话，一次写入。", 0],
+    ["done", sentence, "已写入输入框", "完成输入，由你确认发送。", 0],
   ];
   function render(frame) {
     root.dataset.phase = frame[0];

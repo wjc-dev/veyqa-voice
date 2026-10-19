@@ -6,17 +6,20 @@
     <meta name="theme-color" content="#080b12" />
     <meta
       name="description"
-      content="Veyqa Voice：Mac 上的轻快语音输入工具。按住右 Option 说话，松开写入。支持千问与豆包，保留你的表达。"
+      content="Veyqa Voice：轻量的 Mac 语音输入工具。按住右 Option 说话，松开写入，与现有输入法一起使用。支持千问与豆包。"
     />
-    <meta property="og:title" content="Veyqa Voice — 说出来，即刻输入。" />
-    <meta property="og:description" content="为你的 Mac，添一个语音输入键。" />
+    <meta property="og:title" content="Veyqa Voice — 轻量的 Mac 语音输入" />
+    <meta
+      property="og:description"
+      content="按住说话，松开输入。与你的输入法一起使用。"
+    />
     <meta property="og:type" content="website" />
     <link rel="canonical" href="https://wjc-dev.github.io/voxtype/" />
     <link rel="icon" href="./mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./style.css?v=0.2.6-212-single-card" />
-    <script src="./app.js" defer></script>
-    <script src="./demo.js?v=0.2.6-212" defer></script>
-    <title>Veyqa Voice — 说出来，即刻输入。</title>
+    <link rel="stylesheet" href="./style.css?v=0.2.7-214" />
+    <script src="./app.js?v=0.2.7-214" defer></script>
+    <script src="./demo.js?v=0.2.7-214" defer></script>
+    <title>Veyqa Voice — 轻量的 Mac 语音输入</title>
   </head>
   <body>
     <a class="skip" href="#main">跳到正文</a>
@@ -28,29 +31,22 @@
       >
       <nav aria-label="主导航">
         <a href="#demo">看演示</a><a href="#install">安装</a
-        ><a href="https://github.com/wjc-dev/voxtype"
-          >GitHub <span aria-hidden="true">↗</span></a
-        >
+        ><a href="https://github.com/wjc-dev/voxtype">GitHub ↗</a>
       </nav>
     </header>
-
     <main id="main">
       <section class="shell hero" aria-labelledby="hero-title">
         <div class="hero-copy">
           <p class="eyebrow">
-            <span class="status-dot"></span> MADE FOR YOUR TRAIN OF THOUGHT.
+            <span class="status-dot"></span> LIGHTWEIGHT VOICE INPUT FOR MAC
           </p>
-          <h1 id="hero-title">思路不用等，<br /><span>说出来就好。</span></h1>
+          <h1 id="hero-title">按住说话，<br /><span>松开输入。</span></h1>
           <p class="lead">
-            为你的 Mac，添一个语音输入键。<br />按住右 Option
-            说话，松开写入。<br />保留你的原话，也保留你的节奏。
+            轻量的 Mac 语音输入工具。<br />与现有输入法一起使用，保留你的原话。<br />为日常听写，多一个选择。
           </p>
           <div class="actions">
-            <a class="button primary" href="#install"
-              >下载 Mac 版 <span aria-hidden="true">↓</span></a
-            ><a class="text-link" href="#demo"
-              >看看怎么用 <span aria-hidden="true">↗</span></a
-            >
+            <a class="button primary" href="#install">下载 Mac 版 ↓</a
+            ><a class="text-link" href="#demo">看看怎么用 ↗</a>
           </div>
           <p class="fine hero-meta">
             macOS 13+ <span>·</span> Apple Silicon <span>·</span> 开源
@@ -60,25 +56,25 @@
           class="demo"
           id="demo"
           data-phase="done"
-          aria-label="语音输入交互示意，不是实时录音"
+          aria-label="语音输入交互演示"
         >
           <div class="demo-top">
             <div class="window-dots" aria-hidden="true">
               <i></i><i></i><i></i>
             </div>
-            <span>一段新的想法</span><span class="demo-tag">交互示意</span>
+            <span>工作笔记</span><span class="demo-tag">交互演示</span>
           </div>
           <div class="demo-editor">
-            <p class="demo-date">给明天的自己</p>
+            <p class="demo-date">数据查询</p>
             <p class="demo-text">
-              <span id="demo-output">先把想法记下来，明天再把它变成现实。</span
+              <span id="demo-output">按 seller_id 汇总昨天的订单量。</span
               ><span class="caret" aria-hidden="true"></span>
             </p>
-            <p class="editor-note">光标在哪里，想法就在哪里落下。</p>
+            <p class="editor-note">先点击输入框，再按住右 Option 说话。</p>
           </div>
           <div class="voice-strip">
-            <span class="mic-dot" aria-hidden="true">●</span>
-            <span id="demo-preview">已写入，未发送</span>
+            <span class="mic-dot" aria-hidden="true">●</span
+            ><span id="demo-preview">已写入输入框</span>
             <div class="wave" aria-hidden="true">
               <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
               ><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
@@ -86,15 +82,12 @@
             <kbd id="demo-key">右 ⌥</kbd>
           </div>
           <div class="demo-controls">
-            <span id="demo-status" role="status">你的原话，一次写入。</span
-            ><button id="demo-play" type="button" hidden>
-              播放演示 <span aria-hidden="true">↻</span>
-            </button>
+            <span id="demo-status" role="status">完成输入，由你确认发送。</span
+            ><button id="demo-play" type="button" hidden>播放演示 ↻</button>
           </div>
-          <figcaption>不会启用麦克风 · 演示节奏不代表实际识别耗时</figcaption>
+          <figcaption>流程演示 · 添加专有词汇，提升识别概率</figcaption>
         </figure>
       </section>
-
       <section class="shell workflow" aria-label="如何使用">
         <div>
           <span>01</span><kbd>右 Option ⌥</kbd>
@@ -103,7 +96,7 @@
         <i aria-hidden="true">→</i>
         <div>
           <span>02</span><b class="mini-wave" aria-hidden="true">▂ ▅ ▃ ▇ ▄ ▂</b>
-          <p>看到实时识别预览</p>
+          <p>实时查看识别预览</p>
         </div>
         <i aria-hidden="true">→</i>
         <div>
@@ -111,25 +104,26 @@
           <p>松开，文字写入</p>
         </div>
       </section>
-
       <section class="shell benefits" aria-label="产品特点">
         <article>
-          <span class="feature-number">01 / FLOW</span>
-          <h2>想说就说，不必切换</h2>
-          <p>拼音、双拼、Rime 照常使用。<br />想说的时候，再用语音。</p>
+          <span class="feature-number">01 / LIGHTWEIGHT</span>
+          <h2>需要时，随时听写</h2>
+          <p>空闲时保持轻量。<br />点击菜单栏或 Dock 图标打开设置。</p>
         </article>
         <article>
-          <span class="feature-number">02 / YOUR WORDS</span>
-          <h2>是你的话，不是套话</h2>
-          <p>默认不加 AI 润色。<br />文字写进输入框，不替你发送。</p>
+          <span class="feature-number">02 / WORK TOGETHER</span>
+          <h2>保留你的输入习惯</h2>
+          <p>拼音、双拼、Rime 照常使用。<br />用语音补充键盘输入。</p>
         </article>
         <article>
-          <span class="feature-number">03 / YOUR CHOICE</span>
-          <h2>服务和用量，由你掌握</h2>
-          <p>支持千问与豆包。<br />使用自己的 API 凭证。</p>
+          <span class="feature-number">03 / YOUR WORDS</span>
+          <h2>直接转写，保留原话</h2>
+          <p>
+            文字写入当前输入框，由你确认发送。<br />添加 user_id、seller_id
+            等专有词汇。
+          </p>
         </article>
       </section>
-
       <section
         class="shell install section"
         id="install"
@@ -137,33 +131,74 @@
       >
         <div class="section-heading">
           <p class="eyebrow">GET STARTED</p>
-          <h2 id="install-title">第一次设置好，<br />以后只需一个键。</h2>
+          <h2 id="install-title">下载，拖入，<br />开始设置。</h2>
           <p>
-            下载 DMG，将 App 拖入“应用程序”后打开。<br />不需要 Homebrew、Python
-            或开发环境；首次使用需配置自己的 API Key 并授权。
+            下载 DMG 并打开，将 Veyqa Voice 拖入
+            Applications（应用程序），再从“应用程序”启动。
           </p>
+          <div class="install-drag" aria-label="将 Veyqa Voice 拖入应用程序">
+            <img
+              src="./mark.svg"
+              width="48"
+              height="48"
+              alt="Veyqa Voice"
+            /><span aria-hidden="true">→</span
+            ><span>Applications<br /><small>应用程序</small></span>
+          </div>
           <a
             class="button primary"
-            href="https://github.com/wjc-dev/voxtype/releases/download/v0.2.6/Veyqa-Voice-v0.2.6-macOS-arm64.dmg"
-            >下载 Mac 版 <span aria-hidden="true">↓</span></a
+            href="https://github.com/wjc-dev/voxtype/releases/download/v0.2.7/Veyqa-Voice-v0.2.7-macOS-arm64.dmg"
+            >下载 Mac 版 ↓</a
           >
           <p class="fine">
             M 系列 Mac · macOS 13+ ·
-            <a href="https://github.com/wjc-dev/voxtype/releases/tag/v0.2.6"
-              >0.2.6 Preview 发布说明 ↗</a
+            <a href="https://github.com/wjc-dev/voxtype/releases/tag/v0.2.7"
+              >0.2.7 Preview ↗</a
             >
           </p>
           <p>
             <a class="text-link" href="#safety"
-              >首次打开被阻止？查看安全提示 ↓</a
+              >首次打开提示“无法验证开发者”？查看步骤 ↓</a
             >
           </p>
         </div>
         <div class="install-content">
+          <ol class="steps">
+            <li>
+              <span>1</span>
+              <div>
+                <h3>连接语音服务</h3>
+                <p>
+                  默认千问。粘贴自己的百炼 API
+                  Key，点击“连接并继续”，成功后自动保存。<a href="#api-key"
+                    >获取 Key 的步骤 ↓</a
+                  >
+                </p>
+              </div>
+            </li>
+            <li>
+              <span>2</span>
+              <div>
+                <h3>开启权限</h3>
+                <p>
+                  按引导开启麦克风、辅助功能和输入监控。返回 App
+                  后自动检查；系统要求重新打开时，按提示操作即可。
+                </p>
+              </div>
+            </li>
+            <li>
+              <span>3</span>
+              <div>
+                <h3>试一句，完成设置</h3>
+                <p>
+                  点击试用文本框，按住右 Option 说话，松开写入。完成后即可在其他
+                  App 使用。菜单栏和 Dock 都能打开设置。
+                </p>
+              </div>
+            </li>
+          </ol>
           <details class="brew-details">
-            <summary>
-              习惯用终端？使用 Homebrew <span aria-hidden="true">＋</span>
-            </summary>
+            <summary>也可以使用 Homebrew ＋</summary>
             <div class="terminal">
               <div class="terminal-label">
                 <span>TERMINAL</span
@@ -173,56 +208,20 @@
                   data-copy="brew-command"
                   aria-label="复制 Homebrew 安装命令"
                 >
-                  复制命令 <span aria-hidden="true">⧉</span>
+                  复制命令 ⧉
                 </button>
               </div>
               <pre><span class="prompt" aria-hidden="true">$ </span><code id="brew-command">brew install --cask wjc-dev/veyqa/veyqa-voice</code></pre>
             </div>
           </details>
-          <ol class="steps">
-            <li>
-              <span>1</span>
-              <div>
-                <h3>连接语音服务</h3>
-                <p>
-                  默认千问。按应用里的获取步骤创建并粘贴 API
-                  Key，点击“连接并继续”，成功后自动保存。<a href="#api-key"
-                    >Key 是什么？</a
-                  >
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>2</span>
-              <div>
-                <h3>确认权限</h3>
-                <p>
-                  按应用引导开启麦克风、辅助功能和输入监控权限。授权由你在系统设置里亲自确认。
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>3</span>
-              <div>
-                <h3>先在应用里试一句</h3>
-                <p>
-                  点击试用文本框，按住键盘右侧 Option
-                  说话，松开结束。看到文字后完成设置，再到其他 App
-                  使用。升级保留原配置。
-                </p>
-              </div>
-            </li>
-          </ol>
         </div>
       </section>
-
       <section class="shell section" id="api-key" aria-labelledby="key-title">
         <div class="section-heading">
           <p class="eyebrow">ONE-TIME SETUP</p>
-          <h2 id="key-title">API Key，只需配置一次。</h2>
+          <h2 id="key-title">配置一次 API Key，<br />以后直接说话。</h2>
           <p>
-            它是语音服务的访问密钥，不是登录密码。Veyqa 不出售额度，也不收集你的
-            Key。
+            使用自己的语音服务账户。Key 保存在本机，API 费用由对应服务商收取。
           </p>
         </div>
         <ol class="steps key-steps">
@@ -232,12 +231,12 @@
               <div class="guide-picture" aria-hidden="true">
                 <span>阿里云百炼</span><b>API Key →</b>
               </div>
-              <h3>打开百炼，登录你的账号</h3>
+              <h3>打开百炼，登录账号</h3>
               <p>
                 进入<a
                   href="https://bailian.console.aliyun.com/?tab=model#/api-key"
                   >百炼 API Key 页面 ↗</a
-                >，按控制台提示开通服务。这是识别语音的服务，不是另一个输入法。
+                >，按控制台提示开通语音服务。
               </p>
             </div>
           </li>
@@ -249,8 +248,8 @@
               </div>
               <h3>创建 Key，然后复制</h3>
               <p>
-                应用默认中国内地（北京）；其他地区在高级设置中调整。Key
-                相当于访问凭证，不要发给聊天或 Agent。
+                应用默认中国内地（北京）。其他地区可在“高级设置”调整。Key
+                请仅填写在应用的凭证输入框。
               </p>
             </div>
           </li>
@@ -262,74 +261,100 @@
               </div>
               <h3>粘贴到 Veyqa，检查连接</h3>
               <p>
-                成功后自动保存，再按引导授权和试用。API
-                调用可能产生费用，以百炼的账户额度与计费说明为准。
+                点击“连接并继续”，成功后自动保存。随后开启权限，在试用文本框完成首次输入。
               </p>
             </div>
           </li>
         </ol>
         <p class="fine">
-          以上为步骤示意，实际控制台界面可能不同。<a
-            href="https://help.aliyun.com/zh/model-studio/get-api-key"
-            >查看官方详细教程 ↗</a
+          <a href="https://help.aliyun.com/zh/model-studio/get-api-key"
+            >百炼官方配置教程 ↗</a
           >
         </p>
       </section>
-
       <section
-        class="shell section agent"
-        id="agent"
-        aria-labelledby="agent-title"
+        class="shell section"
+        id="engines"
+        aria-labelledby="engines-title"
       >
-        <div class="agent-heading">
-          <div>
-            <p class="eyebrow">LET YOUR AGENT HELP</p>
-            <h2 id="agent-title">安装配置，交给你的 Agent。</h2>
-            <p>
-              把下面的提示词交给能操作本机的 AI Agent。<br />它负责安装与检查，你亲自填写
-              Key、确认系统权限。
-            </p>
-          </div>
-          <button type="button" class="button primary" data-copy="agent-prompt">
-            复制 Agent 提示词 <span aria-hidden="true">⧉</span>
-          </button>
+        <div class="section-heading">
+          <p class="eyebrow">SPEECH ENGINES</p>
+          <h2 id="engines-title">选择适合你的语音服务。</h2>
+          <p>
+            默认千问，也可切换豆包。音频直接发送至所选语音服务；录音存档默认关闭。
+          </p>
         </div>
-        <details id="agent-details">
-          <summary>查看完整提示词 <span aria-hidden="true">＋</span></summary>
-          <label class="sr-only" for="agent-prompt"
-            >安装配置提示词，可选中手动复制</label
-          ><textarea readonly id="agent-prompt" spellcheck="false">
-请帮我在这台 Mac 安装并配置 Veyqa Voice。
-官网：https://wjc-dev.github.io/voxtype/
-官方仓库：https://github.com/wjc-dev/voxtype
-安装命令：brew install --cask wjc-dev/veyqa/veyqa-voice
-
-1. 先检查 Apple Silicon、macOS 13+，以及是否已经安装 Veyqa Voice、VoxType 或 Voice Input。已有 Homebrew 可使用它；不在 PATH 时检查 /opt/homebrew/bin/brew。没有 Homebrew 则优先从官网的官方 Release 下载 DMG，校验后将 App 安装到“应用程序”，不要为了此应用额外安装 Homebrew、Python 或开发工具。需要管理员密码时由我亲自输入。
-2. 已有版本先为 ~/Library/Application Support/Veyqa 做权限受限的本地备份，保留凭证、快捷键、词汇和配置，不使用 --zap、不清空用户数据。若检测到本机固定签名版或非 Homebrew 安装，先询问，不直接覆盖。停止旧版本前等我结束录音，不修改其他 App，不同时运行多个版本。
-3. 选择 Homebrew 时，新用户使用上述命令；已有 Homebrew 安装先 brew update，再 brew upgrade --cask wjc-dev/veyqa/veyqa-voice。直接安装则从官方 DMG 复制 App 后推出磁盘镜像。核对官方 Release、适用的 cask 版本、下载校验值和实际安装版本，打开 /Applications/Veyqa Voice.app。不要安装未验收开发包。
-4. 已有 API Key 直接保留；没有则指导我展开应用中的“没有 Key？查看获取步骤”，登录百炼、选择地区、创建 Key 后自行填写。千问点击“连接并继续”成功后自动保存，再确认权限、在应用内试用文本框验证听写，最后完成设置。以后修改设置只需保存，无需重启。不要索取、读取、打印、截图或上传 Key、.env 内容或钥匙串凭证；不把 Key 放进命令参数、聊天、日志或 Git。提示我语音会发送到所选云端服务，API 费用由服务商收取；不代我开户、购买套餐或接受付费条款。
-5. 系统权限由我亲自确认。新用户默认按住右 Option 说话，需要麦克风、辅助功能和输入监控；老用户的快捷键及按住/切换模式保持不变。不要擅自重置权限。
-6. 当前为未公证 Preview。若仅因“无法验证开发者／未经公证”被 macOS 阻止，先核实官方来源和下载校验值；说明风险后，由我本人决定是否到“系统设置 → 隐私与安全性”点击“仍要打开”，再确认“打开”。Agent 只说明步骤，不代替我点击安全例外。参考 https://support.apple.com/zh-cn/102445 。若提示恶意软件、文件损坏或被公司安全软件拦截，停止并反馈／联系管理员；不禁用 Gatekeeper、不移除隔离属性、不修改权限数据库、不反复放行。
-7. 最后核对只有一个主程序、Dock 能打开设置，让我在空白文稿连续听写同一句三次（每次等文字写入再开始），确认无丢字或重复、没有自动发送。关闭设置后检查没有持续录音或异常占用。只有真实输入通过后才报告配置完成；未完成的检查要明确说明。</textarea
-          >
-        </details>
+        <div class="benefits engine-cards">
+          <article>
+            <span class="feature-number">默认 · 千问</span>
+            <h3>Qwen Audio 3.0 ASR Streaming</h3>
+            <p>
+              流式识别，边说边查看预览。支持多语种及方言、热词增强，适合日常听写和专业词汇输入。
+            </p>
+            <a href="https://help.aliyun.com/zh/model-studio/asr-model/"
+              >模型说明 ↗</a
+            >
+          </article>
+          <article>
+            <span class="feature-number">可选 · 豆包</span>
+            <h3>豆包语音识别</h3>
+            <p>
+              使用火山引擎语音账户，支持流式转写与词汇提示。已有豆包凭证可直接在应用中切换。
+            </p>
+            <a href="https://www.volcengine.com/docs/6561">服务说明 ↗</a>
+          </article>
+        </div>
       </section>
-      <aside class="shell release-note" id="safety">
-        <span>使用前了解</span>
-        <p>
-          当前为未经过 Apple 公证的
-          Preview。若首次打开仅提示“无法验证开发者／未经公证”，确认下载来自官网且你信任来源后，可由你在「系统设置
-          → 隐私与安全性」点击「仍要打开」，再确认「打开」。无需关闭系统防护。
-          <a href="https://support.apple.com/zh-cn/102445">苹果官方说明 ↗</a
-          ><br />
-          提示恶意软件、文件损坏或被公司安全软件拦截时，请停止并反馈／联系管理员，不强行放行。<br />
-          语音会发送到所选云端 ASR 服务，费用由服务商收取，默认不保存本地录音。
+      <section class="shell section" id="safety" aria-labelledby="safety-title">
+        <div class="section-heading">
+          <p class="eyebrow">FIRST OPEN</p>
+          <h2 id="safety-title">首次打开，跟着这三步。</h2>
+          <p>
+            当前为尚未经过 Apple 公证的
+            Preview。遇到“无法验证开发者”提示，确认来自官网并信任其来源后：
+          </p>
+        </div>
+        <ol class="steps key-steps">
+          <li>
+            <span>1</span>
+            <div>
+              <h3>打开系统设置</h3>
+              <p>选择“隐私与安全性”，向下滚动到“安全性”。</p>
+            </div>
+          </li>
+          <li>
+            <span>2</span>
+            <div>
+              <h3>点击“仍要打开”</h3>
+              <p>
+                找到 Veyqa Voice 对应的提示，点击“仍要打开”，按系统提示确认。
+              </p>
+            </div>
+          </li>
+          <li>
+            <span>3</span>
+            <div>
+              <h3>返回 App 继续设置</h3>
+              <p>完成 Key 配置和权限设置，再按住右 Option 试一句。</p>
+            </div>
+          </li>
+        </ol>
+        <p class="fine">
+          <a href="https://support.apple.com/zh-cn/102445"
+            >Apple 官方图文说明 ↗</a
+          >
         </p>
-      </aside>
+        <p class="fine">
+          恶意软件或文件损坏提示：暂停安装并<a
+            href="https://github.com/wjc-dev/voxtype/issues"
+            >反馈</a
+          >。公司安全软件拦截：联系管理员处理。
+        </p>
+      </section>
     </main>
     <footer class="shell footer">
       <a class="brand" href="#">Veyqa<span>Voice</span></a
-      ><span class="fine">A little less typing. A little more flow.</span>
+      ><span class="fine">Lightweight voice input for Mac.</span>
       <div>
         <a href="https://github.com/wjc-dev/voxtype/issues">反馈问题 ↗</a
         ><a href="https://github.com/wjc-dev/voxtype/blob/main/LICENSE"

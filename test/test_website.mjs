@@ -8,51 +8,27 @@ const site = new URL("../website/", import.meta.url);
 const html = readFileSync(new URL("index.html", site), "utf8");
 const script = readFileSync(new URL("app.js", site), "utf8");
 const css = readFileSync(new URL("style.css", site), "utf8");
-const prompt = html.match(
-  /<textarea[^>]*id="agent-prompt"[^>]*>([\s\S]*?)<\/textarea\s*>/,
-)[1];
 const brew = "brew install --cask wjc-dev/veyqa/veyqa-voice";
 
-test("demo uses a single card without offset decorative pseudo-elements", () => {
-  assert.doesNotMatch(css, /\.demo\s*::?(?:before|after)\b/);
-});
-
-// Test the actual client script with a minimal DOM. No browser or real clipboard.
 function fixture(clipboard) {
-  const details = { open: false };
   const status = { hidden: true, textContent: "" };
   const command = { textContent: brew, closest: () => null };
-  const agent = {
-    value: prompt,
-    closest: () => details,
-    focus() {
-      this.focused = true;
-    },
-    select() {
-      this.selected = true;
+  const button = {
+    dataset: { copy: "brew-command" },
+    addEventListener(_, cb) {
+      this.click = cb;
     },
   };
-  const buttons = ["brew-command", "agent-prompt"].map((id) => ({
-    dataset: { copy: id },
-    addEventListener(event, callback) {
-      this.click = callback;
-    },
-  }));
   const selection = {
     removeAllRanges() {},
     addRange() {
       this.selected = true;
     },
   };
-  const elements = {
-    "copy-status": status,
-    "brew-command": command,
-    "agent-prompt": agent,
-  };
   vm.runInNewContext(script, {
     document: {
-      getElementById: (id) => elements[id],
-      querySelectorAll: () => buttons,
+      getElementById: (id) => (id === "copy-status" ? status : command),
+      querySelectorAll: () => [button],
       createRange: () => ({ selectNodeContents() {} }),
     },
     navigator: { clipboard },
@@ -60,90 +36,94 @@ function fixture(clipboard) {
     setTimeout: () => 1,
     clearTimeout() {},
   });
-  return { buttons, details, status, agent, selection };
+  return { button, status, selection };
 }
-
-test("installation command is copied exactly, without the shell prompt", async () => {
+test("installation command is copied exactly", async () => {
   let copied;
   const f = fixture({
     writeText: async (text) => {
       copied = text;
     },
   });
-  await f.buttons[0].click();
+  await f.button.click();
   assert.equal(copied, brew);
-  assert.equal(f.status.hidden, false);
   assert.match(f.status.textContent, /已复制/);
 });
-test("full agent prompt is copied, not a shortened description", async () => {
-  let copied;
-  const f = fixture({
-    writeText: async (text) => {
-      copied = text;
+test("clipboard refusal selects command without claiming success", async () => {
+  for (const clipboard of [
+    undefined,
+    {
+      writeText: async () => {
+        throw Error("denied");
+      },
     },
-  });
-  await f.buttons[1].click();
-  assert.equal(copied, prompt.trim());
-  for (const boundary of [
-    "不使用 --zap",
-    "不直接覆盖",
-    "不禁用 Gatekeeper",
-    "自行填写",
-    "三次",
-    "右 Option",
   ]) {
-    assert.ok(copied.includes(boundary));
+    const f = fixture(clipboard);
+    await f.button.click();
+    assert.equal(f.selection.selected, true);
+    assert.match(f.status.textContent, /手动复制/);
+    assert.doesNotMatch(f.status.textContent, /已复制/);
   }
 });
-test("rejected clipboard opens and selects the prompt without claiming success", async () => {
-  const f = fixture({
-    writeText: async () => {
-      throw new Error("denied");
-    },
-  });
-  await f.buttons[1].click();
-  assert.equal(f.details.open, true);
-  assert.ok(f.agent.focused && f.agent.selected);
-  assert.match(f.status.textContent, /手动复制/);
-  assert.doesNotMatch(f.status.textContent, /已复制/);
-});
-test("missing clipboard falls back to selected command text", async () => {
-  const f = fixture(undefined);
-  await f.buttons[0].click();
-  assert.equal(f.selection.selected, true);
-  assert.match(f.status.textContent, /手动复制/);
-});
-test("local assets and navigation anchors exist", () => {
-  for (const [, path] of html.matchAll(/(?:src|href)="\.\/([^"]+)"/g)) {
-    assert.ok(existsSync(fileURLToPath(new URL(path.split("?")[0], site))), path);
-  }
-  for (const [, id] of html.matchAll(/href="#([^"]+)"/g)) {
+test("single card and valid local assets and navigation anchors", () => {
+  assert.doesNotMatch(css, /\.demo\s*::?(?:before|after)\b/);
+  for (const [, path] of html.matchAll(/(?:src|href)="\.\/([^"]+)"/g))
+    assert.ok(
+      existsSync(fileURLToPath(new URL(path.split("?")[0], site))),
+      path,
+    );
+  for (const [, id] of html.matchAll(/href="#([^"]+)"/g))
     assert.ok(html.includes(`id="${id}"`), id);
-  }
 });
-test("website is accessible static content, not a credential collection form", () => {
+test("static accessible website with no agent prompt or credential form", () => {
   assert.match(html, /lang="zh-CN"/);
   assert.match(html, /name="viewport"/);
   assert.match(html, /role="status"\s+aria-live="polite"/);
-  assert.match(html, /textarea\s+readonly/);
-  assert.doesNotMatch(html, /<form|<input|https?:[^"']+\.(?:js|css)["']/i);
-  assert.ok(html.includes("/releases/tag/v0.2.6"));
+  assert.doesNotMatch(
+    html,
+    /<form|<input|<textarea|agent-prompt|LET YOUR AGENT|给明天的自己/i,
+  );
+  assert.doesNotMatch(html, /https?:[^"']+\.(?:js|css)["']/i);
 });
-
-test("direct DMG installation is primary and setup instructions match the app", () => {
-  assert.ok(html.includes("/releases/download/v0.2.6/Veyqa-Voice-v0.2.6-macOS-arm64.dmg"));
-  assert.match(html, /不需要 Homebrew、Python\s+或开发环境/);
-  assert.ok(html.includes("连接并继续"));
-  assert.ok(html.includes("试用文本框"));
-  assert.ok(prompt.includes("不要为了此应用额外安装 Homebrew"));
-  assert.ok(prompt.includes("不代我开户"));
-  assert.doesNotMatch(html, /完成，开始使用|零配置|零门槛/);
+test("DMG install, permissions and trial have clear instructions", () => {
+  assert.ok(
+    html.includes(
+      "/releases/download/v0.2.7/Veyqa-Voice-v0.2.7-macOS-arm64.dmg",
+    ),
+  );
+  for (const text of [
+    "Applications（应用程序）",
+    "连接并继续",
+    "试用文本框",
+    "自动检查",
+    "菜单栏",
+    "Dock",
+  ])
+    assert.ok(html.includes(text), text);
 });
-
-test("security instructions separate a personal exception from malware and managed-device blocks", () => {
-  for (const text of ["仍要打开", "隐私与安全性", "恶意软件", "文件损坏", "公司安全软件", "不代替我点击安全例外"]) {
-    assert.ok(prompt.includes(text), text);
-  }
+test("precise service facts and concise vocabulary copy", () => {
+  for (const text of [
+    "Key 保存在本机",
+    "音频直接发送至所选语音服务",
+    "费用由对应服务商收取",
+    "提升识别概率",
+    "user_id",
+    "seller_id",
+    "Qwen Audio 3.0",
+  ])
+    assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /不承诺|不等于|≠|零门槛|零配置|不上传云端/);
+});
+test("security guide distinguishes verification from malware and managed blocks", () => {
+  for (const text of [
+    "仍要打开",
+    "隐私与安全性",
+    "恶意软件",
+    "文件损坏",
+    "公司安全软件",
+    "联系管理员",
+  ])
+    assert.ok(html.includes(text), text);
   assert.ok(html.includes('href="https://support.apple.com/zh-cn/102445"'));
-  assert.doesNotMatch(prompt, /spctl\s+--|xattr\s+-/);
+  assert.doesNotMatch(html, /spctl\s+--|xattr\s+-/);
 });

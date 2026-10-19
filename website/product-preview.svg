@@ -10,7 +10,7 @@
     <g fill="#9cddd8"><rect x="56" y="51" width="4" height="14" rx="2"/><rect x="65" y="43" width="4" height="30" rx="2"/><rect x="74" y="48" width="4" height="20" rx="2"/></g>
     <text x="93" y="66" font-size="25" fill="#edf3f8" font-weight="600">Veyqa <tspan fill="#a2afbd" font-weight="400">Voice</tspan></text>
     <text x="56" y="161" fill="#edf3f8" font-size="54" font-weight="550" letter-spacing="-2">Say it. <tspan fill="#9cddd8">Type it.</tspan></text>
-    <text x="58" y="200" fill="#a2afbd" font-size="18">A voice input key for your Mac. Your words, at your pace.</text>
+    <text x="58" y="200" fill="#a2afbd" font-size="18">Lightweight voice input. Works alongside your keyboard.</text>
     <text x="1144" y="64" text-anchor="end" font-size="12" letter-spacing="2" fill="#a2afbd">MACOS · OPEN SOURCE</text>
     <g stroke="#34454e" fill="url(#panel)"><rect x="56" y="254" width="342" height="218" rx="16"/><rect x="429" y="254" width="342" height="218" rx="16"/><rect x="802" y="254" width="342" height="218" rx="16"/></g>
     <g fill="#8197a3" font-size="12" letter-spacing="1.5"><text x="80" y="287">01 / HOLD</text><text x="453" y="287">02 / SPEAK</text><text x="826" y="287">03 / RELEASE</text></g>
@@ -20,9 +20,9 @@
     <g stroke="#9cddd8" stroke-width="5" stroke-linecap="round"><path d="M535 339v12 M548 332v26 M561 323v44 M574 331v28 M587 318v54 M600 327v36 M613 334v22 M626 324v42 M639 331v28 M652 336v18 M665 340v10"/></g>
     <text x="600" y="432" text-anchor="middle" fill="#d1dee5" font-size="17">See a live preview.</text>
     <rect x="826" y="316" width="294" height="68" rx="10" fill="#0b1118" stroke="#2c414b"/>
-    <text x="844" y="345" fill="#e0eee9" font-size="17">Let's make it happen.</text><text x="844" y="368" fill="#8cb8aa" font-size="11">Inserted. Never auto-sent.</text>
-    <text x="973" y="432" text-anchor="middle" fill="#d1dee5" font-size="17">Keep the thought moving.</text>
-    <text x="58" y="520" fill="#8c9da9" font-size="12">Interaction illustration · No AI rewriting by default · Bring your own API key</text>
+    <text x="844" y="345" fill="#e0eee9" font-size="17">Group orders by seller_id.</text><text x="844" y="368" fill="#8cb8aa" font-size="11">Inserted. Ready for your review.</text>
+    <text x="973" y="432" text-anchor="middle" fill="#d1dee5" font-size="17">Type into the focused field.</text>
+    <text x="58" y="520" fill="#8c9da9" font-size="12">Interaction illustration · Direct transcription · Bring your own API key</text>
     <text x="1144" y="520" text-anchor="end" fill="#9cddd8" font-size="12">Watch the demo ↗</text>
   </g>
 </svg>

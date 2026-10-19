@@ -103,6 +103,9 @@ class _Learner:
 
 
 class _Keyboard:
+    def listener_ready(self):
+        return True
+
     def __init__(self, **callbacks):
         self.callbacks = callbacks
         self.typed = []

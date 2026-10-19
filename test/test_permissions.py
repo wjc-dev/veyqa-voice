@@ -7,6 +7,24 @@ from src.permissions import PermissionMonitor, required_permissions_granted
 
 
 class PermissionLogicTests(unittest.TestCase):
+    def test_granted_permissions_do_not_claim_a_working_listener(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ready = unittest.mock.Mock(return_value=False)
+            monitor = PermissionMonitor(version="test", hotkey_backend="passive",
+                                        listener_ready=ready,
+                                        status_path=Path(directory) / "permissions.json")
+            with patch("src.permissions._microphone_status", return_value="granted"), \
+                    patch("src.permissions._accessibility_status", return_value="granted"), \
+                    patch("src.permissions._input_monitoring_status", return_value="granted"), \
+                    patch.object(monitor, "_atomic_write", wraps=monitor._atomic_write) as write:
+                snapshot = monitor.refresh()
+                self.assertTrue(snapshot["all_required_granted"])
+                self.assertFalse(snapshot["hotkey_ready"])
+                ready.return_value = True
+                self.assertTrue(monitor.refresh()["hotkey_ready"])
+                monitor.refresh()
+                self.assertEqual(write.call_count, 2)
+
     def test_request_all_only_requests_missing_required_permissions(self):
         for backend, input_required in (("registered", False), ("passive", True)):
             with self.subTest(backend=backend), tempfile.TemporaryDirectory() as directory:

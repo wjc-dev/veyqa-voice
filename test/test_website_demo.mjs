@@ -87,7 +87,7 @@ test("illustration previews first and commits only after release", () => {
   assert.equal(f.elements["demo-output"].textContent, "");
   f.tick();
   assert.equal(f.phase(), "done");
-  assert.ok(f.elements["demo-output"].textContent.includes("想法"));
+  assert.ok(f.elements["demo-output"].textContent.includes("seller_id"));
   assert.equal(f.timers.size, 0);
 });
 test("autoplay runs once and replay never stacks timers", () => {

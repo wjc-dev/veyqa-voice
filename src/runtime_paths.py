@@ -80,6 +80,7 @@ def ensure_runtime_layout() -> None:
                 "VOICE_HOTKEY_LABEL=右 Option（⌥）\n"
                 "FN_HOTKEY_MODE=hold\n"
                 "GLOBAL_HOTKEY_BACKEND=passive\n"
+                "SHOW_MENU_BAR_ICON=true\n"
                 "PUNCTUATION_MODE=spaces\n"
                 "AUDIO_ARCHIVE_ENABLED=false\n"
                 "DISFLUENCY_FILTER_ENABLED=false\n"

@@ -25,6 +25,7 @@ class NewUserDefaultsTests(unittest.TestCase):
             values = dotenv_values(self.seed(directory, ROOT))
         self.assertEqual(values["VOICE_HOTKEY"], "right_option")
         self.assertEqual(values["FN_HOTKEY_MODE"], "hold")
+        self.assertEqual(values["SHOW_MENU_BAR_ICON"], "true")
         self.assertEqual(values["GLOBAL_HOTKEY_BACKEND"], "passive")
 
     def test_missing_template_has_same_new_defaults(self):
