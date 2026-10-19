@@ -16,9 +16,9 @@
     <meta property="og:type" content="website" />
     <link rel="canonical" href="https://wjc-dev.github.io/voxtype/" />
     <link rel="icon" href="./mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./style.css?v=0.2.7-site3" />
-    <script src="./app.js?v=0.2.7-214" defer></script>
-    <script src="./demo.js?v=0.2.7-site2" defer></script>
+    <link rel="stylesheet" href="./style.css?v=0.2.8-217" />
+    <script src="./app.js?v=0.2.8-217" defer></script>
+    <script src="./demo.js?v=0.2.8-217" defer></script>
     <title>Veyqa Voice — 轻量的 Mac 语音输入</title>
   </head>
   <body>
@@ -151,13 +151,13 @@
           </div>
           <a
             class="button primary"
-            href="https://github.com/wjc-dev/voxtype/releases/download/v0.2.7/Veyqa-Voice-v0.2.7-macOS-arm64.dmg"
+            href="https://github.com/wjc-dev/voxtype/releases/download/v0.2.8/Veyqa-Voice-v0.2.8-macOS-arm64.dmg"
             >下载 Mac 版 ↓</a
           >
           <p class="fine">
             M 系列 Mac · macOS 13+ ·
-            <a href="https://github.com/wjc-dev/voxtype/releases/tag/v0.2.7"
-              >0.2.7 Preview ↗</a
+            <a href="https://github.com/wjc-dev/voxtype/releases/tag/v0.2.8"
+              >0.2.8 Preview ↗</a
             >
           </p>
           <p>
@@ -184,6 +184,10 @@
               <pre><span class="prompt" aria-hidden="true">$ </span><code id="brew-command">brew install --cask wjc-dev/veyqa/veyqa-voice</code></pre>
             </div>
           </details>
+          <p class="fine">
+            更新旧版：先退出 App，再下载新版拖入应用程序并选择“替换”，Key 和配置保留。
+            <a href="https://github.com/wjc-dev/voxtype#更新">Homebrew 更新方法 ↗</a>
+          </p>
         </div>
         <div class="install-content">
           <ol class="steps">
@@ -287,15 +291,15 @@
           <p class="eyebrow">SPEECH ENGINES</p>
           <h2 id="engines-title">选择适合你的语音服务。</h2>
           <p>
-            默认千问，也可切换豆包。音频直接发送至所选语音服务；录音存档默认关闭。
+            默认千问，也可切换豆包。在应用内选择模型、刷新官方目录。音频直接发送至所选语音服务；录音存档默认关闭。
           </p>
         </div>
         <div class="benefits engine-cards">
           <article>
             <span class="feature-number">默认 · 千问</span>
-            <h3>Qwen Audio 3.0 ASR Streaming</h3>
+            <h3>Qwen Audio 3.0 / 3.1 ASR</h3>
             <p>
-              流式识别，边说边查看预览。支持多语种及方言、热词增强，适合日常听写和专业词汇输入。
+              流式识别，边说边查看预览。可选持续转写或短句听写，支持多语种及方言、热词增强。
             </p>
             <a href="https://help.aliyun.com/zh/model-studio/asr-model/"
               >模型说明 ↗</a
@@ -307,9 +311,10 @@
             <p>
               使用火山引擎语音账户，支持流式转写与词汇提示。已有豆包凭证可直接在应用中切换。
             </p>
-            <a href="https://www.volcengine.com/docs/6561">服务说明 ↗</a>
+            <a href="https://docs.volcengine.com/docs/DoubaoVoice/model-list?lang=zh">模型说明 ↗</a>
           </article>
         </div>
+        <p class="fine">也支持自定义 OpenAI 兼容语音服务：填入 API 地址、Key 和模型型号，录音结束后转写。</p>
       </section>
       <section class="shell section" id="safety" aria-labelledby="safety-title">
         <div class="section-heading">

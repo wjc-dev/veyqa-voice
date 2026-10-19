@@ -2,7 +2,7 @@
 
 **轻量的 Mac 语音输入工具。按住说话，松开输入。**
 
-[官网](https://wjc-dev.github.io/voxtype/) · [下载安装包](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.7) · [English](README.en.md)
+[官网](https://wjc-dev.github.io/voxtype/) · [下载安装包](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.8) · [English](README.en.md)
 
 [![Veyqa Voice 语音输入演示](website/product-preview.svg)](https://wjc-dev.github.io/voxtype/#demo)
 
@@ -14,7 +14,7 @@
 
 需要 **Apple Silicon（M 系列芯片）、macOS 13+**。
 
-1. [下载 DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.7/Veyqa-Voice-v0.2.7-macOS-arm64.dmg) 并打开。
+1. [下载 DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.8/Veyqa-Voice-v0.2.8-macOS-arm64.dmg) 并打开。
 2. 按窗口中的箭头，将 **Veyqa Voice 拖入 Applications（应用程序）**。
 3. 从“应用程序”打开 Veyqa Voice，完成首次设置。
 
@@ -26,6 +26,19 @@
 brew install --cask wjc-dev/veyqa/veyqa-voice
 ```
 
+## 更新
+
+先从菜单或设置中退出 Veyqa Voice，再更新并重新打开。Key 和配置保留，无需先卸载。
+
+Homebrew 用户：
+
+```bash
+brew update
+brew upgrade --cask wjc-dev/veyqa/veyqa-voice
+```
+
+DMG 用户：下载上方新版安装包，将 App 拖入“应用程序”，选择“替换”。如果 macOS 提示权限需要确认，按应用内引导开启即可。
+
 ## 首次设置
 
 1. **连接服务**：默认千问，粘贴自己的百炼 API Key，点击“连接并继续”。[获取 Key 的步骤](https://wjc-dev.github.io/voxtype/#api-key)。
@@ -36,7 +49,7 @@ brew install --cask wjc-dev/veyqa/veyqa-voice
 
 ## 语音服务
 
-默认使用 **Qwen Audio 3.0 ASR Streaming**，支持流式识别、多语种及方言、热词增强；也可使用豆包语音服务。[模型与配置说明](https://wjc-dev.github.io/voxtype/#engines)。
+默认使用 **Qwen Audio 3.0 ASR Streaming**。在“设置 → 语音服务”中选择千问或豆包模型、刷新官方目录，也可添加 OpenAI 兼容的自定义转写服务。千问和豆包保持流式识别，自定义服务在录音结束后转写。[模型与配置说明](https://wjc-dev.github.io/voxtype/#engines)。
 
 API Key 保存在本机，音频直接发送至所选语音服务，API 费用由对应服务商收取。本地录音存档默认关闭。
 

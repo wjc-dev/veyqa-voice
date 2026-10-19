@@ -2,7 +2,7 @@
 
 **Lightweight voice input for Mac. Hold to speak, release to type.**
 
-[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.7) · [简体中文](README.md)
+[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.8) · [简体中文](README.md)
 
 [![Veyqa Voice demo](website/product-preview.svg)](https://wjc-dev.github.io/voxtype/#demo)
 
@@ -14,7 +14,7 @@
 
 Requires **Apple Silicon and macOS 13+**.
 
-1. [Download and open the DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.7/Veyqa-Voice-v0.2.7-macOS-arm64.dmg).
+1. [Download and open the DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.8/Veyqa-Voice-v0.2.8-macOS-arm64.dmg).
 2. Follow the arrow: drag **Veyqa Voice into Applications**.
 3. Open Veyqa Voice from Applications to begin setup.
 
@@ -26,6 +26,19 @@ Or install with Homebrew:
 brew install --cask wjc-dev/veyqa/veyqa-voice
 ```
 
+## Updating
+
+Quit Veyqa Voice from its menu or settings before updating, then reopen it. Your API credentials and settings are retained; no uninstall is needed.
+
+For Homebrew installations:
+
+```bash
+brew update
+brew upgrade --cask wjc-dev/veyqa/veyqa-voice
+```
+
+For DMG installations, download the new installer above, drag the app into Applications and choose Replace. Follow the in-app guide if macOS asks you to confirm permissions.
+
 ## Set up once
 
 1. Paste your own speech-service API Key and connect. Qwen is selected by default; [Key setup guide](https://wjc-dev.github.io/voxtype/#api-key).
@@ -36,7 +49,7 @@ Open settings from the menu bar or Dock. Adjust the shortcut, hold/toggle mode, 
 
 ## Speech services
 
-The default **Qwen Audio 3.0 ASR Streaming** engine offers streaming recognition, multilingual and dialect support, and hotword enhancement. Doubao is also available.
+The default is **Qwen Audio 3.0 ASR Streaming**. In Settings → Speech Service, choose Qwen or Doubao models and refresh their official catalogues. You can also add an OpenAI-compatible transcription provider. Qwen and Doubao stream live; custom providers transcribe when recording ends.
 
 Your API Key stays on your Mac. Audio goes directly to the selected speech service, which bills your account for API usage. Local audio archives are off by default.
 
