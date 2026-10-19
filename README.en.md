@@ -20,13 +20,11 @@ Requires **Apple Silicon and macOS 13+**.
 
 This Preview is not yet Apple-notarized. For an unidentified-developer prompt, see the [first-open guide](https://wjc-dev.github.io/voxtype/#safety).
 
-<details><summary>Install with Homebrew</summary>
+Or install with Homebrew:
 
 ```bash
 brew install --cask wjc-dev/veyqa/veyqa-voice
 ```
-
-</details>
 
 ## Set up once
 

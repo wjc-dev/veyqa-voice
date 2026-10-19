@@ -20,19 +20,17 @@
 
 首次提示“无法验证开发者”？查看[打开步骤与图文帮助](https://wjc-dev.github.io/voxtype/#safety)。当前为尚未经过 Apple 公证的 Preview。
 
-<details><summary>使用 Homebrew 安装</summary>
+也可以使用 Homebrew 安装：
 
 ```bash
 brew install --cask wjc-dev/veyqa/veyqa-voice
 ```
 
-</details>
-
 ## 首次设置
 
-1. **连接服务：**默认千问，粘贴自己的百炼 API Key，点击“连接并继续”。[获取 Key 的步骤](https://wjc-dev.github.io/voxtype/#api-key)。
-2. **开启权限：**按引导开启麦克风、辅助功能和输入监控，返回后自动检查。系统要求重新打开时按提示操作即可。
-3. **试用输入：**点击试用文本框，按住 **右 Option** 说话，松开写入。完成后即可在其他 App 的输入框使用。
+1. **连接服务**：默认千问，粘贴自己的百炼 API Key，点击“连接并继续”。[获取 Key 的步骤](https://wjc-dev.github.io/voxtype/#api-key)。
+2. **开启权限**：按引导开启麦克风、辅助功能和输入监控，返回后自动检查。系统要求重新打开时按提示操作即可。
+3. **试用输入**：点击试用文本框，按住 **右 Option** 说话，松开写入。完成后即可在其他 App 的输入框使用。
 
 点击菜单栏或 Dock 图标打开设置。快捷键、按住／切换模式和菜单栏显示均可调整，保存后生效，升级保留配置。
 
