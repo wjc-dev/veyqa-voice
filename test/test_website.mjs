@@ -10,6 +10,15 @@ const script = readFileSync(new URL("app.js", site), "utf8");
 const css = readFileSync(new URL("style.css", site), "utf8");
 const brew = "brew install --cask wjc-dev/veyqa/veyqa-voice";
 
+test("live preview wraps without truncation and stays in document flow", () => {
+  const preview = css.match(/#demo-preview\s*\{([^}]+)\}/)[1];
+  const strip = css.match(/\.voice-strip\s*\{([^}]+)\}/)[1];
+  assert.doesNotMatch(preview, /nowrap|ellipsis|overflow:\s*hidden|line-clamp/);
+  assert.match(preview, /white-space:\s*normal/);
+  assert.match(preview, /overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(strip, /position:\s*absolute/);
+});
+
 function fixture(clipboard) {
   const status = { hidden: true, textContent: "" };
   const command = { textContent: brew, closest: () => null };

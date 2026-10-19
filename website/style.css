@@ -237,8 +237,7 @@ h1 span {
   color: #a4b4c3;
 }
 .demo-editor {
-  padding: 30px 30px 106px;
-  min-height: 308px;
+  padding: 30px 30px 18px;
 }
 .demo-date {
   display: flex;
@@ -270,12 +269,9 @@ h1 span {
   margin: 21px 0 0;
 }
 .voice-strip {
-  position: absolute;
-  bottom: 77px;
-  left: 24px;
-  right: 24px;
+  margin: 0 24px 24px;
   display: grid;
-  grid-template-columns: 8px 1fr;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px 12px;
   padding: 13px 17px;
@@ -286,21 +282,22 @@ h1 span {
   transition: border-color 0.2s;
 }
 .mic-dot {
+  align-self: start;
+  margin-top: 5px;
   color: #91b8bb;
   font-size: 8px;
 }
 #demo-preview {
-  font-size: 11px;
-  min-height: 19px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding-right: 36px;
+  grid-column: 2 / -1;
+  font-size: 12px;
+  line-height: 1.7;
+  min-height: 5.1em;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .voice-strip kbd {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
+  grid-column: 3;
+  grid-row: 2;
 }
 .wave {
   display: flex;
@@ -308,7 +305,6 @@ h1 span {
   align-items: center;
   gap: 4px;
   height: 20px;
-  padding-right: 46px;
 }
 .wave i {
   width: 3px;
@@ -732,7 +728,7 @@ details[open] summary {
     font-size: 53px;
   }
   .demo-editor {
-    padding: 26px 24px 106px;
+    padding: 26px 24px 18px;
   }
   .demo-text {
     font-size: 22px;
@@ -788,6 +784,12 @@ details[open] summary {
   .demo-text {
     font-size: 20px;
     min-height: 170px;
+  }
+  #demo-preview {
+    min-height: 8.5em;
+  }
+  .wave {
+    gap: 3px;
   }
   .workflow {
     gap: 20px;
