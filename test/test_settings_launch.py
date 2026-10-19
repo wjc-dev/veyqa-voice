@@ -59,7 +59,7 @@ class SettingsLaunchTests(unittest.TestCase):
         swift = (Path(__file__).resolve().parents[1] / "native_settings/VoiceInputSettings.swift").read_text()
         self.assertIn("RecoverySettingsView(model: model)", swift)
         self.assertIn("applicationShouldTerminateAfterLastWindowClosed", swift)
-        self.assertIn("guard NSApp.isActive else { return }", swift)
+        self.assertIn("guard NSApp.isActive || model.applyingSettings else { return }", swift)
         self.assertIn("guard diagnosticsGate.changed(contents) else { return }", swift)
         self.assertIn("guard recoveriesGate.changed(contents) else { return }", swift)
         self.assertIn("RecoveryFile.delete(ids: ids, at: url)", swift)

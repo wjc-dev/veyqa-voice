@@ -285,6 +285,9 @@ final class SettingsModel: ObservableObject {
     @Published var transcriptionService = "qwen"
     @Published var qwenModel = SpeechModels.defaultModel("qwen")
     @Published var doubaoModel = SpeechModels.defaultModel("doubao")
+    @Published var customASRBaseURL = ""
+    @Published var customASRAPIKey = ""
+    @Published var customASRModel = ""
     @Published var modelSnapshots: [String: SpeechModelSnapshot] = [:]
     @Published var refreshingModels = false
     @Published var modelCatalogStatus = ""
@@ -374,8 +377,11 @@ final class SettingsModel: ObservableObject {
         launchAtLogin = isBundled
             ? Self.bool(environment["LAUNCH_AT_LOGIN"], fallback: true)
             : false
-        transcriptionService = environment["TRANSCRIPTION_SERVICE"] == "doubao"
-            ? "doubao" : "qwen"
+        let storedService = environment["TRANSCRIPTION_SERVICE"] ?? "qwen"
+        transcriptionService = ["qwen", "doubao", "custom"].contains(storedService) ? storedService : "qwen"
+        customASRBaseURL = environment["CUSTOM_ASR_BASE_URL"] ?? ""
+        customASRAPIKey = environment["CUSTOM_ASR_API_KEY"] ?? ""
+        customASRModel = environment["CUSTOM_ASR_MODEL"] ?? ""
         qwenModel = SpeechModels.configuredModel(environment["QWEN_ASR_MODEL"], provider: "qwen")
         doubaoModel = SpeechModels.configuredModel(environment["DOUBAO_ASR_RESOURCE_ID"], provider: "doubao")
         for provider in ["qwen", "doubao"] {
@@ -416,7 +422,7 @@ final class SettingsModel: ObservableObject {
         doubaoAppKey = environment["DOUBAO_APP_KEY"] ?? ""
         doubaoAccessKey = environment["DOUBAO_ACCESS_KEY"] ?? ""
         onboardingComplete = Self.bool(environment["SETUP_COMPLETED"], fallback:
-            !qwenAPIKey.isEmpty || !doubaoAccessKey.isEmpty)
+            !qwenAPIKey.isEmpty || !doubaoAccessKey.isEmpty || !customASRModel.isEmpty)
         doubaoBoostingTableID = environment["DOUBAO_BOOSTING_TABLE_ID"] ?? ""
         // Automatic edit observation remains an internal experiment until a
         // future review/confirmation UI can make every learned rule explicit.
@@ -631,7 +637,23 @@ final class SettingsModel: ObservableObject {
         connectionStatus = ""
     }
 
-    var selectedModelID: String { transcriptionService == "qwen" ? qwenModel : doubaoModel }
+    var selectedModelID: String {
+        switch transcriptionService {
+        case "custom": return customASRModel
+        case "doubao": return doubaoModel
+        default: return qwenModel
+        }
+    }
+
+    var serviceCredentialsReady: Bool {
+        switch transcriptionService {
+        case "custom":
+            return CustomASRConnection.credentialsReady(
+                address: customASRBaseURL, key: customASRAPIKey.trimmingCharacters(in: .whitespacesAndNewlines))
+        case "doubao": return !doubaoAppKey.isEmpty && !doubaoAccessKey.isEmpty
+        default: return !qwenAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
 
     var availableModels: [SpeechModel] {
         let provider = transcriptionService
@@ -655,6 +677,7 @@ final class SettingsModel: ObservableObject {
     func refreshModels(ifStale: Bool = false) {
         cancelModelRefresh()
         let provider = transcriptionService
+        guard provider != "custom", serviceCredentialsReady else { return }
         modelCatalogStatus = ""
         if ifStale {
             if let snapshot = modelSnapshots[provider], Date().timeIntervalSince(snapshot.checkedAt) < 86400 { return }
@@ -739,7 +762,7 @@ final class SettingsModel: ObservableObject {
                     let header = event?["header"] as? [String: Any]
                     if header?["event"] as? String == "task-started" {
                         finish(self.onboardingComplete
-                               ? "模型连接成功：\(self.qwenModel)。点击右上角保存后生效。"
+                               ? "连接成功，保存后生效。"
                                : "连接成功，正在保存并应用…", verified: true)
                         return
                     }
@@ -765,7 +788,12 @@ final class SettingsModel: ObservableObject {
         let normalizedKey = qwenAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         qwenModel = qwenModel.trimmingCharacters(in: .whitespacesAndNewlines)
         doubaoModel = doubaoModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard SpeechModels.compatible(selectedModelID, provider: transcriptionService) else {
+        customASRModel = customASRModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        customASRAPIKey = customASRAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        customASRBaseURL = customASRBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard transcriptionService == "custom"
+                ? (!customASRModel.isEmpty && !customASRModel.contains(where: { $0.isWhitespace }))
+                : SpeechModels.compatible(selectedModelID, provider: transcriptionService) else {
             errorMessage = "请选择支持实时听写的模型，或检查手动填写的型号。"
             return
         }
@@ -781,6 +809,11 @@ final class SettingsModel: ObservableObject {
                 return
             }
             qwenAPIHost = normalizedHost
+        } else if transcriptionService == "custom" {
+            guard serviceCredentialsReady else {
+                errorMessage = "请填写有效的 API 地址和 Key；本机服务可不填 Key。"
+                return
+            }
         } else {
             guard !doubaoAppKey.isEmpty,
                   doubaoAppKey.allSatisfy(\.isNumber),
@@ -805,6 +838,9 @@ final class SettingsModel: ObservableObject {
             "TRANSCRIPTION_SERVICE": transcriptionService,
             "QWEN_ASR_MODEL": qwenModel,
             "DOUBAO_ASR_RESOURCE_ID": doubaoModel,
+            "CUSTOM_ASR_BASE_URL": customASRBaseURL,
+            "CUSTOM_ASR_API_KEY": customASRAPIKey,
+            "CUSTOM_ASR_MODEL": customASRModel,
             "PUNCTUATION_MODE": punctuationMode,
             "DISFLUENCY_FILTER_ENABLED": "false",
             "DISFLUENCY_FILTER_MODE": "off",
@@ -1578,6 +1614,7 @@ struct GeneralSettingsView: View {
     @ObservedObject var model: SettingsModel
     @Binding var showPermissions: Bool
     @Binding var showVocabulary: Bool
+    @Binding var showRecovery: Bool
 
     var body: some View {
         Form {
@@ -1618,6 +1655,9 @@ struct GeneralSettingsView: View {
                     .font(.callout)
             }
 
+            Section {
+                Button("恢复与诊断…") { showRecovery = true }
+            }
             if model.isBundled {
                 Section("应用") {
                     Toggle("登录后自动启动", isOn: $model.launchAtLogin)
@@ -1720,67 +1760,18 @@ struct EngineSettingsView: View {
 
     var body: some View {
         Form {
-            Section("语音引擎") {
-                Picker("当前引擎", selection: $model.transcriptionService) {
+            Section {
+                Picker("供应商", selection: $model.transcriptionService) {
                     Text("千问").tag("qwen")
                     Text("豆包").tag("doubao")
+                    Text("自定义").tag("custom")
                 }
                 .pickerStyle(.segmented)
-                Text(model.onboardingComplete
-                     ? "使用自己的 API 凭证。保存后从下一次听写生效，不中断当前录音。"
-                     : "默认推荐千问。只需配置一次，已有 Key 可以直接粘贴。")
-                    .foregroundStyle(.secondary)
-                    .font(.callout)
-            }
-
-            Section("识别模型") {
-                Picker("模型", selection: model.transcriptionService == "qwen" ? $model.qwenModel : $model.doubaoModel) {
-                    ForEach(model.availableModels) { option in
-                        Text(option.name).tag(option.id)
-                    }
-                }
-                Text(model.selectedModelID)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary).textSelection(.enabled)
-                if let active = model.diagnostics.model {
-                    Text("当前运行：\(active)").font(.caption).foregroundStyle(.secondary)
-                }
-                HStack {
-                    if let snapshot = model.modelSnapshots[model.transcriptionService] {
-                        Text("\(snapshot.source) · \(snapshot.checkedAt.formatted(date: .abbreviated, time: .shortened))")
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else {
-                        Text("模型目录每天自动检查一次").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(model.refreshingModels ? "正在刷新…" : "刷新模型") { model.refreshModels() }
-                        .disabled(model.refreshingModels)
-                }
-                if !model.modelCatalogStatus.isEmpty {
-                    Text(model.modelCatalogStatus).font(.caption).foregroundStyle(.secondary)
-                }
-                DisclosureGroup("手动填写模型型号") {
-                    TextField(model.transcriptionService == "qwen" ? "Model ID" : "Resource ID",
-                              text: model.transcriptionService == "qwen" ? $model.qwenModel : $model.doubaoModel)
-                        .textFieldStyle(.roundedBorder)
-                    Text("填写官方支持的实时语音识别型号，保存后从下一次听写生效。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                if model.transcriptionService == "qwen", model.qwenModel.contains("-message") {
-                    Text("短句听写模式：实时预览，保留原话，润色关闭。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
             }
 
             if model.transcriptionService == "qwen" {
                 Section("千问 API 连接") {
-                    Text("千问实时语音识别 · 阿里云百炼")
-                        .foregroundStyle(.secondary)
-                        .font(.callout)
                     CredentialField("API Key", text: $model.qwenAPIKey)
-                    Text("API Key 是你的语音服务访问密钥，不是阿里云登录密码。请勿发到聊天或截图中。")
-                        .foregroundStyle(.secondary)
-                        .font(.callout)
                     HStack {
                         Button("没有 Key？查看获取步骤") { showKeyHelp.toggle() }
                             .buttonStyle(.link)
@@ -1804,51 +1795,60 @@ struct EngineSettingsView: View {
                     if !model.connectionStatus.isEmpty {
                         Text(model.connectionStatus).font(.callout).foregroundStyle(.secondary)
                     }
-                    Text("音频会发送给你选择的云端语音服务；费用由对应账户承担。默认不保存本地录音。")
+                }
+            } else if model.transcriptionService == "doubao" {
+                Section("豆包 API 连接") {
+                    TextField("App ID", text: $model.doubaoAppKey)
+                        .textFieldStyle(.roundedBorder)
+                    CredentialField("Access Token", text: $model.doubaoAccessKey)
+                    Link("获取 App ID 与 Token ↗", destination: URL(string: "https://console.volcengine.com/speech/app")!)
+                    if !model.onboardingComplete {
+                        Button("保存并继续") { model.saveSettings(advanceSetup: true) }
+                    }
+                }
+            } else {
+                Section("自定义 API 连接") {
+                    TextField("API 地址", text: $model.customASRBaseURL, prompt: Text("https://api.example.com/v1"))
+                        .textFieldStyle(.roundedBorder)
+                    CredentialField("API Key", text: $model.customASRAPIKey)
+                    Text("OpenAI 兼容语音转写 · 录音结束后提交。本机服务可不填 Key。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+            }
 
-                if model.onboardingComplete { Section("识别") {
+            if model.serviceCredentialsReady {
+                compactModelSection
+            } else {
+                Text("填写上方凭证后，即可选择识别模型。")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+
+            if model.transcriptionService == "qwen" {
+                DisclosureGroup("高级设置") {
+                    Picker("Key 所属地区", selection: $model.qwenRegion) {
+                        Text("中国内地（北京）").tag("beijing")
+                        Text("新加坡").tag("singapore")
+                    }
                     Picker("识别语言", selection: $model.qwenLanguage) {
                         Text("中文优先").tag("zh")
                         Text("自动判断").tag("auto")
                         Text("粤语").tag("yue")
                         Text("英语").tag("en")
                     }
-                } }
-                DisclosureGroup("高级设置（一般无需修改）") {
-                    Picker("Key 所属地区", selection: $model.qwenRegion) {
-                        Text("中国内地（北京）").tag("beijing")
-                        Text("新加坡").tag("singapore")
-                    }
-                    TextField("自定义 API 地址（留空自动选择）", text: $model.qwenAPIHost)
+                    TextField("百炼 API 地址（留空自动选择）", text: $model.qwenAPIHost)
                         .textFieldStyle(.roundedBorder)
-                    Text("已有自定义地址优先使用；更换地区时请清空原地址，或填入该地区的官方地址。")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
-            } else {
-                Section("豆包 API 连接") {
-                    TextField("App ID", text: $model.doubaoAppKey)
+            } else if model.transcriptionService == "doubao" {
+                DisclosureGroup("高级设置") {
+                    TextField("热词表 ID（可选）", text: $model.doubaoBoostingTableID)
                         .textFieldStyle(.roundedBorder)
-                    CredentialField("Access Token", text: $model.doubaoAccessKey)
-                    TextField("热词表 ID（可选加强）", text: $model.doubaoBoostingTableID)
-                        .textFieldStyle(.roundedBorder)
-                    Link("打开火山引擎语音应用", destination: URL(string: "https://console.volcengine.com/speech/app")!)
-                    Link("查看豆包热词表配置说明", destination: URL(string: "https://www.volcengine.com/docs/6561/155739?lang=zh")!)
-                    Text("在火山引擎开通所选模型对应的服务。本机识别词汇会随请求发送；热词表 ID 可选填。")
-                        .foregroundStyle(.secondary)
-                        .font(.callout)
-                    if !model.onboardingComplete {
-                        Button("保存并继续") { model.saveSettings(advanceSetup: true) }
-                        Text("保存后将在试用步骤验证实际识别；保存成功不等于服务已连接。")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+                    Link("热词表配置说明 ↗", destination: URL(string: "https://www.volcengine.com/docs/6561/155739?lang=zh")!)
                 }
             }
         }
         .formStyle(.grouped)
         .disabled(model.applyingSettings)
-        .task(id: model.transcriptionService) { model.refreshModels(ifStale: true) }
+        .task(id: "\(model.transcriptionService)-\(model.serviceCredentialsReady)") { model.refreshModels(ifStale: true) }
         .onDisappear { model.cancelModelRefresh() }
         .onChange(of: model.qwenModel) { _ in model.cancelConnectionCheck() }
         .onChange(of: model.transcriptionService) { _ in model.cancelConnectionCheck() }
@@ -1856,6 +1856,53 @@ struct EngineSettingsView: View {
         .onChange(of: model.qwenAPIHost) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
         .onChange(of: model.qwenRegion) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
         .onChange(of: model.qwenWorkspace) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
+    }
+
+    private var documentationURL: URL {
+        switch model.transcriptionService {
+        case "doubao": return URL(string: "https://docs.volcengine.com/docs/DoubaoVoice/model-list?lang=zh")!
+        case "custom": return URL(string: "https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create")!
+        default: return URL(string: "https://help.aliyun.com/zh/model-studio/asr-model/")!
+        }
+    }
+
+    private var compactModelSection: some View {
+        Section("识别模型") {
+            if model.transcriptionService == "custom" {
+                TextField("模型型号", text: $model.customASRModel, prompt: Text("供应商提供的 Model ID"))
+                    .textFieldStyle(.roundedBorder)
+                Link("接口说明 ↗", destination: documentationURL)
+                if !model.onboardingComplete {
+                    Button("保存并继续") { model.saveSettings(advanceSetup: true) }
+                        .disabled(model.customASRModel.isEmpty)
+                }
+            } else {
+                Picker("模型", selection: model.transcriptionService == "qwen" ? $model.qwenModel : $model.doubaoModel) {
+                    ForEach(model.availableModels) { option in Text(option.name).tag(option.id) }
+                }
+                HStack(alignment: .top) {
+                    Text(model.selectedModelID).font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    Link("官方模型与说明 ↗", destination: documentationURL)
+                    Button { model.refreshModels() } label: {
+                        Image(systemName: model.refreshingModels ? "hourglass" : "arrow.clockwise")
+                    }.disabled(model.refreshingModels).help("刷新官方模型列表")
+                }
+                if !model.modelCatalogStatus.isEmpty {
+                    Text(model.modelCatalogStatus).font(.caption).foregroundStyle(.secondary)
+                }
+                DisclosureGroup("手动型号与目录信息") {
+                    TextField(model.transcriptionService == "qwen" ? "Model ID" : "Resource ID",
+                              text: model.transcriptionService == "qwen" ? $model.qwenModel : $model.doubaoModel)
+                        .textFieldStyle(.roundedBorder)
+                    if let snapshot = model.modelSnapshots[model.transcriptionService] {
+                        Text("\(snapshot.source) · \(snapshot.checkedAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1938,7 +1985,7 @@ struct RecoverySettingsView: View {
         VStack(spacing: 0) {
             Form {
                 Section("未写入文字") {
-                    Text("输入位置改变、写入失败、识别中断或可控自动恢复时，最多保留最近 5 条已识别文字。片段可能不完整，请确认后复制；不自动发送，也不因此保存录音。")
+                    Text("最近 5 条未写入的文字，可复制后继续使用。")
                         .foregroundStyle(.secondary)
                         .font(.callout)
                 }
@@ -2198,6 +2245,7 @@ struct SettingsRootView: View {
     @ObservedObject var model: SettingsModel
     @State private var showPermissions = false
     @State private var showVocabulary = false
+    @State private var showRecovery = false
     @State private var evaluatedPermissionGate = false
     @State private var selectedTab = "general"
     private let permissionTimer = Timer.publish(
@@ -2213,16 +2261,14 @@ struct SettingsRootView: View {
             GeneralSettingsView(
                 model: model,
                 showPermissions: $showPermissions,
-                showVocabulary: $showVocabulary
+                showVocabulary: $showVocabulary,
+                showRecovery: $showRecovery
             )
-                .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
+                .tabItem { Label("通用", systemImage: "slider.horizontal.3") }
                 .tag("general")
             EngineSettingsView(model: model)
-                .tabItem { Label("引擎", systemImage: "waveform.badge.magnifyingglass") }
+                .tabItem { Label("语音服务", systemImage: "waveform.badge.magnifyingglass") }
                 .tag("engine")
-            RecoverySettingsView(model: model)
-                .tabItem { Label("恢复与诊断", systemImage: "lifepreserver") }
-                .tag("recovery")
         }
         }
         if !model.saveStatus.isEmpty {
@@ -2270,6 +2316,16 @@ struct SettingsRootView: View {
         }
         .sheet(isPresented: $showVocabulary) {
             VocabularyEditorView(vocabulary: $model.customVocabulary)
+        }
+        .sheet(isPresented: $showRecovery) {
+            VStack(spacing: 12) {
+                HStack {
+                    Text("恢复与诊断").font(.headline)
+                    Spacer()
+                    Button("完成") { showRecovery = false }.keyboardShortcut(.cancelAction)
+                }.padding([.top, .horizontal])
+                RecoverySettingsView(model: model)
+            }.frame(width: 660, height: 500)
         }
         .alert("已完成", isPresented: Binding(
             get: { model.notice != nil },

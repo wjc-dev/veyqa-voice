@@ -11,6 +11,13 @@ private func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 @main
 struct SettingsCoreHarness {
     static func main() throws {
+        require(CustomASRConnection.endpoint("https://api.example.com/v1/")?.absoluteString == "https://api.example.com/v1/audio/transcriptions", "custom endpoint normalization")
+        require(CustomASRConnection.endpoint("https://api.example.com/v1/audio/transcriptions")?.absoluteString == "https://api.example.com/v1/audio/transcriptions", "full endpoint retained")
+        require(CustomASRConnection.endpoint("http://api.example.com/v1") == nil, "remote HTTP rejected")
+        require(CustomASRConnection.endpoint("https://key@example.com/v1") == nil, "embedded credentials rejected")
+        require(CustomASRConnection.endpoint("https://example.com/v1?token=hidden") == nil, "query secrets rejected")
+        require(CustomASRConnection.credentialsReady(address: "http://127.0.0.1:8080/v1", key: ""), "local server without key")
+        require(!CustomASRConnection.credentialsReady(address: "https://example.com/v1", key: ""), "remote server needs own key")
         require(SetupStep.current(connectionApplied: false, permissionsGranted: true) == .connection, "permission alone does not complete setup")
         require(SetupStep.current(connectionApplied: true, permissionsGranted: false) == .permissions, "connection advances to permission")
         require(SetupStep.current(connectionApplied: true, permissionsGranted: true) == .trial, "ready for real dictation trial")

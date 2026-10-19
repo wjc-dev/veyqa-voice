@@ -1,6 +1,30 @@
 import Foundation
 import Darwin
 
+enum CustomASRConnection {
+    static func endpoint(_ value: String) -> URL? {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.contains(where: { $0.isWhitespace || $0.asciiValue.map { $0 < 32 } == true }),
+              var parts = URLComponents(string: normalized),
+              let host = parts.host, !host.isEmpty,
+              parts.user == nil, parts.password == nil, parts.query == nil, parts.fragment == nil,
+              parts.scheme == "https" || (parts.scheme == "http" && isLocal(host)) else { return nil }
+        if let port = parts.port, !(1...65535).contains(port) { return nil }
+        while parts.path.hasSuffix("/") { parts.path.removeLast() }
+        if !parts.path.hasSuffix("/audio/transcriptions") { parts.path += "/audio/transcriptions" }
+        return parts.url
+    }
+
+    static func isLocal(_ host: String) -> Bool {
+        ["localhost", "127.0.0.1", "::1", "[::1]"].contains(host.lowercased())
+    }
+
+    static func credentialsReady(address: String, key: String) -> Bool {
+        guard let url = endpoint(address), let host = url.host else { return false }
+        return (!key.isEmpty || isLocal(host)) && !key.contains(where: { $0.isWhitespace })
+    }
+}
+
 enum SetupStep: Int {
     case connection = 1, permissions, trial
 

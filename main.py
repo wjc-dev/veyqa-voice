@@ -59,6 +59,7 @@ from src.text_processing import (
 )
 from src.transcription.doubao_streaming import DoubaoStreamingProcessor
 from src.transcription.qwen_streaming import QwenStreamingProcessor
+from src.transcription.custom_asr import CustomASRProcessor
 from src.ui.floating_preview import FloatingPreviewWindow
 from src.ui.status_bar import StatusBarController
 from src.utils.logger import logger
@@ -124,8 +125,8 @@ class VoiceAssistant:
         login_enabled = os.getenv("LAUNCH_AT_LOGIN", "true").lower() == "true"
         login_result = sync_login_item(login_enabled)
         self.processor = processor
-        self.service = service if service in {"qwen", "doubao"} else "qwen"
-        self.engine_label = "豆包" if self.service == "doubao" else "千问"
+        self.service = service if service in {"qwen", "doubao", "custom"} else "qwen"
+        self.engine_label = {"doubao": "豆包", "custom": "自定义服务"}.get(self.service, "千问")
         self.punctuation_mode = os.getenv("PUNCTUATION_MODE", "auto").lower()
         self.archive_enabled = os.getenv("AUDIO_ARCHIVE_ENABLED", "false").lower() == "true"
 
@@ -286,12 +287,12 @@ class VoiceAssistant:
                     return
                 load_dotenv(ENV_FILE, override=True)
                 service = os.getenv("TRANSCRIPTION_SERVICE", "qwen").lower()
-                processor = DoubaoStreamingProcessor() if service == "doubao" else QwenStreamingProcessor()
+                processor = make_processor(service)
                 if not processor.is_available():
                     raise ValueError("语音服务凭证尚未配置")
                 self.processor = processor
-                self.service = "doubao" if service == "doubao" else "qwen"
-                self.engine_label = "豆包" if self.service == "doubao" else "千问"
+                self.service = service if service in {"doubao", "custom"} else "qwen"
+                self.engine_label = {"doubao": "豆包", "custom": "自定义服务"}.get(self.service, "千问")
                 self.punctuation_mode = os.getenv("PUNCTUATION_MODE", "auto")
                 self.archive_enabled = os.getenv("AUDIO_ARCHIVE_ENABLED", "false").lower() == "true"
                 self.keyboard_manager.reload_configuration()
@@ -703,7 +704,12 @@ class VoiceAssistant:
             stream_failed = True
             logger.error("%s流式识别失败: %s", self.engine_label, error)
             if any(token in error.lower() for token in ("401", "403", "鉴权", "unauthorized", "invalid_api_key")):
-                reason, outcome = "API Key 未通过验证，请在设置中检查 Key、地区和服务权限", "authentication_error"
+                reason = ("API Key 未通过验证，请检查 Key 和模型权限" if self.service == "custom"
+                          else "API Key 未通过验证，请在设置中检查 Key、地区和服务权限")
+                outcome = "authentication_error"
+            elif self.service == "custom":
+                # The adapter emits only local, sanitized messages, never server bodies.
+                reason, outcome = error, "custom_provider_error"
             else:
                 reason, outcome = f"{self.engine_label}连接中断，请检查网络后重试", "network_error"
             self._fail_session(session, reason, outcome)
@@ -800,15 +806,21 @@ class VoiceAssistant:
         self.status_controller.start()
 
 
+def make_processor(service: str):
+    if service == "doubao":
+        return DoubaoStreamingProcessor()
+    if service == "custom":
+        return CustomASRProcessor()
+    return QwenStreamingProcessor()
+
+
 def main() -> None:
     try:
         resume_supervisor_for_manual_launch(sys.argv[1:])
         service = os.getenv("TRANSCRIPTION_SERVICE", "qwen").strip().lower()
-        if service == "doubao":
-            processor = DoubaoStreamingProcessor()
-        else:
+        if service not in {"qwen", "doubao", "custom"}:
             service = "qwen"
-            processor = QwenStreamingProcessor()
+        processor = make_processor(service)
         assistant = VoiceAssistant(
             processor if processor.is_available() else None,
             service=service,

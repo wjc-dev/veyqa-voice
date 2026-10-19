@@ -60,7 +60,8 @@ _STATE_VISUALS = {
 
 
 def _service_label() -> str:
-    return "豆包" if os.getenv("TRANSCRIPTION_SERVICE", "qwen").lower() == "doubao" else "千问"
+    return {"doubao": "豆包", "custom": "自定义服务"}.get(
+        os.getenv("TRANSCRIPTION_SERVICE", "qwen").lower(), "千问")
 
 
 def _menu_bar_enabled() -> bool:
@@ -142,6 +143,7 @@ def _launch_settings_window(on_restart=None) -> int:
     settings_script = os.path.join(root_dir, "settings_ui.py")
     native_source = os.path.join(root_dir, "native_settings", "VoiceInputSettings.swift")
     native_core = os.path.join(root_dir, "native_settings", "SettingsCore.swift")
+    native_models = os.path.join(root_dir, "native_settings", "SpeechModels.swift")
     native_info = os.path.join(
         root_dir, "native_settings", "VoiceInputSettings-Info.plist"
     )
@@ -189,7 +191,7 @@ def _launch_settings_window(on_restart=None) -> int:
             not os.path.exists(native_binary)
             or any(
                 os.path.getmtime(source) > os.path.getmtime(native_binary)
-                for source in (native_source, native_core, native_info)
+                for source in (native_source, native_core, native_models, native_info)
             )
         )
         if needs_build:

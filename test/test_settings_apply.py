@@ -54,6 +54,25 @@ def test_save_during_dictation_is_deferred(tmp_path):
     assert request.exists()
 
 
+def test_custom_service_applies_without_restart(tmp_path):
+    app = assistant()
+    request = tmp_path / ".settings-apply-request"
+    request.write_text("custom-save")
+    with patch("main.DATA_DIR", tmp_path), patch("main.load_dotenv"), \
+            patch.dict("os.environ", {"TRANSCRIPTION_SERVICE": "custom"}), \
+            patch("main.CustomASRProcessor") as processor, \
+            patch("main.sync_login_item") as login:
+        processor.return_value.is_available.return_value = True
+        processor.return_value.model_name = "test-custom-model"
+        login.return_value = SimpleNamespace(status="enabled", error="")
+        app._apply_pending_settings()
+    assert app.service == "custom"
+    assert app.engine_label == "自定义服务"
+    assert app.processor is processor.return_value
+    assert app.diagnostics.update.call_args.kwargs["model"] == "test-custom-model"
+    assert not request.exists()
+
+
 def test_failed_save_is_acknowledged_and_not_retried_forever(tmp_path):
     app = assistant()
     request = tmp_path / ".settings-apply-request"
