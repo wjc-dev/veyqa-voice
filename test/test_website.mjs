@@ -7,10 +7,15 @@ import assert from "node:assert/strict";
 const site = new URL("../website/", import.meta.url);
 const html = readFileSync(new URL("index.html", site), "utf8");
 const script = readFileSync(new URL("app.js", site), "utf8");
+const css = readFileSync(new URL("style.css", site), "utf8");
 const prompt = html.match(
   /<textarea[^>]*id="agent-prompt"[^>]*>([\s\S]*?)<\/textarea\s*>/,
 )[1];
 const brew = "brew install --cask wjc-dev/veyqa/veyqa-voice";
+
+test("demo uses a single card without offset decorative pseudo-elements", () => {
+  assert.doesNotMatch(css, /\.demo\s*::?(?:before|after)\b/);
+});
 
 // Test the actual client script with a minimal DOM. No browser or real clipboard.
 function fixture(clipboard) {

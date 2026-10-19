@@ -184,16 +184,6 @@ h1 span {
   box-shadow:
     0 24px 90px #0007,
     0 0 80px #77d8cc08;
-  isolation: isolate;
-}
-.demo::before {
-  content: "";
-  position: absolute;
-  inset: -12px 16px 12px;
-  border: 1px solid #9cddd81c;
-  border-radius: 20px;
-  z-index: -1;
-  background: #14202833;
 }
 .demo-top {
   height: 48px;
