@@ -1,6 +1,20 @@
 import Foundation
 import Darwin
 
+struct SettingsDraftTracker {
+    private var saved: [String]?
+    private var submitted: [String]?
+
+    func isDirty(_ draft: [String]) -> Bool { saved.map { $0 != draft } ?? false }
+    mutating func reset(_ draft: [String]) { saved = draft; submitted = nil }
+    mutating func begin(_ draft: [String]) { submitted = draft }
+    mutating func confirm() {
+        if let submitted { saved = submitted }
+        submitted = nil
+    }
+    mutating func fail() { submitted = nil }
+}
+
 enum CustomASRConnection {
     static func endpoint(_ value: String) -> URL? {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)

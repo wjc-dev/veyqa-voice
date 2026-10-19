@@ -144,6 +144,7 @@ def _launch_settings_window(on_restart=None) -> int:
     native_source = os.path.join(root_dir, "native_settings", "VoiceInputSettings.swift")
     native_core = os.path.join(root_dir, "native_settings", "SettingsCore.swift")
     native_models = os.path.join(root_dir, "native_settings", "SpeechModels.swift")
+    native_controls = os.path.join(root_dir, "native_settings", "SettingsControls.swift")
     native_info = os.path.join(
         root_dir, "native_settings", "VoiceInputSettings-Info.plist"
     )
@@ -191,7 +192,7 @@ def _launch_settings_window(on_restart=None) -> int:
             not os.path.exists(native_binary)
             or any(
                 os.path.getmtime(source) > os.path.getmtime(native_binary)
-                for source in (native_source, native_core, native_models, native_info)
+                for source in (native_source, native_core, native_models, native_controls, native_info)
             )
         )
         if needs_build:

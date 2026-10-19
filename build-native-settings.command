@@ -29,6 +29,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macos13.0 \
   -Xlinker "$PROJECT_DIR/native_settings/VoiceInputSettings-Info.plist" \
   native_settings/SettingsCore.swift \
   native_settings/SpeechModels.swift \
+  native_settings/SettingsControls.swift \
   native_settings/VoiceInputSettings.swift \
   -o "$SETTINGS_EXECUTABLE"
 

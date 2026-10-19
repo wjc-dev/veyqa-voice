@@ -11,6 +11,22 @@ private func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 @main
 struct SettingsCoreHarness {
     static func main() throws {
+        var draftTracker = SettingsDraftTracker()
+        require(!draftTracker.isDirty(["initial"]), "unloaded draft stays clean")
+        draftTracker.reset(["original"])
+        require(draftTracker.isDirty(["edited"]), "edit marks draft dirty")
+        require(!draftTracker.isDirty(["original"]), "reverting an edit clears dirty state")
+        draftTracker.begin(["submitted"])
+        require(draftTracker.isDirty(["submitted"]), "writing file alone does not confirm application")
+        draftTracker.confirm()
+        require(!draftTracker.isDirty(["submitted"]), "backend acknowledgement confirms exact draft")
+        require(draftTracker.isDirty(["later edit"]), "newer changes stay unsaved")
+        draftTracker.begin(["failed edit"])
+        draftTracker.fail()
+        draftTracker.confirm()
+        require(draftTracker.isDirty(["failed edit"]), "failed apply does not advance baseline")
+        draftTracker.reset(["reloaded"])
+        require(!draftTracker.isDirty(["reloaded"]), "loading settings resets baseline")
         require(CustomASRConnection.endpoint("https://api.example.com/v1/")?.absoluteString == "https://api.example.com/v1/audio/transcriptions", "custom endpoint normalization")
         require(CustomASRConnection.endpoint("https://api.example.com/v1/audio/transcriptions")?.absoluteString == "https://api.example.com/v1/audio/transcriptions", "full endpoint retained")
         require(CustomASRConnection.endpoint("http://api.example.com/v1") == nil, "remote HTTP rejected")
@@ -160,5 +176,6 @@ struct SettingsCoreHarness {
         let attributes = try FileManager.default.attributesOfItem(atPath: envURL.path)
         let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0
         require(permissions & 0o777 == 0o600, "saved environment remains private")
+        print("Native settings core checks passed")
     }
 }

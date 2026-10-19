@@ -303,6 +303,23 @@ final class SettingsModel: ObservableObject {
     @Published var applyingSettings = false
     @Published var trialText = ""
     @Published var saveStatus = ""
+    @Published var saveFailed = false
+    private var draftTracker = SettingsDraftTracker()
+
+    private var editableDraft: [String] {
+        [transcriptionService, qwenModel, doubaoModel, customASRBaseURL, customASRAPIKey,
+         customASRModel, qwenAPIKey, qwenAPIHost, qwenWorkspace, qwenRegion, qwenLanguage,
+         doubaoAppKey, doubaoAccessKey, doubaoBoostingTableID, hotkeySpec, hotkeyLabel,
+         hotkeyMode, punctuationMode, personalContext, customVocabulary,
+         String(launchAtLogin), String(showMenuBarIcon), String(qwenContextEnabled),
+         String(recentMemoryEnabled)]
+    }
+
+    var hasUnsavedChanges: Bool { draftTracker.isDirty(editableDraft) }
+    var saveFeedback: String {
+        if applyingSettings || saveFailed { return saveStatus }
+        return hasUnsavedChanges ? "有未保存的修改" : saveStatus
+    }
     private var pendingSaveID: String?
     private var saveStartedAt: TimeInterval = 0
     private var closeAfterApply = false
@@ -439,6 +456,7 @@ final class SettingsModel: ObservableObject {
         reloadRecoveries()
         reloadDiagnostics()
         reloadPermissions()
+        draftTracker.reset(editableDraft)
     }
 
     func reloadCorrections() {
@@ -781,6 +799,7 @@ final class SettingsModel: ObservableObject {
 
     func saveSettings(completeSetup: Bool = false, advanceSetup: Bool = false) {
         guard !applyingSettings else { return }
+        saveFailed = false
         if completeSetup && (!setupConnectionApplied || !readyForDictation) {
             errorMessage = "请先连接语音服务并完成权限授权。"
             return
@@ -886,6 +905,7 @@ final class SettingsModel: ObservableObject {
                 try restartBackgroundService()
             }
             environment.merge(updates) { _, new in new }
+            draftTracker.begin(editableDraft)
             if isBundled {
                 let revision = UUID().uuidString
                 pendingSaveID = revision
@@ -896,12 +916,16 @@ final class SettingsModel: ObservableObject {
                 saveStatus = "已保存，正在等待生效…"
                 try Self.privateWrite(Data(revision.utf8), to: dataURL.appendingPathComponent(".settings-apply-request"))
             } else {
+                draftTracker.confirm()
                 if advanceSetup { setupConnectionApplied = true }
                 if completeSetup { onboardingComplete = true }
                 notice = "设置已保存，后台语音服务已经重启。"
             }
         } catch {
+            draftTracker.fail()
             applyingSettings = false
+            saveFailed = true
+            saveStatus = "保存失败，请重试"
             errorMessage = "保存失败：\(error.localizedDescription)"
         }
     }
@@ -911,13 +935,16 @@ final class SettingsModel: ObservableObject {
         guard diagnostics.settingsRevision == pendingSaveID else {
             if ProcessInfo.processInfo.systemUptime - saveStartedAt > 15 {
                 self.pendingSaveID = nil
+                draftTracker.fail()
                 applyingSettings = false
+                saveFailed = true
                 saveStatus = "后台暂未确认设置。请重试；若主程序已退出，请从应用程序打开 Veyqa Voice。"
             }
             return
         }
         switch diagnostics.settingsStatus {
         case "applied":
+            draftTracker.confirm()
             saveStatus = onboardingComplete ? "已生效，下次听写使用新设置" : "语音服务设置已保存，可以继续"
             self.pendingSaveID = nil
             applyingSettings = false
@@ -928,6 +955,8 @@ final class SettingsModel: ObservableObject {
             }
         case "pending": saveStatus = "已保存，本次听写结束后生效"
         case "error":
+            draftTracker.fail()
+            saveFailed = true
             saveStatus = "未能应用设置，请重试；无需重启 App"
             self.pendingSaveID = nil
             applyingSettings = false
@@ -1380,6 +1409,7 @@ private struct PermissionRow: View {
 
 struct PermissionSetupView: View {
     @ObservedObject var model: SettingsModel
+    @State private var showIdentityInfo = false
     let allowsDismiss: Bool
     let onContinue: () -> Void
 
@@ -1429,7 +1459,13 @@ struct PermissionSetupView: View {
             .padding(.horizontal, 18)
             .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 16))
 
-            DisclosureGroup("查看当前应用信息") { identityCard }
+            Button { showIdentityInfo.toggle() } label: {
+                Label("查看当前应用信息", systemImage: "info.circle").frame(minHeight: 28)
+            }
+            .buttonStyle(.link)
+            .popover(isPresented: $showIdentityInfo) {
+                identityCard.padding(12).frame(width: 560)
+            }
 
             if model.readyForDictation {
                 Label("权限和快捷键已就绪，可以开始试用。", systemImage: "checkmark.circle.fill")
@@ -1641,14 +1677,9 @@ struct GeneralSettingsView: View {
                     Text("替换为空格，保留问号").tag("spaces")
                     Text("删除所有标点").tag("none")
                 }
-                LabeledContent("识别词汇") {
-                    Button {
-                        showVocabulary = true
-                    } label: {
-                        Text(model.customVocabularyCount == 0
-                            ? "添加…"
-                            : "管理 \(model.customVocabularyCount) 个词…")
-                    }
+                SettingsActionRow(title: "识别词汇", detail: model.customVocabularyCount == 0
+                                  ? "添加…" : "\(model.customVocabularyCount) 个词") {
+                    showVocabulary = true
                 }
                 Text("添加 user_id、seller_id 等字段名或专有词汇，提升识别概率。")
                     .foregroundStyle(.secondary)
@@ -1656,12 +1687,12 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                Button("恢复与诊断…") { showRecovery = true }
+                SettingsActionRow(title: "恢复与诊断", systemImage: "lifepreserver") { showRecovery = true }
             }
             if model.isBundled {
                 Section("应用") {
-                    Toggle("登录后自动启动", isOn: $model.launchAtLogin)
-                    Toggle("显示菜单栏图标", isOn: $model.showMenuBarIcon)
+                    SettingsToggleRow(title: "登录后自动启动", isOn: $model.launchAtLogin)
+                    SettingsToggleRow(title: "显示菜单栏图标", isOn: $model.showMenuBarIcon)
                     Text("点击菜单栏或 Dock 图标，随时打开设置。")
                         .font(.callout).foregroundStyle(.secondary)
                     HStack(spacing: 10) {
@@ -1713,19 +1744,16 @@ struct CredentialField: View {
             Button { isRevealed.toggle() } label: {
                 Image(systemName: isRevealed ? "eye.slash" : "eye")
             }
-            .buttonStyle(.borderless)
             .help(isRevealed ? "隐藏 \(title)" : "显示 \(title)")
             .accessibilityLabel(isRevealed ? "隐藏 \(title)" : "显示 \(title)")
+            .buttonStyle(SettingsIconButtonStyle())
             Button(action: copyCredential) {
                 Image(systemName: copyStatus == "已复制" ? "checkmark" : "doc.on.doc")
             }
-            .buttonStyle(.borderless)
             .disabled(text.isEmpty)
             .help(copyStatus.isEmpty ? "复制 \(title)" : copyStatus)
             .accessibilityLabel(copyStatus.isEmpty ? "复制 \(title)" : copyStatus)
-            if !copyStatus.isEmpty {
-                Text(copyStatus).font(.caption).foregroundStyle(.secondary)
-            }
+            .buttonStyle(SettingsIconButtonStyle())
         }
         .onDisappear { conceal() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
@@ -1773,24 +1801,11 @@ struct EngineSettingsView: View {
                 Section("千问 API 连接") {
                     CredentialField("API Key", text: $model.qwenAPIKey)
                     HStack {
-                        Button("没有 Key？查看获取步骤") { showKeyHelp.toggle() }
-                            .buttonStyle(.link)
+                        credentialHelpButton
                         Spacer()
                         Button(model.checkingConnection ? "连接中…" :
                                 (model.onboardingComplete ? "检查连接" : "连接并继续")) { model.checkConnection() }
                             .disabled(model.checkingConnection || model.applyingSettings)
-                    }
-                    if showKeyHelp {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("1. 打开百炼控制台，用你自己的阿里云账号登录，按页面提示开通服务。")
-                            Text("2. 在 API Key 页面选择与你使用的服务相同的地区，创建并复制 Key。本应用默认中国内地（北京）。")
-                            Text("3. 回到这里粘贴，点击“\(model.onboardingComplete ? "检查连接" : "连接并继续")”。其他地区可在下方高级设置中调整。")
-                            Text("API 调用可能产生费用，以百炼账户的额度与计费说明为准；不需要为了此应用购买编程套餐。")
-                            HStack {
-                                Link("打开百炼 API Key 页面 ↗", destination: URL(string: "https://bailian.console.aliyun.com/?tab=model#/api-key")!)
-                                Link("官方详细教程 ↗", destination: URL(string: "https://help.aliyun.com/zh/model-studio/get-api-key")!)
-                            }
-                        }.font(.callout).textSelection(.enabled)
                     }
                     if !model.connectionStatus.isEmpty {
                         Text(model.connectionStatus).font(.callout).foregroundStyle(.secondary)
@@ -1801,7 +1816,7 @@ struct EngineSettingsView: View {
                     TextField("App ID", text: $model.doubaoAppKey)
                         .textFieldStyle(.roundedBorder)
                     CredentialField("Access Token", text: $model.doubaoAccessKey)
-                    Link("获取 App ID 与 Token ↗", destination: URL(string: "https://console.volcengine.com/speech/app")!)
+                    credentialHelpButton
                     if !model.onboardingComplete {
                         Button("保存并继续") { model.saveSettings(advanceSetup: true) }
                     }
@@ -1851,11 +1866,25 @@ struct EngineSettingsView: View {
         .task(id: "\(model.transcriptionService)-\(model.serviceCredentialsReady)") { model.refreshModels(ifStale: true) }
         .onDisappear { model.cancelModelRefresh() }
         .onChange(of: model.qwenModel) { _ in model.cancelConnectionCheck() }
-        .onChange(of: model.transcriptionService) { _ in model.cancelConnectionCheck() }
+        .onChange(of: model.transcriptionService) { _ in
+            showKeyHelp = false
+            model.cancelConnectionCheck()
+        }
         .onChange(of: model.qwenAPIKey) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
         .onChange(of: model.qwenAPIHost) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
         .onChange(of: model.qwenRegion) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
         .onChange(of: model.qwenWorkspace) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
+    }
+
+    private var credentialHelpButton: some View {
+        Button { showKeyHelp.toggle() } label: {
+            Label("获取 API 凭证", systemImage: "questionmark.circle")
+                .frame(minHeight: 28)
+        }
+        .buttonStyle(.link)
+        .popover(isPresented: $showKeyHelp, arrowEdge: .bottom) {
+            CredentialHelpView(provider: model.transcriptionService)
+        }
     }
 
     private var documentationURL: URL {
@@ -1887,7 +1916,8 @@ struct EngineSettingsView: View {
                     Link("官方模型与说明 ↗", destination: documentationURL)
                     Button { model.refreshModels() } label: {
                         Image(systemName: model.refreshingModels ? "hourglass" : "arrow.clockwise")
-                    }.disabled(model.refreshingModels).help("刷新官方模型列表")
+                    }.buttonStyle(SettingsIconButtonStyle())
+                        .disabled(model.refreshingModels).help("刷新官方模型列表")
                 }
                 if !model.modelCatalogStatus.isEmpty {
                     Text(model.modelCatalogStatus).font(.caption).foregroundStyle(.secondary)
@@ -2264,6 +2294,7 @@ struct SettingsRootView: View {
                 showVocabulary: $showVocabulary,
                 showRecovery: $showRecovery
             )
+                .disabled(model.applyingSettings)
                 .tabItem { Label("通用", systemImage: "slider.horizontal.3") }
                 .tag("general")
             EngineSettingsView(model: model)
@@ -2271,9 +2302,23 @@ struct SettingsRootView: View {
                 .tag("engine")
         }
         }
-        if !model.saveStatus.isEmpty {
-            Text(model.saveStatus).font(.callout).foregroundStyle(.secondary)
+        HStack(spacing: 7) {
+            if !model.saveFeedback.isEmpty {
+                if model.applyingSettings {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: model.saveFailed ? "exclamationmark.circle" :
+                          model.hasUnsavedChanges ? "circle.fill" : "checkmark.circle.fill")
+                        .foregroundStyle(model.saveFailed || model.hasUnsavedChanges ? Color.orange : Color.green)
+                        .font(.caption)
+                        .accessibilityHidden(true)
+                }
+                Text(model.saveFeedback).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
         }
+        .frame(height: 24)
+        .padding(.horizontal, 20)
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -2285,11 +2330,12 @@ struct SettingsRootView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut("s", modifiers: .command)
-                .disabled(model.applyingSettings)
+                .disabled(model.applyingSettings || !model.hasUnsavedChanges)
                 }
             }
         }
         .padding(.top, 8)
+        .disclosureGroupStyle(SettingsDisclosureStyle())
         .frame(width: 700, height: model.onboardingComplete ? 500 : 660)
         .onAppear {
             SettingsAppDelegate.openSettingsWindow = { openWindow(id: "settings") }
