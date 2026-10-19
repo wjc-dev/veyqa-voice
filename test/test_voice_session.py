@@ -67,6 +67,9 @@ class _Preview:
     def update_text(self, _text):
         pass
 
+    def set_processing(self):
+        pass
+
     def show_notice(self, text, **_kwargs):
         self.notices.append(text)
 

@@ -51,6 +51,55 @@ class NoticeTests(unittest.TestCase):
         preview._panel.animator.assert_not_called()
 
 
+class AnimationLifecycleTests(unittest.TestCase):
+    def test_native_waveform_reuses_palette_and_reduced_motion_tracks_level(self):
+        wave = fp._WaveformView.alloc().initWithFrame_(fp.NSMakeRect(0, 0, 320, 58))
+        colors = wave._colors
+        self.assertEqual(len(colors), 17)
+        wave.animate_(None)
+        self.assertIs(wave._colors, colors)
+        wave.resetMotion_(True)
+        wave.setAudioLevel_(0.6)
+        self.assertEqual(wave._phase, 0.0)
+        self.assertEqual(wave._level, 0.6)
+
+    def test_reduced_motion_never_starts_a_frame_timer(self):
+        preview = fp.FloatingPreviewWindow()
+        preview._waveform = Mock()
+        preview._reduced_motion = True
+        with patch.object(fp, "NSTimer") as timer:
+            preview._start_animation()
+        timer.timerWithTimeInterval_target_selector_userInfo_repeats_.assert_not_called()
+
+    def test_processing_stops_wave_timer_without_delaying_recognition(self):
+        preview = fp.FloatingPreviewWindow()
+        timer = preview._timer = Mock()
+        preview._waveform = Mock()
+        with patch.object(fp.AppHelper, "callAfter", side_effect=lambda fn: fn()):
+            preview.set_processing()
+        timer.invalidate.assert_called_once()
+        self.assertIsNone(preview._timer)
+        preview._waveform.resetMotion_.assert_called_with(True)
+
+    def test_duplicate_preview_text_does_not_redraw(self):
+        preview = fp.FloatingPreviewWindow()
+        preview._text_label = Mock()
+        with patch.object(fp.AppHelper, "callAfter", side_effect=lambda fn: fn()):
+            preview.update_text("同一句话")
+            preview.update_text("同一句话")
+        preview._text_label.setStringValue_.assert_called_once_with("同一句话")
+
+    def test_hide_invalidates_timer_before_fade_finishes(self):
+        preview = fp.FloatingPreviewWindow()
+        preview._panel = Mock()
+        timer = preview._timer = Mock()
+        with patch.object(fp.AppHelper, "callAfter", side_effect=lambda fn: fn()), \
+             patch.object(fp, "NSAnimationContext"):
+            preview.hide()
+        timer.invalidate.assert_called_once()
+        self.assertIsNone(preview._timer)
+
+
 class _Point(SimpleNamespace):
     def __init__(self, x: float, y: float) -> None:
         super().__init__(x=x, y=y)

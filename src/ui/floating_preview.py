@@ -62,6 +62,10 @@ _FOLLOW_CARET = os.getenv("VOICE_INPUT_FLOATING_FOLLOW_CARET", "0") == "1"
 _FIXED_BOTTOM_OFFSET = 0.0
 
 
+def _reduce_motion() -> bool:
+    return bool(NSWorkspace.sharedWorkspace().accessibilityDisplayShouldReduceMotion())
+
+
 def _ax_rect_in_any_screen(
     ax_x: float, ax_y: float, width: float, height: float
 ) -> bool:
@@ -248,6 +252,10 @@ class _WaveformView(NSView):
         self._phase = 0.0
         self._level = 0.04
         self._target_level = 0.04
+        self._reduce_motion = False
+        # Fixed palette: avoid allocating 17 colors on every animation frame.
+        self._colors = [NSColor.colorWithCalibratedHue_saturation_brightness_alpha_(
+            0.48 + index * 0.007, 0.40, 0.93, 0.98) for index in range(17)]
         self.setWantsLayer_(True)
         return self
 
@@ -256,6 +264,15 @@ class _WaveformView(NSView):
 
     def setAudioLevel_(self, level):
         self._target_level = max(0.025, min(float(level), 1.0))
+        if self._reduce_motion:
+            self._level = self._target_level
+            self.setNeedsDisplay_(True)
+
+    def resetMotion_(self, reduced):
+        self._reduce_motion = bool(reduced)
+        self._phase = 0.0
+        self._level = self._target_level = 0.04
+        self.setNeedsDisplay_(True)
 
     def animate_(self, _timer):
         self._phase += 0.18
@@ -270,8 +287,11 @@ class _WaveformView(NSView):
         background = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(
             bounds, bounds.size.height / 2, bounds.size.height / 2
         )
-        NSColor.colorWithCalibratedWhite_alpha_(0.08, 0.88).setFill()
+        NSColor.colorWithCalibratedWhite_alpha_(0.065, 0.94).setFill()
         background.fill()
+        NSColor.colorWithCalibratedWhite_alpha_(1.0, 0.12).setStroke()
+        background.setLineWidth_(1.0)
+        background.stroke()
 
         bar_count = 17
         bar_width = 3.2
@@ -293,13 +313,7 @@ class _WaveformView(NSView):
                 rect, bar_width / 2, bar_width / 2
             )
 
-            # Slowly breathe through cyan → blue → violet. Keeping the hue
-            # inside this band avoids the traffic-light red/yellow look.
-            color_wave = (math.sin(self._phase * 0.055 + index * 0.24) + 1.0) / 2.0
-            hue = 0.51 + 0.24 * color_wave
-            NSColor.colorWithCalibratedHue_saturation_brightness_alpha_(
-                hue, 0.72, 1.0, 0.98
-            ).setFill()
+            self._colors[index].setFill()
             bar.fill()
 
 
@@ -313,6 +327,8 @@ class FloatingPreviewWindow:
         self._timer: Optional[NSTimer] = None
         self._is_visible = False
         self._animation_generation = 0
+        self._last_text = ""
+        self._reduced_motion = False
         self._width = 320.0
         self._height = 58.0
 
@@ -330,13 +346,16 @@ class FloatingPreviewWindow:
             self._position_fixed()
         if self._text_label is not None:
             self._text_label.setStringValue_("")
+        self._last_text = ""
+        self._reduced_motion = _reduce_motion()
+        self._waveform.resetMotion_(self._reduced_motion)
         self._start_animation()
         self._panel.setAlphaValue_(0.0)
         self._panel.orderFrontRegardless()
         self._is_visible = True
 
         def animations(context) -> None:
-            context.setDuration_(0.24)
+            context.setDuration_(0.0 if self._reduced_motion else 0.16)
             self._panel.animator().setAlphaValue_(1.0)
 
         NSAnimationContext.runAnimationGroup_completionHandler_(animations, None)
@@ -349,6 +368,7 @@ class FloatingPreviewWindow:
             self._show_now()
             self._stop_animation()
             self._text_label.setStringValue_(message)
+            self._last_text = message
             generation = self._animation_generation
 
             def dismiss() -> None:
@@ -368,9 +388,10 @@ class FloatingPreviewWindow:
             self._animation_generation += 1
             generation = self._animation_generation
             self._is_visible = False
+            self._stop_animation()
 
             def animations(context) -> None:
-                context.setDuration_(0.34)
+                context.setDuration_(0.0 if self._reduced_motion else 0.18)
                 self._panel.animator().setAlphaValue_(0.0)
 
             def completed() -> None:
@@ -395,13 +416,22 @@ class FloatingPreviewWindow:
         text = " ".join((text or "").split())
 
         def _update() -> None:
-            if self._text_label is not None:
+            if self._text_label is not None and text != self._last_text:
                 self._text_label.setStringValue_(text)
+                self._last_text = text
 
         AppHelper.callAfter(_update)
 
+    def set_processing(self) -> None:
+        """No moving audio wave after the microphone stops; never block ASR."""
+        def update() -> None:
+            self._stop_animation()
+            if self._waveform is not None:
+                self._waveform.resetMotion_(True)
+        AppHelper.callAfter(update)
+
     def _start_animation(self) -> None:
-        if self._timer is not None or self._waveform is None:
+        if self._timer is not None or self._waveform is None or self._reduced_motion:
             return
         self._timer = NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(
             1.0 / 30.0,
@@ -410,6 +440,7 @@ class FloatingPreviewWindow:
             None,
             True,
         )
+        self._timer.setTolerance_(0.005)
         NSRunLoop.mainRunLoop().addTimer_forMode_(self._timer, NSRunLoopCommonModes)
 
     def _stop_animation(self) -> None:

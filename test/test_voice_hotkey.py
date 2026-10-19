@@ -256,9 +256,77 @@ class VoiceHotkeyTests(unittest.TestCase):
     def test_poll_reconciles_missing_release_without_new_key_event(self):
         manager = self.make_manager("right_option")
         manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate)
-        with patch("Quartz.CGEventSourceKeyState", return_value=False):
+        with (patch("Quartz.CGEventSourceKeyState", return_value=False),
+              patch("Quartz.CGEventSourceFlagsState", return_value=0)):
+            manager._reconcile_hotkey_release()
+            self.assertEqual(manager.actions, ["start"])
             manager._reconcile_hotkey_release()
         self.assertEqual(manager.actions, ["start", "stop"])
+
+    def test_modifier_hold_survives_key_state_false_while_flags_still_down(self):
+        manager = self.make_manager("right_option")
+        manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate)
+        with (patch("Quartz.CGEventSourceKeyState", return_value=False),
+              patch("Quartz.CGEventSourceFlagsState", return_value=kCGEventFlagMaskAlternate)):
+            for _ in range(5):
+                manager._reconcile_hotkey_release()
+        self.assertEqual(manager.actions, ["start"])
+        manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, 0)
+        self.assertEqual(manager.actions, ["start", "stop"])
+
+    def test_transient_poll_disagreement_does_not_stop_hold(self):
+        manager = self.make_manager("right_option")
+        manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate)
+        with (patch("Quartz.CGEventSourceKeyState", return_value=False),
+              patch("Quartz.CGEventSourceFlagsState", side_effect=[0, kCGEventFlagMaskAlternate, 0])):
+            for _ in range(3):
+                manager._reconcile_hotkey_release()
+        self.assertEqual(manager.actions, ["start"])
+
+    def test_releasing_right_option_while_left_option_held_stops_immediately(self):
+        manager = self.make_manager("right_option")
+        manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate | 0x40)
+        manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate | 0x20)
+        self.assertEqual(manager.actions, ["start", "stop"])
+
+    def test_combo_poll_does_not_treat_remaining_modifier_as_main_key_held(self):
+        manager = self.make_manager("keycode:49;mods:command")
+        manager._handle_configured_hotkey(kCGEventKeyDown, 49, kCGEventFlagMaskCommand)
+        with (patch("Quartz.CGEventSourceKeyState", return_value=False),
+              patch("Quartz.CGEventSourceFlagsState", return_value=kCGEventFlagMaskCommand)):
+            manager._reconcile_hotkey_release()
+            manager._reconcile_hotkey_release()
+        self.assertEqual(manager.actions, ["start", "stop"])
+
+    def test_all_modifier_shortcuts_use_their_own_flag_and_side(self):
+        for key, vk, side, other in [
+            ("left_option", 58, 0x20, 0x40), ("right_option", 61, 0x40, 0x20),
+            ("left_command", 55, 0x08, 0x10), ("right_command", 54, 0x10, 0x08),
+            ("left_control", 59, 0x01, 0x2000), ("right_control", 62, 0x2000, 0x01),
+            ("fn", 63, 0, 0),
+        ]:
+            with self.subTest(key=key):
+                manager = self.make_manager(key)
+                mask = manager._voice_hotkey_spec["mask"]
+                manager._handle_configured_hotkey(kCGEventFlagsChanged, vk, mask | side)
+                with (patch("Quartz.CGEventSourceKeyState", return_value=False),
+                      patch("Quartz.CGEventSourceFlagsState", return_value=mask | side)):
+                    for _ in range(3):
+                        manager._reconcile_hotkey_release()
+                self.assertEqual(manager.actions, ["start"])
+                manager._handle_configured_hotkey(kCGEventFlagsChanged, vk, (mask | other) if other else 0)
+                self.assertEqual(manager.actions, ["start", "stop"])
+
+    def test_poll_miss_does_not_leak_into_next_hold(self):
+        manager = self.make_manager("right_option")
+        with (patch("Quartz.CGEventSourceKeyState", return_value=False),
+              patch("Quartz.CGEventSourceFlagsState", return_value=0)):
+            for _ in range(2):
+                manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate)
+                manager._reconcile_hotkey_release()
+                self.assertEqual(manager.actions[-1], "start")
+                manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, 0)
+        self.assertEqual(manager.actions, ["start", "stop", "start", "stop"])
 
     def test_failed_tap_enable_is_not_reported_as_recovered(self):
         listener = _PassiveTapListener(lambda *_: None)

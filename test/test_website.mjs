@@ -110,7 +110,7 @@ test("missing clipboard falls back to selected command text", async () => {
 });
 test("local assets and navigation anchors exist", () => {
   for (const [, path] of html.matchAll(/(?:src|href)="\.\/([^"]+)"/g)) {
-    assert.ok(existsSync(fileURLToPath(new URL(path, site))), path);
+    assert.ok(existsSync(fileURLToPath(new URL(path.split("?")[0], site))), path);
   }
   for (const [, id] of html.matchAll(/href="#([^"]+)"/g)) {
     assert.ok(html.includes(`id="${id}"`), id);
@@ -127,7 +127,7 @@ test("website is accessible static content, not a credential collection form", (
 
 test("direct DMG installation is primary and setup instructions match the app", () => {
   assert.ok(html.includes("/releases/download/v0.2.6/Veyqa-Voice-v0.2.6-macOS-arm64.dmg"));
-  assert.ok(html.includes("不需要 Homebrew、Python 或开发环境"));
+  assert.match(html, /不需要 Homebrew、Python\s+或开发环境/);
   assert.ok(html.includes("连接并继续"));
   assert.ok(html.includes("试用文本框"));
   assert.ok(prompt.includes("不要为了此应用额外安装 Homebrew"));

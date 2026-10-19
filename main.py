@@ -742,6 +742,7 @@ class VoiceAssistant:
             self.keyboard_manager.reset_state()
             return
         logger.info("停止本轮%s录音", self.engine_label)
+        self.floating_preview.set_processing()
         self.floating_preview.update_text("正在完成识别…")
         audio = self.audio_recorder.stop_streaming_recording()
         self._archive_buffer(session, audio)

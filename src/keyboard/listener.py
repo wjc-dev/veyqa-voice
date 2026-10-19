@@ -819,31 +819,61 @@ class KeyboardManager:
         spec = self._voice_hotkey_spec
         return ({spec["vk"]}, spec.get("mask", 0)) if spec else (set(), 0)
 
-    def _set_voice_hotkey_pressed(self, pressed: bool) -> None:
+    def _set_voice_hotkey_pressed(self, pressed: bool, *, source="event") -> None:
         if pressed == self._voice_hotkey_pressed:
             return
         self._voice_hotkey_pressed = pressed
+        self._missing_release_polls = 0
         mode = getattr(self, "_hotkey_mode", getattr(self, "_fn_hotkey_mode", "hold"))
         if pressed:
+            self._hotkey_pressed_at = time.monotonic()
             if mode == "hold":
                 self.start_recording()
             else:
                 self.toggle_recording()
-        elif mode == "hold":
-            self.stop_recording()
+        else:
+            held_ms = int((time.monotonic() - getattr(self, "_hotkey_pressed_at", time.monotonic())) * 1000)
+            # Only this app's configured shortcut; never log other keys or text.
+            logger.info("语音快捷键释放（来源=%s，按住=%dms）", source, held_ms)
+            if mode == "hold":
+                self.stop_recording()
 
     def _recover_hotkey_state(self) -> None:
         self._voice_hotkey_pressed = False
+        self._missing_release_polls = 0
         if getattr(self, "_hotkey_mode", "hold") == "hold" and self.is_recording:
             self.cancel_recording()
 
     def _reconcile_hotkey_release(self) -> None:
         if not self._voice_hotkey_pressed:
             return
-        from Quartz import CGEventSourceKeyState, kCGEventSourceStateCombinedSessionState
+        from Quartz import CGEventSourceKeyState, CGEventSourceFlagsState, kCGEventSourceStateCombinedSessionState
         spec = self._voice_hotkey_spec
-        if spec and not CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, spec["vk"]):
-            self._set_voice_hotkey_pressed(False)
+        if not spec:
+            return
+        key_down = CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, spec["vk"])
+        # Modifier flags and key-code state can disagree. A false key-code
+        # snapshot alone must never terminate an Option/Command/Fn hold.
+        modifier_down = spec["kind"] == "modifier" and self._modifier_is_down(
+            spec, CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState))
+        if key_down or modifier_down:
+            self._missing_release_polls = 0
+            return
+        self._missing_release_polls = getattr(self, "_missing_release_polls", 0) + 1
+        # This is a lost-event fallback, not the normal stop path. Confirm on
+        # two polls; real release events below still stop immediately.
+        if self._missing_release_polls >= 2:
+            self._set_voice_hotkey_pressed(False, source="poll-confirmed")
+
+    @staticmethod
+    def _modifier_is_down(spec, flags) -> bool:
+        # Device-specific masks from macOS IOKit/hidsystem/IOLLEvent.h.
+        # Use the generic mask when a backend omits left/right bits.
+        sides = {58: (0x20, 0x60), 61: (0x40, 0x60),
+                 55: (0x08, 0x18), 54: (0x10, 0x18),
+                 59: (0x01, 0x2001), 62: (0x2000, 0x2001)}
+        side, pair = sides.get(spec["vk"], (0, 0))
+        return bool(flags & side) if flags & pair else bool(flags & spec["mask"])
 
     def _handle_configured_hotkey(self, event_type, vk, flags) -> bool:
         from Quartz import kCGEventFlagsChanged, kCGEventKeyDown, kCGEventKeyUp
@@ -854,7 +884,7 @@ class KeyboardManager:
         if spec["kind"] == "modifier":
             if event_type != kCGEventFlagsChanged or vk != spec["vk"]:
                 return False
-            self._set_voice_hotkey_pressed(bool(flags & spec["mask"]))
+            self._set_voice_hotkey_pressed(self._modifier_is_down(spec, flags))
             return True
         if (
             event_type == kCGEventFlagsChanged
