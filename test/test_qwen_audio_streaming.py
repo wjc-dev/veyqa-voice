@@ -112,6 +112,26 @@ class QwenAudioProtocolTests(unittest.TestCase):
 
 
 class QwenAudioStreamingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_message_revised_sentence_replaces_previous_final(self):
+        with patch.dict(os.environ, {"QWEN_ASR_MODEL": "qwen-audio-3.1-asr-flash-message"}):
+            processor = QwenStreamingProcessor()
+        processor.api_key = "test-key"
+        events = []
+        for number, text in [(1, "数据工作"), (1, "DataWorks。"), (2, "继续测试。")]:
+            events.append({"header": {"event": "result-generated"}, "payload": {"output": {
+                "sentence": {"sentence_id": number, "text": text, "sentence_end": True}
+            }}})
+        events.append({"header": {"event": "task-finished"}, "payload": {}})
+        processor._ws = _ResultWebSocket(events)
+        async def noop(*args): pass
+        async def audio(): yield b"\0" * 3200
+        processor._connect = processor._disconnect = processor._wait_until_ready = noop
+        processor._send_json = processor._send_audio = noop
+        finals, errors = [], []
+        await processor.process_audio_stream(audio(), lambda _: None, finals.append, lambda: None, errors.append)
+        self.assertEqual(errors, [])
+        self.assertEqual(finals, ["DataWorks。继续测试。"])
+
     async def test_accumulates_finalized_sentences_without_duplicate_output(self):
         processor = QwenStreamingProcessor()
         processor.api_key = "test-key-present-only-in-memory"

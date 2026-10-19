@@ -168,6 +168,7 @@ struct CorrectionEvent: Codable {
 struct DiagnosticSnapshot: Codable {
     var version: String?
     var engine: String?
+    var model: String?
     var state: String?
     var microphone: String?
     var sampleRate: Int?
@@ -191,7 +192,7 @@ struct DiagnosticSnapshot: Codable {
     var microphoneTestStatus: String?
 
     enum CodingKeys: String, CodingKey {
-        case version, engine, state, microphone, hotkey
+        case version, engine, model, state, microphone, hotkey
         case hotkeyBackend = "hotkey_backend"
         case sampleRate = "sample_rate"
         case archiveEnabled = "archive_enabled"
@@ -282,6 +283,14 @@ final class SettingsModel: ObservableObject {
     @Published var reopenStatus = ""
 
     @Published var transcriptionService = "qwen"
+    @Published var qwenModel = SpeechModels.defaultModel("qwen")
+    @Published var doubaoModel = SpeechModels.defaultModel("doubao")
+    @Published var modelSnapshots: [String: SpeechModelSnapshot] = [:]
+    @Published var refreshingModels = false
+    @Published var modelCatalogStatus = ""
+    private var modelRefreshTask: Task<Void, Never>?
+    private var modelRefreshID = UUID()
+    private var modelRefreshAttempts: [String: Date] = [:]
 
     @Published var qwenAPIKey = ""
     @Published var checkingConnection = false
@@ -367,6 +376,14 @@ final class SettingsModel: ObservableObject {
             : false
         transcriptionService = environment["TRANSCRIPTION_SERVICE"] == "doubao"
             ? "doubao" : "qwen"
+        qwenModel = SpeechModels.configuredModel(environment["QWEN_ASR_MODEL"], provider: "qwen")
+        doubaoModel = SpeechModels.configuredModel(environment["DOUBAO_ASR_RESOURCE_ID"], provider: "doubao")
+        for provider in ["qwen", "doubao"] {
+            if let data = try? Data(contentsOf: modelCacheURL(provider)),
+               let snapshot = try? JSONDecoder().decode(SpeechModelSnapshot.self, from: data) {
+                modelSnapshots[provider] = snapshot
+            }
+        }
         punctuationMode = environment["PUNCTUATION_MODE"] ?? "spaces"
         disfluencyMode = environment["DISFLUENCY_FILTER_MODE"]
             ?? (Self.bool(environment["DISFLUENCY_FILTER_ENABLED"], fallback: false)
@@ -614,8 +631,63 @@ final class SettingsModel: ObservableObject {
         connectionStatus = ""
     }
 
+    var selectedModelID: String { transcriptionService == "qwen" ? qwenModel : doubaoModel }
+
+    var availableModels: [SpeechModel] {
+        let provider = transcriptionService
+        return SpeechModels.merge(
+            [SpeechModels.option(selectedModelID, provider: provider)]
+                + (modelSnapshots[provider]?.models ?? []) + SpeechModels.seed.models,
+            provider: provider)
+    }
+
+    private func modelCacheURL(_ provider: String) -> URL {
+        dataURL.appendingPathComponent("model-catalog-\(provider).json")
+    }
+
+    func cancelModelRefresh() {
+        modelRefreshID = UUID()
+        modelRefreshTask?.cancel()
+        modelRefreshTask = nil
+        refreshingModels = false
+    }
+
+    func refreshModels(ifStale: Bool = false) {
+        cancelModelRefresh()
+        let provider = transcriptionService
+        modelCatalogStatus = ""
+        if ifStale {
+            if let snapshot = modelSnapshots[provider], Date().timeIntervalSince(snapshot.checkedAt) < 86400 { return }
+            if let attempt = modelRefreshAttempts[provider], Date().timeIntervalSince(attempt) < 1800 { return }
+        }
+        modelRefreshAttempts[provider] = Date()
+        let id = modelRefreshID
+        let host = QwenConnection.host(custom: qwenAPIHost, region: qwenRegion, workspace: qwenWorkspace)
+        let key = qwenAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        refreshingModels = true
+        modelRefreshTask = Task { @MainActor in
+            defer {
+                if self.modelRefreshID == id { self.refreshingModels = false; self.modelRefreshTask = nil }
+            }
+            do {
+                let snapshot = try await SpeechModelDiscovery.refresh(provider: provider, host: host, key: key)
+                guard !Task.isCancelled, self.modelRefreshID == id else { return }
+                self.modelSnapshots[provider] = snapshot
+                try Self.privateWrite(JSONEncoder().encode(snapshot), to: self.modelCacheURL(provider))
+                self.modelCatalogStatus = "模型列表已更新"
+            } catch {
+                guard !Task.isCancelled, self.modelRefreshID == id else { return }
+                self.modelCatalogStatus = "暂时无法刷新，仍可选择已保存的模型，或手动填写型号。"
+            }
+        }
+    }
+
     func checkConnection() {
         cancelConnectionCheck()
+        guard SpeechModels.compatible(qwenModel, provider: "qwen") else {
+            connectionStatus = "请先选择支持实时听写的千问模型。"
+            return
+        }
         let key = qwenAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard key.count >= 20, !key.contains(where: { $0.isWhitespace }) else {
             connectionStatus = "请先粘贴完整的百炼 API Key。"
@@ -653,7 +725,7 @@ final class SettingsModel: ObservableObject {
         Task { @MainActor in
             do {
                 let taskID = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-                let data = try JSONSerialization.data(withJSONObject: QwenConnection.startRequest(taskID: taskID))
+                let data = try JSONSerialization.data(withJSONObject: QwenConnection.startRequest(taskID: taskID, model: self.qwenModel))
                 try await socket.send(.string(String(decoding: data, as: UTF8.self)))
                 for _ in 0..<8 {
                     let message = try await socket.receive()
@@ -667,7 +739,7 @@ final class SettingsModel: ObservableObject {
                     let header = event?["header"] as? [String: Any]
                     if header?["event"] as? String == "task-started" {
                         finish(self.onboardingComplete
-                               ? "连接成功。修改过 Key 后，请点击右上角保存。"
+                               ? "模型连接成功：\(self.qwenModel)。点击右上角保存后生效。"
                                : "连接成功，正在保存并应用…", verified: true)
                         return
                     }
@@ -691,6 +763,12 @@ final class SettingsModel: ObservableObject {
             return
         }
         let normalizedKey = qwenAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        qwenModel = qwenModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        doubaoModel = doubaoModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard SpeechModels.compatible(selectedModelID, provider: transcriptionService) else {
+            errorMessage = "请选择支持实时听写的模型，或检查手动填写的型号。"
+            return
+        }
         if transcriptionService == "qwen" {
             guard normalizedKey.count >= 20,
                   !normalizedKey.contains(where: { $0.isWhitespace }) else {
@@ -725,6 +803,8 @@ final class SettingsModel: ObservableObject {
         var updates: [String: String] = [
             "SETUP_COMPLETED": String(onboardingComplete || completeSetup),
             "TRANSCRIPTION_SERVICE": transcriptionService,
+            "QWEN_ASR_MODEL": qwenModel,
+            "DOUBAO_ASR_RESOURCE_ID": doubaoModel,
             "PUNCTUATION_MODE": punctuationMode,
             "DISFLUENCY_FILTER_ENABLED": "false",
             "DISFLUENCY_FILTER_MODE": "off",
@@ -1653,6 +1733,45 @@ struct EngineSettingsView: View {
                     .font(.callout)
             }
 
+            Section("识别模型") {
+                Picker("模型", selection: model.transcriptionService == "qwen" ? $model.qwenModel : $model.doubaoModel) {
+                    ForEach(model.availableModels) { option in
+                        Text(option.name).tag(option.id)
+                    }
+                }
+                Text(model.selectedModelID)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary).textSelection(.enabled)
+                if let active = model.diagnostics.model {
+                    Text("当前运行：\(active)").font(.caption).foregroundStyle(.secondary)
+                }
+                HStack {
+                    if let snapshot = model.modelSnapshots[model.transcriptionService] {
+                        Text("\(snapshot.source) · \(snapshot.checkedAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text("模型目录每天自动检查一次").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(model.refreshingModels ? "正在刷新…" : "刷新模型") { model.refreshModels() }
+                        .disabled(model.refreshingModels)
+                }
+                if !model.modelCatalogStatus.isEmpty {
+                    Text(model.modelCatalogStatus).font(.caption).foregroundStyle(.secondary)
+                }
+                DisclosureGroup("手动填写模型型号") {
+                    TextField(model.transcriptionService == "qwen" ? "Model ID" : "Resource ID",
+                              text: model.transcriptionService == "qwen" ? $model.qwenModel : $model.doubaoModel)
+                        .textFieldStyle(.roundedBorder)
+                    Text("填写官方支持的实时语音识别型号，保存后从下一次听写生效。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if model.transcriptionService == "qwen", model.qwenModel.contains("-message") {
+                    Text("短句听写模式：实时预览，保留原话，润色关闭。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
             if model.transcriptionService == "qwen" {
                 Section("千问 API 连接") {
                     Text("千问实时语音识别 · 阿里云百炼")
@@ -1708,7 +1827,7 @@ struct EngineSettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
             } else {
-                Section("豆包 Seed ASR 2.0") {
+                Section("豆包 API 连接") {
                     TextField("App ID", text: $model.doubaoAppKey)
                         .textFieldStyle(.roundedBorder)
                     CredentialField("Access Token", text: $model.doubaoAccessKey)
@@ -1716,7 +1835,7 @@ struct EngineSettingsView: View {
                         .textFieldStyle(.roundedBorder)
                     Link("打开火山引擎语音应用", destination: URL(string: "https://console.volcengine.com/speech/app")!)
                     Link("查看豆包热词表配置说明", destination: URL(string: "https://www.volcengine.com/docs/6561/155739?lang=zh")!)
-                    Text("应用需开通“豆包流式语音识别模型 2.0 小时版”。本机识别词汇会直接随请求发送；如果还需要更稳定的热词偏置，可在火山引擎自学习平台创建词表，并将其 ID 填在上方。")
+                    Text("在火山引擎开通所选模型对应的服务。本机识别词汇会随请求发送；热词表 ID 可选填。")
                         .foregroundStyle(.secondary)
                         .font(.callout)
                     if !model.onboardingComplete {
@@ -1729,10 +1848,14 @@ struct EngineSettingsView: View {
         }
         .formStyle(.grouped)
         .disabled(model.applyingSettings)
-        .onChange(of: model.qwenAPIKey) { _ in model.cancelConnectionCheck() }
-        .onChange(of: model.qwenAPIHost) { _ in model.cancelConnectionCheck() }
-        .onChange(of: model.qwenRegion) { _ in model.cancelConnectionCheck() }
-        .onChange(of: model.qwenWorkspace) { _ in model.cancelConnectionCheck() }
+        .task(id: model.transcriptionService) { model.refreshModels(ifStale: true) }
+        .onDisappear { model.cancelModelRefresh() }
+        .onChange(of: model.qwenModel) { _ in model.cancelConnectionCheck() }
+        .onChange(of: model.transcriptionService) { _ in model.cancelConnectionCheck() }
+        .onChange(of: model.qwenAPIKey) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
+        .onChange(of: model.qwenAPIHost) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
+        .onChange(of: model.qwenRegion) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
+        .onChange(of: model.qwenWorkspace) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
     }
 }
 
@@ -2130,7 +2253,8 @@ struct SettingsRootView: View {
             evaluatePermissionGate()
         }
         .onReceive(permissionTimer) { _ in
-            guard NSApp.isActive else { return }
+            // Finish an in-flight save even if the user switches to another app.
+            guard NSApp.isActive || model.applyingSettings else { return }
             model.reloadDiagnostics()
             model.reloadPermissions()
             model.reloadRecoveries()

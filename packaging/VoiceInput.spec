@@ -10,6 +10,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(project / "env.example"), "."),
+        (str(project / "config" / "asr-models.json"), "."),
         (str(project / "packaging" / "StatusBarIcon.png"), "."),
     ],
     hiddenimports=[
@@ -62,12 +63,12 @@ app = BUNDLE(
     name="Veyqa Voice.app",
     icon=str(project / "packaging" / "AppIcon.icns"),
     bundle_identifier="com.wjcdev.veyqa",
-    version="0.2.7",
+    version="0.2.8",
     info_plist={
         "CFBundleDisplayName": "Veyqa Voice",
         "CFBundleName": "Veyqa Voice",
-        "CFBundleShortVersionString": "0.2.7",
-        "CFBundleVersion": "214",
+        "CFBundleShortVersionString": "0.2.8",
+        "CFBundleVersion": "215",
         "LSMinimumSystemVersion": "13.0",
         "LSUIElement": False,
         "NSHighResolutionCapable": True,

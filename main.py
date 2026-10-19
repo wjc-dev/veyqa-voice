@@ -65,7 +65,7 @@ from src.utils.logger import logger
 from src.setup_feedback import empty_result_notice
 
 
-__version__ = "0.2.7"
+__version__ = "0.2.8"
 __author__ = "Mor-Li"
 __description__ = "Qwen and Doubao realtime voice input for macOS"
 
@@ -164,6 +164,7 @@ class VoiceAssistant:
         self.diagnostics.update(
             version=__version__,
             engine=self.service,
+            model=getattr(self.processor, "model_name", None),
             state=InputState.IDLE.name,
             microphone=self.audio_recorder.current_device or "未知",
             sample_rate=self.audio_recorder.sample_rate,
@@ -298,7 +299,8 @@ class VoiceAssistant:
                 self.status_controller.apply_preferences()
                 login = sync_login_item(os.getenv("LAUNCH_AT_LOGIN", "true").lower() == "true")
                 self.diagnostics.update(settings_revision=revision, settings_status="applied",
-                                        engine=self.service, hotkey=self.keyboard_manager.voice_hotkey_label,
+                                        engine=self.service, model=processor.model_name,
+                                        hotkey=self.keyboard_manager.voice_hotkey_label,
                                         login_item_status=login.status, login_item_error=login.error)
             # Do not consume a newer save which arrived while this one was applied.
             if request.read_text().strip() == revision:

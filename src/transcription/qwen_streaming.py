@@ -1,4 +1,4 @@
-"""Qwen-Audio-3.0-ASR-Flash-Streaming WebSocket processor.
+"""Qwen Audio Streaming/Message WebSocket processor.
 
 Unlike Qwen3-ASR-Realtime's OpenAI-style ``/realtime`` protocol, Qwen Audio
 3.0 uses DashScope's duplex task protocol on ``/inference``.  Audio is sent as
@@ -25,6 +25,7 @@ from ..correction_learning import (
 )
 from ..custom_vocabulary import load_custom_vocabulary
 from ..runtime_paths import AUDIO_ARCHIVE_DIR, CONTEXT_FILE, CUSTOM_VOCABULARY_FILE
+from .speech_models import DEFAULT_MODELS, selected_model
 
 
 DEFAULT_SAMPLE_RATE = 16000
@@ -33,7 +34,7 @@ SEND_TIMEOUT_SECONDS = 5
 FINAL_RESPONSE_TIMEOUT_SECONDS = 20
 CONTEXT_CHARACTER_LIMIT = 400
 MAX_INLINE_VOCABULARY_TERMS = 2_000
-MODEL_NAME = "qwen-audio-3.0-asr-flash-streaming"
+MODEL_NAME = DEFAULT_MODELS["qwen"]
 
 
 class QwenStreamingProcessor:
@@ -44,6 +45,7 @@ class QwenStreamingProcessor:
     model_name = MODEL_NAME
 
     def __init__(self) -> None:
+        self.model_name = selected_model("qwen", os.getenv("QWEN_ASR_MODEL", ""))
         self.api_key = os.getenv("QWEN_API_KEY") or os.getenv("DASHSCOPE_API_KEY", "")
         self.workspace_id = os.getenv("QWEN_WORKSPACE_ID", "").strip()
         self.api_host = os.getenv("QWEN_API_HOST", "").strip()
@@ -213,6 +215,10 @@ class QwenStreamingProcessor:
             "sample_rate": sample_rate,
             "heartbeat": True,
         }
+        if "-message" in self.model_name:
+            parameters["intermediate_result_enabled"] = True
+            parameters["disfluency_removal_enabled"] = False
+            parameters["keep_dialect"] = True
         language_hints = self._language_hints()
         if language_hints:
             parameters["language_hints"] = language_hints
@@ -240,7 +246,7 @@ class QwenStreamingProcessor:
                 "task_group": "audio",
                 "task": "asr",
                 "function": "recognition",
-                "model": MODEL_NAME,
+                "model": self.model_name,
                 "parameters": parameters,
                 "input": task_input,
             },
@@ -268,6 +274,8 @@ class QwenStreamingProcessor:
             sentence = output.get("sentence") or {} if isinstance(output, dict) else {}
             if not isinstance(sentence, dict):
                 sentence = {}
+            if sentence.get("heartbeat"):
+                return None, None, False
             text = str(sentence.get("text") or "").strip()
             return text or None, None, bool(sentence.get("sentence_end", False))
 
@@ -396,6 +404,7 @@ class QwenStreamingProcessor:
         """Stream one push-to-talk utterance and emit its final transcript."""
         final_segments: list[str] = []
         finalized_segment_keys: set[tuple[object, object, str]] = set()
+        finalized_sentence_indices: dict[object, int] = {}
         current_partial = ""
         latest_preview = ""
         task_finished = False
@@ -441,7 +450,14 @@ class QwenStreamingProcessor:
                                 sentence.get("end_time"),
                                 preview,
                             )
-                            if key not in finalized_segment_keys:
+                            sentence_id = sentence.get("sentence_id")
+                            if isinstance(sentence_id, int) and sentence_id > 0:
+                                if sentence_id in finalized_sentence_indices:
+                                    final_segments[finalized_sentence_indices[sentence_id]] = preview
+                                else:
+                                    finalized_sentence_indices[sentence_id] = len(final_segments)
+                                    final_segments.append(preview)
+                            elif key not in finalized_segment_keys:
                                 finalized_segment_keys.add(key)
                                 final_segments.append(preview)
                             current_partial = ""
@@ -463,7 +479,7 @@ class QwenStreamingProcessor:
         receiver_task: Optional[asyncio.Task] = None
         try:
             await self._connect()
-            logger.info("千问 Qwen Audio 3.0 ASR 实时连接成功")
+            logger.info("千问 ASR 实时连接成功：%s", self.model_name)
             await self._send_json(self._run_task_event(sample_rate, task_id))
             await self._wait_until_ready()
 

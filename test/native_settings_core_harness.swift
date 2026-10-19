@@ -23,6 +23,19 @@ struct SettingsCoreHarness {
         require(snapshotGate.changed(Data("next".utf8)), "changed snapshot updates")
         require(snapshotGate.changed(nil), "deleted snapshot resets")
         require(QwenConnection.host(custom: "", region: "beijing") == "dashscope.aliyuncs.com", "key-only defaults")
+        let messageModel = "qwen-audio-3.1-asr-flash-message"
+        let request = QwenConnection.startRequest(taskID: "probe", model: messageModel)
+        let requestPayload = request["payload"] as! [String: Any]
+        require(requestPayload["model"] as? String == messageModel, "connection check uses selected model")
+        let parameters = requestPayload["parameters"] as! [String: Any]
+        require(parameters["disfluency_removal_enabled"] as? Bool == false, "message polishing remains off")
+        require(parameters["intermediate_result_enabled"] as? Bool == true, "message preview enabled")
+        require(SpeechModels.compatible("qwen-audio-9.2-asr-flash-streaming", provider: "qwen"), "future same-protocol version")
+        require(!SpeechModels.compatible("qwen-audio-3.1-asr-flash-filetrans", provider: "qwen"), "file ASR excluded")
+        let discovered = SpeechModels.fromOfficialText("qwen-audio-3.1-asr-flash-streaming qwen-audio-3.1-asr-flash-streaming qwen-audio-3.1-asr-flash-message", provider: "qwen")
+        require(discovered.count == 2, "official discovery deduplicates compatible models")
+        let api = SpeechModels.fromAPI(["output": ["total": 2, "models": [["model": messageModel], ["model": "qwen-image"]]]])
+        require(api?.models.count == 1 && api?.total == 2, "API discovery filters protocol and preserves pagination total")
         require(QwenConnection.host(custom: "", region: "singapore") == "dashscope-intl.aliyuncs.com", "region honored")
         require(QwenConnection.host(custom: "https://example.com", region: "beijing") == nil, "untrusted host rejected")
         require(QwenConnection.host(custom: "https://dashscope.aliyuncs.com@evil.example", region: "beijing") == nil, "userinfo rejected")

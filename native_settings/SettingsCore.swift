@@ -78,11 +78,17 @@ enum QwenConnection {
         return host
     }
 
-    static func startRequest(taskID: String) -> [String: Any] {
-        ["header": ["action": "run-task", "task_id": taskID, "streaming": "duplex"],
+    static func startRequest(taskID: String, model: String = SpeechModels.defaultModel("qwen")) -> [String: Any] {
+        var parameters: [String: Any] = ["format": "pcm", "sample_rate": 16000]
+        if model.contains("-message") {
+            parameters["intermediate_result_enabled"] = true
+            parameters["disfluency_removal_enabled"] = false
+            parameters["keep_dialect"] = true
+        }
+        return ["header": ["action": "run-task", "task_id": taskID, "streaming": "duplex"],
          "payload": ["task_group": "audio", "task": "asr", "function": "recognition",
-                     "model": "qwen-audio-3.0-asr-flash-streaming",
-                     "parameters": ["format": "pcm", "sample_rate": 16000], "input": [:]]]
+                     "model": model,
+                     "parameters": parameters, "input": [:]]]
     }
 }
 

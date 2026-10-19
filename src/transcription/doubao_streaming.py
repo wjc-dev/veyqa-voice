@@ -28,6 +28,7 @@ from ..correction_learning import (
 )
 from ..custom_vocabulary import load_custom_vocabulary
 from ..runtime_paths import CUSTOM_VOCABULARY_FILE
+from .speech_models import DEFAULT_MODELS, selected_model
 
 
 DEFAULT_SAMPLE_RATE = 16000
@@ -73,9 +74,10 @@ class DoubaoStreamingProcessor:
 
     engine_id = "doubao"
     engine_label = "豆包"
-    model_name = "seed-asr-2.0"
+    model_name = DEFAULT_MODELS["doubao"]
 
     def __init__(self) -> None:
+        self.model_name = selected_model("doubao", os.getenv("DOUBAO_ASR_RESOURCE_ID", ""))
         self.app_key = os.getenv("DOUBAO_APP_KEY", "").strip()
         self.access_key = os.getenv("DOUBAO_ACCESS_KEY", "").strip()
         self.ws_url = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
@@ -304,7 +306,7 @@ class DoubaoStreamingProcessor:
             self._ws = await self._session.ws_connect(
                 self.ws_url,
                 headers={
-                    "X-Api-Resource-Id": "volc.seedasr.sauc.duration",
+                    "X-Api-Resource-Id": self.model_name,
                     "X-Api-Connect-Id": str(uuid.uuid4()),
                     "X-Api-Access-Key": self.access_key,
                     "X-Api-App-Key": self.app_key,

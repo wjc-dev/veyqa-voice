@@ -17,6 +17,7 @@ fi
 mkdir -p "$SETTINGS_APP/Contents/MacOS"
 mkdir -p "$SETTINGS_APP/Contents/Resources"
 cp "$PROJECT_DIR/packaging/AppIcon.icns" "$SETTINGS_APP/Contents/Resources/AppIcon.icns"
+cp "$PROJECT_DIR/config/asr-models.json" "$SETTINGS_APP/Contents/Resources/asr-models.json"
 cp "$PROJECT_DIR/native_settings/VoiceInputSettings-Info.plist" \
   "$SETTINGS_APP/Contents/Info.plist"
 
@@ -27,6 +28,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macos13.0 \
   -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist \
   -Xlinker "$PROJECT_DIR/native_settings/VoiceInputSettings-Info.plist" \
   native_settings/SettingsCore.swift \
+  native_settings/SpeechModels.swift \
   native_settings/VoiceInputSettings.swift \
   -o "$SETTINGS_EXECUTABLE"
 

@@ -1,4 +1,5 @@
 import pathlib
+import re
 import unittest
 
 
@@ -15,12 +16,12 @@ class PackagingIdentityTests(unittest.TestCase):
             ROOT / "native_settings" / "VoiceInputSettings-Info.plist"
         ).read_text(encoding="utf-8")
 
-        self.assertIn('__version__ = "0.2.7"', main)
-        self.assertIn('version="0.2.7"', spec)
-        self.assertIn('"CFBundleShortVersionString": "0.2.7"', spec)
-        self.assertIn('VERSION="0.2.7"', build)
-        self.assertIn('PACKAGE_NAME="Veyqa-Voice-v0.2.7"', source_package)
-        self.assertIn("<string>0.2.7</string>", settings_info)
+        version = re.search(r'__version__ = "([0-9.]+)"', main).group(1)
+        self.assertIn(f'version="{version}"', spec)
+        self.assertIn(f'"CFBundleShortVersionString": "{version}"', spec)
+        self.assertIn(f'VERSION="{version}"', build)
+        self.assertIn(f'PACKAGE_NAME="Veyqa-Voice-v{version}"', source_package)
+        self.assertIn(f"<string>{version}</string>", settings_info)
 
     def test_main_app_is_a_regular_dock_application(self):
         spec = (ROOT / "packaging" / "VoiceInput.spec").read_text(encoding="utf-8")

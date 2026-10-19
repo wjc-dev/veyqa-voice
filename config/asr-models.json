@@ -1,0 +1,15 @@
+{
+  "defaults": {
+    "qwen": "qwen-audio-3.0-asr-flash-streaming",
+    "doubao": "volc.seedasr.sauc.duration"
+  },
+  "models": [
+    {"provider": "qwen", "id": "qwen-audio-3.1-asr-flash-message", "name": "Qwen Audio 3.1 · 短句听写"},
+    {"provider": "qwen", "id": "qwen-audio-3.1-asr-flash-streaming", "name": "Qwen Audio 3.1 · 持续转写"},
+    {"provider": "qwen", "id": "qwen-audio-3.0-asr-flash-streaming", "name": "Qwen Audio 3.0 · 持续转写"},
+    {"provider": "doubao", "id": "volc.seedasr.sauc.duration", "name": "Seed ASR 2.0 · 小时版"},
+    {"provider": "doubao", "id": "volc.seedasr.sauc.concurrent", "name": "Seed ASR 2.0 · 并发版"},
+    {"provider": "doubao", "id": "volc.bigasr.sauc.duration", "name": "豆包 ASR 1.0 · 小时版"},
+    {"provider": "doubao", "id": "volc.bigasr.sauc.concurrent", "name": "豆包 ASR 1.0 · 并发版"}
+  ]
+}
