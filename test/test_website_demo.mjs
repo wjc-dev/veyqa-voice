@@ -9,7 +9,7 @@ const script = readFileSync(
 );
 function fixture(reducedMotion = false) {
   const elements = Object.fromEntries(
-    ["demo", "demo-play", "demo-output", "demo-preview", "demo-status"].map(
+    ["demo", "demo-play", "demo-output", "demo-preview", "demo-status", "demo-topic", "demo-count"].map(
       (id) => [
         id,
         {
@@ -88,9 +88,24 @@ test("illustration previews first and commits only after release", () => {
   f.tick();
   assert.equal(f.phase(), "done");
   assert.ok(f.elements["demo-output"].textContent.includes("seller_id"));
-  assert.equal(f.timers.size, 0);
+  assert.equal(f.timers.size, 1);
 });
-test("autoplay runs once and replay never stacks timers", () => {
+test("examples rotate and wrap without stacking timers", () => {
+  const f = fixture();
+  f.visible(true);
+  const sentences = [];
+  for (let scene = 0; scene < 4; scene++) {
+    for (let i = 0; i < 4; i++) f.tick();
+    sentences.push(f.elements["demo-output"].textContent);
+    assert.equal(f.timers.size, 1);
+    f.tick();
+  }
+  assert.match(sentences[0], /DataWorks.*user_id.*seller_id/);
+  assert.match(sentences[1], /ODPS.*DSW/);
+  assert.match(sentences[2], /GMV.*灰度发布/);
+  assert.equal(sentences[3], sentences[0]);
+});
+test("pause persists across viewport changes and replay never stacks timers", () => {
   const f = fixture();
   f.visible(true);
   f.visible(true);
@@ -102,6 +117,9 @@ test("autoplay runs once and replay never stacks timers", () => {
   f.elements["demo-play"].click();
   assert.equal(f.timers.size, 1);
   f.elements["demo-play"].click();
+  assert.equal(f.timers.size, 0);
+  f.visible(false);
+  f.visible(true);
   assert.equal(f.timers.size, 0);
 });
 test("background and offscreen demonstrations stop all scheduled work", () => {
@@ -123,6 +141,11 @@ test("reduced motion renders a static result, including a live preference change
   f.elements["demo-play"].click();
   assert.equal(f.timers.size, 0);
   assert.equal(f.phase(), "done");
+  assert.equal(f.elements["demo-play"].textContent, "下个示例 →");
+  const first = f.elements["demo-output"].textContent;
+  f.elements["demo-play"].click();
+  assert.notEqual(f.elements["demo-output"].textContent, first);
+  assert.equal(f.timers.size, 0);
   f.reduced.matches = false;
   f.elements["demo-play"].click();
   assert.equal(f.timers.size, 1);

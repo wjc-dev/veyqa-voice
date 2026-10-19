@@ -241,16 +241,19 @@ h1 span {
   min-height: 308px;
 }
 .demo-date {
+  display: flex;
+  justify-content: space-between;
   font-size: 12px;
   color: #92a2b3;
   margin: 0 0 20px;
 }
 .demo-text {
-  font-size: 25px;
+  font-size: 22px;
   line-height: 1.7;
   font-weight: 450;
   margin: 0;
-  min-height: 86px;
+  min-height: 150px;
+  overflow-wrap: anywhere;
   letter-spacing: 0.3px;
 }
 .caret {
@@ -561,6 +564,7 @@ code {
   gap: 16px;
 }
 .steps li > span {
+  flex-shrink: 0;
   font-size: 11px;
   color: var(--accent);
   border: 1px solid #354d52;
@@ -587,6 +591,11 @@ code {
   grid-template-columns: repeat(3, 1fr);
   gap: 28px;
   margin: 34px 0 22px;
+}
+.safety-steps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  margin: 34px 0 28px;
 }
 .key-steps li {
   position: relative;
@@ -642,7 +651,19 @@ details[open] summary {
   border-bottom: 1px solid var(--line);
 }
 .brew-details {
-  margin-top: 0;
+  margin-top: 28px;
+}
+.disclosure-chevron {
+  transition: transform 0.2s;
+  font-size: 18px;
+  line-height: 1;
+}
+.brew-details[open] .disclosure-chevron {
+  transform: rotate(180deg);
+}
+.brew-details pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .footer {
   border-top: 1px solid #ffffff0d;
@@ -765,7 +786,8 @@ details[open] summary {
     justify-self: center;
   }
   .demo-text {
-    font-size: 25px;
+    font-size: 20px;
+    min-height: 170px;
   }
   .workflow {
     gap: 20px;
@@ -824,6 +846,9 @@ details[open] summary {
   .key-steps {
     grid-template-columns: 1fr;
     gap: 28px;
+  }
+  .safety-steps {
+    grid-template-columns: 1fr;
   }
   .key-steps li > div {
     display: grid;

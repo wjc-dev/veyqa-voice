@@ -127,3 +127,14 @@ test("security guide distinguishes verification from malware and managed blocks"
   assert.ok(html.includes('href="https://support.apple.com/zh-cn/102445"'));
   assert.doesNotMatch(html, /spctl\s+--|xattr\s+-/);
 });
+test("first-open steps are independent of picture-card numbering", () => {
+  const safety = html.slice(html.indexOf('id="safety"'));
+  assert.match(safety, /class="steps safety-steps"/);
+  assert.doesNotMatch(safety, /key-steps/);
+});
+test("Homebrew is an alternative near the download, not a fourth setup step", () => {
+  assert.ok(html.indexOf('class="brew-details"') < html.indexOf('class="install-content"'));
+  assert.match(html, /使用 Homebrew 安装/);
+  assert.doesNotMatch(html, /Homebrew ＋/);
+  assert.match(css, /\.brew-details\[open\].*\.disclosure-chevron/);
+});
