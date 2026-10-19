@@ -5,6 +5,16 @@ from main import VoiceAssistant, _should_open_settings_on_start
 
 
 class LaunchPolicyTests(unittest.TestCase):
+    def test_saved_key_does_not_hide_unfinished_setup_on_manual_launch(self):
+        self.assertTrue(_should_open_settings_on_start(
+            processor_present=True, setup_complete=False, is_frozen=True,
+            arguments=["VeyqaVoice"], restarting=False,
+        ))
+        self.assertFalse(_should_open_settings_on_start(
+            processor_present=True, setup_complete=False, is_frozen=True,
+            arguments=["VeyqaVoice", "--background-login"], restarting=False,
+        ))
+
     def test_background_login_never_opens_settings(self):
         for processor_present in (False, True):
             self.assertFalse(

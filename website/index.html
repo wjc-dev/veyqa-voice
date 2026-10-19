@@ -109,18 +109,20 @@
       >
         <div class="section-heading">
           <p class="eyebrow">GET STARTED</p>
-          <h2 id="install-title">一句命令，开始使用。</h2>
+          <h2 id="install-title">下载，打开，开始说话。</h2>
           <p>
-            已有 Homebrew？复制到终端即可。<br />没有也没关系，可以直接下载安装包。
+            下载 DMG，将 App 拖入“应用程序”后打开。<br />不需要 Homebrew、Python 或开发环境；首次使用需配置自己的 API Key 并授权。
           </p>
           <a
-            class="text-link"
-            href="https://github.com/wjc-dev/voxtype/releases/tag/v0.2.5"
-            >下载 0.2.5 Preview <span aria-hidden="true">↗</span></a
+            class="button primary"
+            href="https://github.com/wjc-dev/voxtype/releases/download/v0.2.6/Veyqa-Voice-v0.2.6-macOS-arm64.dmg"
+            >下载 Mac 版 <span aria-hidden="true">↓</span></a
           >
+          <p class="fine">M 系列 Mac · macOS 13+ · <a href="https://github.com/wjc-dev/voxtype/releases/tag/v0.2.6">0.2.6 Preview 发布说明 ↗</a></p>
           <p><a class="text-link" href="#safety">首次打开被阻止？查看安全提示 ↓</a></p>
         </div>
         <div class="install-content">
+          <p class="fine">已有 Homebrew 的用户，也可以使用下方命令。没有 Homebrew？直接下载即可，无需另装。</p>
           <div class="terminal">
             <div class="terminal-label">
               <span>TERMINAL</span
@@ -140,27 +142,40 @@
               <span>1</span>
               <div>
                 <h3>连接语音服务</h3>
-                <p>默认千问。在应用里获取并填写 API Key，点击“检查连接”。</p>
+                <p>默认千问。按应用里的获取步骤创建并粘贴 API Key，点击“连接并继续”，成功后自动保存。<a href="#api-key">Key 是什么？</a></p>
               </div>
             </li>
             <li>
               <span>2</span>
               <div>
                 <h3>确认权限</h3>
-                <p>按引导开启权限，测试麦克风后点击“完成，开始使用”。修改设置只需保存。</p>
+                <p>按应用引导开启麦克风、辅助功能和输入监控权限。授权由你在系统设置里亲自确认。</p>
               </div>
             </li>
             <li>
               <span>3</span>
               <div>
-                <h3>按住右 Option，说话</h3>
+                <h3>先在应用里试一句</h3>
                 <p>
-                  把光标放进文本框，按住说、松开写。快捷键可自定义；升级保留原设置。
+                  点击试用文本框，按住键盘右侧 Option 说话，松开结束。看到文字后完成设置，再到其他 App 使用。升级保留原配置。
                 </p>
               </div>
             </li>
           </ol>
         </div>
+      </section>
+
+      <section class="shell section" id="api-key" aria-labelledby="key-title">
+        <div class="section-heading">
+          <p class="eyebrow">ONE-TIME SETUP</p>
+          <h2 id="key-title">API Key，只需配置一次。</h2>
+          <p>它是语音服务的访问密钥，不是登录密码。Veyqa 不出售额度，也不收集你的 Key。</p>
+        </div>
+        <ol class="steps">
+          <li><span>1</span><div><h3>登录阿里云百炼</h3><p>用自己的账号打开<a href="https://bailian.console.aliyun.com/?tab=model#/api-key">百炼 API Key 页面 ↗</a>，按控制台提示开通服务。</p></div></li>
+          <li><span>2</span><div><h3>创建并复制 Key</h3><p>选择所用服务的地区后创建 Key。应用默认中国内地（北京）；其他地区在高级设置中调整。不要把 Key 发给聊天或 Agent。</p></div></li>
+          <li><span>3</span><div><h3>回到 Veyqa 粘贴</h3><p>点击“连接并继续”。API 调用可能产生费用，以百炼的账户额度与计费说明为准。<a href="https://help.aliyun.com/zh/model-studio/get-api-key">官方详细教程 ↗</a></p></div></li>
+        </ol>
       </section>
 
       <section
@@ -191,10 +206,10 @@
 官方仓库：https://github.com/wjc-dev/voxtype
 安装命令：brew install --cask wjc-dev/veyqa/veyqa-voice
 
-1. 先检查 Apple Silicon、macOS 13+，以及是否已经安装 Veyqa Voice、VoxType 或 Voice Input。Homebrew 不在 PATH 时先检查 /opt/homebrew/bin/brew；未安装则引导我从 https://brew.sh 安装，管理员密码由我亲自输入。
+1. 先检查 Apple Silicon、macOS 13+，以及是否已经安装 Veyqa Voice、VoxType 或 Voice Input。已有 Homebrew 可使用它；不在 PATH 时检查 /opt/homebrew/bin/brew。没有 Homebrew 则优先从官网的官方 Release 下载 DMG，校验后将 App 安装到“应用程序”，不要为了此应用额外安装 Homebrew、Python 或开发工具。需要管理员密码时由我亲自输入。
 2. 已有版本先为 ~/Library/Application Support/Veyqa 做权限受限的本地备份，保留凭证、快捷键、词汇和配置，不使用 --zap、不清空用户数据。若检测到本机固定签名版或非 Homebrew 安装，先询问，不直接覆盖。停止旧版本前等我结束录音，不修改其他 App，不同时运行多个版本。
-3. 新用户使用上述安装命令；已有 Homebrew 安装先 brew update，再 brew upgrade --cask wjc-dev/veyqa/veyqa-voice。核对官方 Release、cask 版本、下载校验值和实际安装版本，打开 /Applications/Veyqa Voice.app。不要安装未验收开发包。
-4. 已有 API Key 直接保留；没有则指导我在应用里点击“获取 API Key”，自行填写并“检查连接”，确认权限、测试麦克风后点击“完成，开始使用”。以后修改设置只需保存，无需重启。不要索取、读取、打印、截图或上传 Key、.env 内容或钥匙串凭证；不把 Key 放进命令参数、聊天、日志或 Git。提示我语音会发送到所选云端服务，API 费用由服务商收取。
+3. 选择 Homebrew 时，新用户使用上述命令；已有 Homebrew 安装先 brew update，再 brew upgrade --cask wjc-dev/veyqa/veyqa-voice。直接安装则从官方 DMG 复制 App 后推出磁盘镜像。核对官方 Release、适用的 cask 版本、下载校验值和实际安装版本，打开 /Applications/Veyqa Voice.app。不要安装未验收开发包。
+4. 已有 API Key 直接保留；没有则指导我展开应用中的“没有 Key？查看获取步骤”，登录百炼、选择地区、创建 Key 后自行填写。千问点击“连接并继续”成功后自动保存，再确认权限、在应用内试用文本框验证听写，最后完成设置。以后修改设置只需保存，无需重启。不要索取、读取、打印、截图或上传 Key、.env 内容或钥匙串凭证；不把 Key 放进命令参数、聊天、日志或 Git。提示我语音会发送到所选云端服务，API 费用由服务商收取；不代我开户、购买套餐或接受付费条款。
 5. 系统权限由我亲自确认。新用户默认按住右 Option 说话，需要麦克风、辅助功能和输入监控；老用户的快捷键及按住/切换模式保持不变。不要擅自重置权限。
 6. 当前为未公证 Preview。若仅因“无法验证开发者／未经公证”被 macOS 阻止，先核实官方来源和下载校验值；说明风险后，由我本人决定是否到“系统设置 → 隐私与安全性”点击“仍要打开”，再确认“打开”。Agent 只说明步骤，不代替我点击安全例外。参考 https://support.apple.com/zh-cn/102445 。若提示恶意软件、文件损坏或被公司安全软件拦截，停止并反馈／联系管理员；不禁用 Gatekeeper、不移除隔离属性、不修改权限数据库、不反复放行。
 7. 最后核对只有一个主程序、Dock 能打开设置，让我在空白文稿连续听写同一句三次（每次等文字写入再开始），确认无丢字或重复、没有自动发送。关闭设置后检查没有持续录音或异常占用。只有真实输入通过后才报告配置完成；未完成的检查要明确说明。</textarea

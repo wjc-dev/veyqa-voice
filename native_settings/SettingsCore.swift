@@ -1,6 +1,21 @@
 import Foundation
 import Darwin
 
+enum SetupStep: Int {
+    case connection = 1, permissions, trial
+
+    static func current(connectionApplied: Bool, permissionsGranted: Bool) -> SetupStep {
+        if !connectionApplied { return .connection }
+        return permissionsGranted ? .trial : .permissions
+    }
+
+    static func instruction(hotkey: String, mode: String) -> String {
+        mode == "toggle"
+            ? "点击下方文本框，按一下\(hotkey)开始说话，再按一下结束。"
+            : "点击下方文本框，按住\(hotkey)说话，说完再松开。"
+    }
+}
+
 struct RecoveryEntry: Codable, Identifiable, Hashable {
     var id: String
     var text: String

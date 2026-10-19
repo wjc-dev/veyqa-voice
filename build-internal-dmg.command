@@ -4,9 +4,9 @@ set -euo pipefail
 PROJECT_DIR="${0:A:h}"
 source "$PROJECT_DIR/packaging/signing.zsh"
 veyqa_configure_signing
-VERSION="0.2.5"
+VERSION="0.2.6"
 OUTPUT_DIR="${1:-$PROJECT_DIR/dist-$VEYQA_SIGNING_PROFILE}"
-BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-208}"
+BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-210}"
 [[ "$BUILD_NUMBER" == <-> ]] || { print -u2 "Invalid build number"; exit 1; }
 ARTIFACT_SUFFIX=""
 [[ "$VEYQA_SIGNING_PROFILE" == "local" ]] && ARTIFACT_SUFFIX="-local"
@@ -45,8 +45,6 @@ if ! "$PROJECT_DIR/.venv/bin/python" -c 'import PyInstaller' >/dev/null 2>&1; th
   fi
 fi
 
-zsh "$PROJECT_DIR/build-native-settings.command"
-
 xcrun swiftc -O -target arm64-apple-macos13.0 \
   -framework AppKit \
   "$PROJECT_DIR/native_settings/SupervisorHealth.swift" \
@@ -65,6 +63,8 @@ if [[ ! -f "$PROJECT_DIR/packaging/AppIcon.icns" || \
   done
   iconutil -c icns "$ICONSET" -o "$PROJECT_DIR/packaging/AppIcon.icns"
 fi
+
+zsh "$PROJECT_DIR/build-native-settings.command"
 
 "$PROJECT_DIR/.venv/bin/pyinstaller" \
   --noconfirm \

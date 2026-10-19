@@ -11,6 +11,11 @@ private func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 @main
 struct SettingsCoreHarness {
     static func main() throws {
+        require(SetupStep.current(connectionApplied: false, permissionsGranted: true) == .connection, "permission alone does not complete setup")
+        require(SetupStep.current(connectionApplied: true, permissionsGranted: false) == .permissions, "connection advances to permission")
+        require(SetupStep.current(connectionApplied: true, permissionsGranted: true) == .trial, "ready for real dictation trial")
+        require(SetupStep.instruction(hotkey: "右 Option", mode: "hold").contains("按住"), "hold instructions")
+        require(SetupStep.instruction(hotkey: "自定义按键", mode: "toggle").contains("再按一下"), "existing toggle mode retained")
         var snapshotGate = SnapshotChangeGate()
         require(!snapshotGate.changed(nil), "missing snapshot stays quiet")
         require(snapshotGate.changed(Data("first".utf8)), "first snapshot updates")

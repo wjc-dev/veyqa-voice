@@ -155,6 +155,12 @@ class PermissionMonitor:
     def stop(self) -> None:
         self._stop.set()
 
+    @property
+    def latest_snapshot(self) -> dict[str, Any] | None:
+        """A published copy; reading it never performs a new system permission query."""
+        snapshot = self._last_snapshot
+        return dict(snapshot) if snapshot is not None else None
+
     def refresh(self) -> dict[str, Any]:
         microphone = _microphone_status()
         accessibility = _accessibility_status()

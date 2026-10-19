@@ -1,5 +1,6 @@
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -23,6 +24,7 @@ from src.keyboard.listener import (
 class VoiceHotkeyTests(unittest.TestCase):
     def make_manager(self, value):
         manager = KeyboardManager.__new__(KeyboardManager)
+        manager._recording_lock = threading.RLock()
         manager.single_fn_hotkey = True
         manager._voice_hotkey_pressed = False
         manager._fn_hotkey_mode = "hold"

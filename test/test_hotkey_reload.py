@@ -53,3 +53,26 @@ def test_stopped_tap_cannot_be_revived_by_delayed_start():
     with listener:
         listener.join()
         assert not listener.running
+
+
+def test_listener_created_by_obsolete_worker_cannot_replace_new_config():
+    result = manager()
+    result._listener_generation = 1
+    original = result._listener
+    def changed_during_creation(*args, **kwargs):
+        result._listener_generation = 2
+        return Mock()
+    with patch("src.keyboard.listener._PassiveTapListener", side_effect=changed_during_creation):
+        result.start_listening(1)
+    assert result._listener is original
+
+
+def test_permission_rebind_stops_old_listener_once():
+    result = manager()
+    original = result._listener
+    with patch.dict(os.environ, {"VOICE_HOTKEY": "right_option", "GLOBAL_HOTKEY_BACKEND": "passive"}), \
+            patch("src.keyboard.listener.threading.Thread") as thread:
+        result.reload_configuration(force_listener=True)
+    original.stop.assert_called_once()
+    thread.return_value.start.assert_called_once()
+    assert result._listener_generation == 1

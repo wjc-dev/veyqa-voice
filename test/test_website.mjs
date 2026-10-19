@@ -122,7 +122,17 @@ test("website is accessible static content, not a credential collection form", (
   assert.match(html, /role="status"\s+aria-live="polite"/);
   assert.match(html, /textarea\s+readonly/);
   assert.doesNotMatch(html, /<form|<input|https?:[^"']+\.(?:js|css)["']/i);
-  assert.ok(html.includes("/releases/tag/v0.2.5"));
+  assert.ok(html.includes("/releases/tag/v0.2.6"));
+});
+
+test("direct DMG installation is primary and setup instructions match the app", () => {
+  assert.ok(html.includes("/releases/download/v0.2.6/Veyqa-Voice-v0.2.6-macOS-arm64.dmg"));
+  assert.ok(html.includes("不需要 Homebrew、Python 或开发环境"));
+  assert.ok(html.includes("连接并继续"));
+  assert.ok(html.includes("试用文本框"));
+  assert.ok(prompt.includes("不要为了此应用额外安装 Homebrew"));
+  assert.ok(prompt.includes("不代我开户"));
+  assert.doesNotMatch(html, /完成，开始使用|零配置|零门槛/);
 });
 
 test("security instructions separate a personal exception from malware and managed-device blocks", () => {

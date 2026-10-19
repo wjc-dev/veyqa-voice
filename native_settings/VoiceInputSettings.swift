@@ -247,11 +247,15 @@ final class SettingsModel: ObservableObject {
     @Published var qwenAPIKey = ""
     @Published var checkingConnection = false
     @Published var connectionStatus = ""
-    @Published var connectionVerified = false
     @Published var onboardingComplete = true
+    @Published var setupConnectionApplied = false
+    @Published var applyingSettings = false
+    @Published var trialText = ""
     @Published var saveStatus = ""
     private var pendingSaveID: String?
+    private var saveStartedAt: TimeInterval = 0
     private var closeAfterApply = false
+    private var advanceAfterApply = false
     private var connectionID = UUID()
     private var connectionTask: URLSessionWebSocketTask?
     private var connectionSession: URLSession?
@@ -556,7 +560,6 @@ final class SettingsModel: ObservableObject {
     }
 
     func cancelConnectionCheck() {
-        connectionVerified = false
         connectionID = UUID()
         connectionTask?.cancel(with: .goingAway, reason: nil)
         connectionSession?.invalidateAndCancel()
@@ -591,11 +594,13 @@ final class SettingsModel: ObservableObject {
         connectionSession = session
         connectionTask = socket
         socket.resume()
-        func finish(_ message: String) {
+        func finish(_ message: String, verified: Bool = false) {
             guard self.connectionID == id else { return }
             self.cancelConnectionCheck()
             self.connectionStatus = message
-            self.connectionVerified = message.hasPrefix("连接成功")
+            if verified && !self.onboardingComplete {
+                self.saveSettings(advanceSetup: true)
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
             finish("检查超时。请检查网络；海外 Key 请在高级设置中选择对应地区。")
@@ -616,7 +621,9 @@ final class SettingsModel: ObservableObject {
                     let event = try JSONSerialization.jsonObject(with: payload) as? [String: Any]
                     let header = event?["header"] as? [String: Any]
                     if header?["event"] as? String == "task-started" {
-                        finish("连接成功，语音服务可用。点击右上角保存即可。")
+                        finish(self.onboardingComplete
+                               ? "连接成功。修改过 Key 后，请点击右上角保存。"
+                               : "连接成功，正在保存并应用…", verified: true)
                         return
                     }
                     if header?["event"] as? String == "task-failed" {
@@ -632,11 +639,16 @@ final class SettingsModel: ObservableObject {
         }
     }
 
-    func saveSettings(completeSetup: Bool = false) {
-        qwenAPIKey = qwenAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    func saveSettings(completeSetup: Bool = false, advanceSetup: Bool = false) {
+        guard !applyingSettings else { return }
+        if completeSetup && (!setupConnectionApplied || !allRequiredPermissionsGranted) {
+            errorMessage = "请先连接语音服务并完成权限授权。"
+            return
+        }
+        let normalizedKey = qwenAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         if transcriptionService == "qwen" {
-            guard qwenAPIKey.count >= 20,
-                  !qwenAPIKey.contains(where: { $0.isWhitespace }) else {
+            guard normalizedKey.count >= 20,
+                  !normalizedKey.contains(where: { $0.isWhitespace }) else {
                 errorMessage = "千问 API Key 格式不正确。"
                 return
             }
@@ -677,7 +689,7 @@ final class SettingsModel: ObservableObject {
             "GLOBAL_HOTKEY_BACKEND": hotkeyBackend,
             "SINGLE_FN_HOTKEY": "true",
             "LAUNCH_AT_LOGIN": String(launchAtLogin),
-            "QWEN_API_KEY": qwenAPIKey,
+            "QWEN_API_KEY": normalizedKey,
             "QWEN_API_HOST": qwenAPIHost,
             "QWEN_WORKSPACE_ID": qwenAPIHost.isEmpty ? qwenWorkspace : "",
             "QWEN_REGION": qwenRegion,
@@ -716,25 +728,47 @@ final class SettingsModel: ObservableObject {
                 let revision = UUID().uuidString
                 pendingSaveID = revision
                 closeAfterApply = completeSetup
+                advanceAfterApply = advanceSetup
+                applyingSettings = true
+                saveStartedAt = ProcessInfo.processInfo.systemUptime
                 saveStatus = "已保存，正在等待生效…"
                 try Self.privateWrite(Data(revision.utf8), to: dataURL.appendingPathComponent(".settings-apply-request"))
             } else {
+                if advanceSetup { setupConnectionApplied = true }
+                if completeSetup { onboardingComplete = true }
                 notice = "设置已保存，后台语音服务已经重启。"
             }
         } catch {
+            applyingSettings = false
             errorMessage = "保存失败：\(error.localizedDescription)"
         }
     }
 
     func checkAppliedSettings() {
-        guard let pendingSaveID, diagnostics.settingsRevision == pendingSaveID else { return }
+        guard let pendingSaveID else { return }
+        guard diagnostics.settingsRevision == pendingSaveID else {
+            if ProcessInfo.processInfo.systemUptime - saveStartedAt > 15 {
+                self.pendingSaveID = nil
+                applyingSettings = false
+                saveStatus = "后台暂未确认设置。请重试；若主程序已退出，请从应用程序打开 Veyqa Voice。"
+            }
+            return
+        }
         switch diagnostics.settingsStatus {
         case "applied":
-            saveStatus = "已生效，下次听写使用新设置"
+            saveStatus = onboardingComplete ? "已生效，下次听写使用新设置" : "语音服务设置已保存，可以继续"
             self.pendingSaveID = nil
-            if closeAfterApply { NSApp.terminate(nil) }
+            applyingSettings = false
+            if advanceAfterApply { setupConnectionApplied = true }
+            if closeAfterApply {
+                onboardingComplete = true
+                NSApp.terminate(nil)
+            }
         case "pending": saveStatus = "已保存，本次听写结束后生效"
-        case "error": saveStatus = "已保存，但未能应用，请检查设置后重试"
+        case "error":
+            saveStatus = "未能应用设置，请重试；无需重启 App"
+            self.pendingSaveID = nil
+            applyingSettings = false
         default: break
         }
     }
@@ -1152,7 +1186,7 @@ struct PermissionSetupView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Veyqa Voice 权限")
                         .font(.system(size: 30, weight: .bold))
-                    Text("只检测当前正在运行的 App，不按同名历史条目猜测。")
+                    Text("允许录音和语音快捷键，让文字写入你的输入框。")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -1186,7 +1220,7 @@ struct PermissionSetupView: View {
             .padding(.horizontal, 18)
             .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 16))
 
-            identityCard
+            DisclosureGroup("查看当前应用信息") { identityCard }
 
             HStack {
                 Menu("更多") {
@@ -1486,6 +1520,7 @@ struct CredentialField: View {
 
 struct EngineSettingsView: View {
     @ObservedObject var model: SettingsModel
+    @State private var showKeyHelp = false
 
     var body: some View {
         Form {
@@ -1495,25 +1530,41 @@ struct EngineSettingsView: View {
                     Text("豆包").tag("doubao")
                 }
                 .pickerStyle(.segmented)
-                Text("使用自己的 API 凭证。保存后从下一次听写生效，不中断当前录音。")
+                Text(model.onboardingComplete
+                     ? "使用自己的 API 凭证。保存后从下一次听写生效，不中断当前录音。"
+                     : "默认推荐千问。只需配置一次，已有 Key 可以直接粘贴。")
                     .foregroundStyle(.secondary)
                     .font(.callout)
             }
 
             if model.transcriptionService == "qwen" {
                 Section("千问 API 连接") {
-                    Text("当前模型：Qwen Audio 3.0 ASR Streaming")
+                    Text("千问实时语音识别 · 阿里云百炼")
                         .foregroundStyle(.secondary)
                         .font(.callout)
                     CredentialField("API Key", text: $model.qwenAPIKey)
-                    Text("1. 获取百炼 API Key　2. 粘贴到上方　3. 检查连接后保存")
+                    Text("API Key 是你的语音服务访问密钥，不是阿里云登录密码。请勿发到聊天或截图中。")
                         .foregroundStyle(.secondary)
                         .font(.callout)
                     HStack {
-                        Link("获取 API Key", destination: URL(string: "https://bailian.console.aliyun.com/?tab=model#/api-key")!)
+                        Button("没有 Key？查看获取步骤") { showKeyHelp.toggle() }
+                            .buttonStyle(.link)
                         Spacer()
-                        Button(model.checkingConnection ? "检查中…" : "检查连接") { model.checkConnection() }
-                            .disabled(model.checkingConnection)
+                        Button(model.checkingConnection ? "连接中…" :
+                                (model.onboardingComplete ? "检查连接" : "连接并继续")) { model.checkConnection() }
+                            .disabled(model.checkingConnection || model.applyingSettings)
+                    }
+                    if showKeyHelp {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("1. 打开百炼控制台，用你自己的阿里云账号登录，按页面提示开通服务。")
+                            Text("2. 在 API Key 页面选择与你使用的服务相同的地区，创建并复制 Key。本应用默认中国内地（北京）。")
+                            Text("3. 回到这里粘贴，点击“\(model.onboardingComplete ? "检查连接" : "连接并继续")”。其他地区可在下方高级设置中调整。")
+                            Text("API 调用可能产生费用，以百炼账户的额度与计费说明为准；不需要为了此应用购买编程套餐。")
+                            HStack {
+                                Link("打开百炼 API Key 页面 ↗", destination: URL(string: "https://bailian.console.aliyun.com/?tab=model#/api-key")!)
+                                Link("官方详细教程 ↗", destination: URL(string: "https://help.aliyun.com/zh/model-studio/get-api-key")!)
+                            }
+                        }.font(.callout).textSelection(.enabled)
                     }
                     if !model.connectionStatus.isEmpty {
                         Text(model.connectionStatus).font(.callout).foregroundStyle(.secondary)
@@ -1522,14 +1573,14 @@ struct EngineSettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
-                Section("识别") {
+                if model.onboardingComplete { Section("识别") {
                     Picker("识别语言", selection: $model.qwenLanguage) {
                         Text("中文优先").tag("zh")
                         Text("自动判断").tag("auto")
                         Text("粤语").tag("yue")
                         Text("英语").tag("en")
                     }
-                }
+                } }
                 DisclosureGroup("高级设置（一般无需修改）") {
                     Picker("Key 所属地区", selection: $model.qwenRegion) {
                         Text("中国内地（北京）").tag("beijing")
@@ -1552,10 +1603,16 @@ struct EngineSettingsView: View {
                     Text("应用需开通“豆包流式语音识别模型 2.0 小时版”。本机识别词汇会直接随请求发送；如果还需要更稳定的热词偏置，可在火山引擎自学习平台创建词表，并将其 ID 填在上方。")
                         .foregroundStyle(.secondary)
                         .font(.callout)
+                    if !model.onboardingComplete {
+                        Button("保存并继续") { model.saveSettings(advanceSetup: true) }
+                        Text("保存后将在试用步骤验证实际识别；保存成功不等于服务已连接。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
         }
         .formStyle(.grouped)
+        .disabled(model.applyingSettings)
         .onChange(of: model.qwenAPIKey) { _ in model.cancelConnectionCheck() }
         .onChange(of: model.qwenAPIHost) { _ in model.cancelConnectionCheck() }
         .onChange(of: model.qwenRegion) { _ in model.cancelConnectionCheck() }
@@ -1807,6 +1864,96 @@ struct RecoverySettingsView: View {
     }
 }
 
+/// A real editor: trial dictation exercises the same focus safety and insertion
+/// path as every other app, without ever granting access to credential fields.
+struct SetupTrialEditor: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        let editor = scroll.documentView as! NSTextView
+        editor.isRichText = false
+        editor.isAutomaticQuoteSubstitutionEnabled = false
+        editor.font = NSFont.systemFont(ofSize: 17)
+        editor.textContainerInset = NSSize(width: 12, height: 12)
+        editor.setAccessibilityIdentifier("veyqa.setup.trial")
+        editor.setAccessibilityLabel("语音试用文本框")
+        editor.delegate = context.coordinator
+        scroll.hasVerticalScroller = true
+        return scroll
+    }
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+        if let editor = scroll.documentView as? NSTextView, editor.string != text {
+            editor.string = text
+        }
+    }
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: SetupTrialEditor
+        init(_ parent: SetupTrialEditor) { self.parent = parent }
+        func textDidChange(_ notification: Notification) {
+            if let editor = notification.object as? NSTextView { parent.text = editor.string }
+        }
+    }
+}
+
+struct FirstRunView: View {
+    @ObservedObject var model: SettingsModel
+    @Binding var showPermissions: Bool
+
+    private var step: SetupStep {
+        SetupStep.current(connectionApplied: model.setupConnectionApplied,
+                          permissionsGranted: model.allRequiredPermissionsGranted)
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("欢迎使用 Veyqa Voice").font(.title2.bold())
+            Text("\(step.rawValue) / 3 · 连接语音服务 → 开启权限 → 试用语音输入")
+                .foregroundStyle(.secondary)
+            switch step {
+            case .connection:
+                EngineSettingsView(model: model)
+            case .permissions:
+                Text("语音服务设置已保存。接下来允许麦克风与键盘相关权限。")
+                Text("授权只在 macOS 系统设置中完成；我们不会读取其他按键内容。")
+                    .font(.callout).foregroundStyle(.secondary)
+                Button("开启所需权限") { showPermissions = true }
+                    .buttonStyle(.borderedProminent)
+                Spacer()
+            case .trial:
+                Text("试着说一句：今天开始使用语音输入。")
+                    .font(.headline)
+                Text(SetupStep.instruction(hotkey: model.hotkeyLabel, mode: model.hotkeyMode))
+                SetupTrialEditor(text: $model.trialText)
+                    .frame(minHeight: 140, maxHeight: 220)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+                Text("文字会写到这里，不会自动发送。本次语音会发送给你选择的云端服务。")
+                    .font(.caption).foregroundStyle(.secondary)
+                if let error = model.diagnostics.lastError, !error.isEmpty {
+                    Text(error).font(.callout).foregroundStyle(.orange)
+                }
+                HStack {
+                    Button("没有收到声音？测试麦克风") { model.testMicrophone() }
+                    if let status = model.diagnostics.microphoneTestStatus {
+                        Text(status == "passed" ? "麦克风已收到声音" : status).font(.caption)
+                    }
+                }
+                Spacer()
+                HStack {
+                    Button("返回连接设置") { model.setupConnectionApplied = false }
+                    Spacer()
+                    Button(model.trialText.isEmpty ? "稍后试用，关闭设置" : "完成设置") {
+                        model.saveSettings(completeSetup: true)
+                    }.buttonStyle(.borderedProminent).disabled(model.applyingSettings)
+                }
+                Text("关闭后，先点击任意 App 的输入框，再用同一个快捷键说话。点击 Dock 图标可随时回来。")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        }.padding(20)
+    }
+}
+
 struct SettingsRootView: View {
     @ObservedObject var model: SettingsModel
     @State private var showPermissions = false
@@ -1820,26 +1967,8 @@ struct SettingsRootView: View {
     var body: some View {
         VStack(spacing: 8) {
         if !model.onboardingComplete {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("首次使用：连接语音服务 → 确认权限 → 试一下麦克风").font(.headline)
-                Text("在下方获取并粘贴 Key、检查连接。Key 只保存在你的电脑上，不要发给别人。")
-                    .font(.callout).foregroundStyle(.secondary)
-                HStack {
-                    Label(model.allRequiredPermissionsGranted ? "权限已就绪" : "需要权限", systemImage: "checkmark.shield")
-                    Button("测试麦克风（2 秒）") { model.testMicrophone() }
-                        .disabled(!model.allRequiredPermissionsGranted)
-                    Spacer()
-                    Button("完成，开始使用") { model.saveSettings(completeSetup: true) }
-                        .disabled(!model.allRequiredPermissionsGranted
-                                  || model.diagnostics.microphoneTestStatus != "passed"
-                                  || (model.transcriptionService == "qwen" && !model.connectionVerified))
-                }
-                if let status = model.diagnostics.microphoneTestStatus {
-                    Text(status == "passed" ? "麦克风已收到声音。完成后点击文本框，再用语音快捷键。" : status)
-                        .font(.callout)
-                }
-            }.padding().background(Color.accentColor.opacity(0.07)).cornerRadius(10)
-        }
+            FirstRunView(model: model, showPermissions: $showPermissions)
+        } else {
         TabView(selection: $selectedTab) {
             GeneralSettingsView(
                 model: model,
@@ -1855,12 +1984,14 @@ struct SettingsRootView: View {
                 .tabItem { Label("恢复与诊断", systemImage: "lifepreserver") }
                 .tag("recovery")
         }
+        }
         if !model.saveStatus.isEmpty {
             Text(model.saveStatus).font(.callout).foregroundStyle(.secondary)
         }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                if model.onboardingComplete {
                 Button {
                     model.saveSettings()
                 } label: {
@@ -1868,6 +1999,8 @@ struct SettingsRootView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut("s", modifiers: .command)
+                .disabled(model.applyingSettings)
+                }
             }
         }
         .padding(.top, 8)
@@ -1917,6 +2050,7 @@ struct SettingsRootView: View {
     private func evaluatePermissionGate() {
         guard model.isBundled,
               model.permissionsLoaded,
+              (model.onboardingComplete || model.setupConnectionApplied),
               !evaluatedPermissionGate
         else { return }
         // A snapshot from another PID/version/path is deliberately treated as

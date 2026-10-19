@@ -332,6 +332,17 @@ class StatusBarController:
         # hidden by macOS when space is tight, so it must never be the user's
         # only way back into settings.
         app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+        # A bundled Python runtime can inherit its framework's generic icon.
+        # Resolve the signed outer bundle's asset explicitly, without resetting
+        # the user's Dock or global LaunchServices caches.
+        bundle = app_bundle_path()
+        if bundle:
+            icon = NSImage.alloc().initWithContentsOfFile_(
+                str(bundle / "Contents/Resources/AppIcon.icns")
+            )
+            if icon is not None:
+                app.setApplicationIconImage_(icon)
+                _write_status_log("dock application icon loaded from main bundle")
         self._application_delegate = _ApplicationDelegate.alloc().init()
         self._application_delegate.controller = self
         app.setDelegate_(self._application_delegate)

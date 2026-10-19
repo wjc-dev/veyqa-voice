@@ -15,6 +15,8 @@ if ! xcrun --find swiftc >/dev/null 2>&1; then
 fi
 
 mkdir -p "$SETTINGS_APP/Contents/MacOS"
+mkdir -p "$SETTINGS_APP/Contents/Resources"
+cp "$PROJECT_DIR/packaging/AppIcon.icns" "$SETTINGS_APP/Contents/Resources/AppIcon.icns"
 cp "$PROJECT_DIR/native_settings/VoiceInputSettings-Info.plist" \
   "$SETTINGS_APP/Contents/Info.plist"
 

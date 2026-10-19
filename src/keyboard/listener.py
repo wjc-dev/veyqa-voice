@@ -535,8 +535,33 @@ class KeyboardManager:
         app = NSWorkspace.sharedWorkspace().frontmostApplication()
         return bool(app and app.bundleIdentifier() == "com.wjcdev.veyqa.settings")
 
-    def reload_configuration(self):
+    def is_setup_trial_target(self, target):
+        """Only the dedicated trial editor may receive dictation inside settings.
+
+        Never allow API keys, ordinary settings fields, or a stale trial target.
+        The identifier is set on the native NSTextView, not a surrounding view.
+        """
+        if target is None:
+            return False
+        try:
+            from AppKit import NSWorkspace
+            from ApplicationServices import AXUIElementCopyAttributeValue
+            app = NSWorkspace.sharedWorkspace().frontmostApplication()
+            if (not app or app.bundleIdentifier() != "com.wjcdev.veyqa.settings"
+                    or int(app.processIdentifier()) != target.pid
+                    or not self.correction_learner.target_is_focused(target)):
+                return False
+            error, identifier = AXUIElementCopyAttributeValue(target.element, "AXIdentifier", None)
+            return error == 0 and identifier == "veyqa.setup.trial"
+        except Exception:
+            return False
+
+    def reload_configuration(self, *, force_listener=False):
         """Called on the app loop, only between utterances."""
+        with self._recording_lock:
+            self._reload_configuration(force_listener=force_listener)
+
+    def _reload_configuration(self, *, force_listener):
         key = os.getenv("VOICE_HOTKEY", self.voice_hotkey).strip().lower()
         spec = self._parse_voice_hotkey(key)
         if spec is None:
@@ -544,7 +569,7 @@ class KeyboardManager:
         backend = self._backend_for_hotkey(spec, os.getenv("GLOBAL_HOTKEY_BACKEND", "passive"))
         # Passive listeners already observe all key events. Reuse the tap when
         # only its matching rule changes; do not create duplicate listeners.
-        changed = (backend != self._hotkey_backend or self._listener is None
+        changed = (force_listener or backend != self._hotkey_backend or self._listener is None
                    or (backend == "registered" and key != self.voice_hotkey))
         if changed and self._listener is not None:
             previous, self._listener = self._listener, None
@@ -922,7 +947,9 @@ class KeyboardManager:
             logger.debug("只读快捷键事件处理失败: %s", exc)
 
     def start_listening(self, generation=None):
-        if generation is not None and generation != getattr(self, "_listener_generation", 0):
+        if generation is None:
+            generation = getattr(self, "_listener_generation", 0)
+        if generation != getattr(self, "_listener_generation", 0):
             return
         if self._hotkey_backend == "off":
             logger.info("全局快捷键已关闭；请打开设置重新选择快捷键")
@@ -954,7 +981,10 @@ class KeyboardManager:
             on_recovered=self._recover_hotkey_state,
             reconcile=self._reconcile_hotkey_release,
         )
-        self._listener = listener
+        with self._recording_lock:
+            if generation != getattr(self, "_listener_generation", 0):
+                return
+            self._listener = listener
         try:
             with listener:
                 logger.info("全局录音快捷键已启用（Quartz 只读监听，可自动恢复）")
@@ -965,8 +995,11 @@ class KeyboardManager:
                 return
             logger.warning("Quartz 快捷键监听不可用，切换到 AppKit 兼容模式: %s", exc)
 
-        fallback = _PassiveGlobalMonitorListener(self._nsevent_intercept)
-        self._listener = fallback
+        with self._recording_lock:
+            if self._listener is not listener or generation != getattr(self, "_listener_generation", 0):
+                return
+            fallback = _PassiveGlobalMonitorListener(self._nsevent_intercept)
+            self._listener = fallback
 
         def install_monitor() -> None:
             if self._listener is not fallback:

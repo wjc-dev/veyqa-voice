@@ -65,7 +65,7 @@ from src.utils.logger import logger
 from src.setup_feedback import empty_result_notice
 
 
-__version__ = "0.2.5"
+__version__ = "0.2.6"
 __author__ = "Mor-Li"
 __description__ = "Qwen and Doubao realtime voice input for macOS"
 
@@ -76,6 +76,7 @@ def _should_open_settings_on_start(
     is_frozen: bool,
     arguments: list[str],
     restarting: bool,
+    setup_complete: bool = True,
 ) -> bool:
     """Only a deliberate foreground launch may open the settings window."""
     if "--show-settings-after-restart" in arguments:
@@ -84,7 +85,7 @@ def _should_open_settings_on_start(
         return False
     # Configured launches stay quiet. The Dock remains the explicit settings
     # entry point; a delayed helper launch must not steal a new dictation.
-    return not processor_present
+    return not processor_present or not setup_complete
 
 
 @dataclass
@@ -154,6 +155,7 @@ class VoiceAssistant:
                 is_frozen=IS_FROZEN,
                 arguments=sys.argv,
                 restarting=os.getenv("VOICE_INPUT_RESTARTING") == "true",
+                setup_complete=os.getenv("SETUP_COMPLETED", "true").lower() == "true",
             ),
         )
         self.audio_recorder.set_auto_stop_callback(self._handle_auto_stop)
@@ -230,11 +232,33 @@ class VoiceAssistant:
         from PyObjCTools import AppHelper
         self.health.tick_main()
         self._apply_pending_settings()
+        self._refresh_permission_listener()
         self._check_microphone_test_request()
         if (DATA_DIR / ".restart-request").exists():
             self._restart_application()
             return
         AppHelper.callLater(2, self._tick_health)
+
+    def _refresh_permission_listener(self):
+        """Rebind once after a TCC grant, never restart the app or poll AX here."""
+        snapshot = self.permission_monitor.latest_snapshot
+        if not snapshot:
+            return
+        current = (snapshot.get("accessibility"), snapshot.get("input_monitoring"))
+        previous = getattr(self, "_last_permission_state", None)
+        if current == previous:
+            return
+        if (self._current_session is not None or self.keyboard_manager.is_recording
+                or getattr(self.keyboard_manager, "_transition_started_at", None) is not None):
+            return
+        self._last_permission_state = current
+        if previous is not None and current == ("granted", "granted"):
+            try:
+                self.keyboard_manager.reload_configuration(force_listener=True)
+                self.diagnostics.update(recovery_status="权限已更新，快捷键监听已重新启用")
+            except Exception:
+                self.diagnostics.update(last_error="权限已更新，但快捷键未能重新启用，请重新保存快捷键设置")
+                logger.exception("授权后恢复快捷键监听失败")
 
     def _apply_pending_settings(self):
         request = DATA_DIR / ".settings-apply-request"
@@ -257,7 +281,9 @@ class VoiceAssistant:
                 load_dotenv(ENV_FILE, override=True)
                 service = os.getenv("TRANSCRIPTION_SERVICE", "qwen").lower()
                 processor = DoubaoStreamingProcessor() if service == "doubao" else QwenStreamingProcessor()
-                self.processor = processor if processor.is_available() else None
+                if not processor.is_available():
+                    raise ValueError("语音服务凭证尚未配置")
+                self.processor = processor
                 self.service = "doubao" if service == "doubao" else "qwen"
                 self.engine_label = "豆包" if self.service == "doubao" else "千问"
                 self.punctuation_mode = os.getenv("PUNCTUATION_MODE", "auto")
@@ -324,10 +350,17 @@ class VoiceAssistant:
             logger.debug("更新状态栏失败: %s", exc)
 
     def _start_unconfigured(self) -> None:
-        notice = f"尚未完成配置，请点击 Dock 图标设置{self.engine_label}，完成后再开始听写"
-        self.keyboard_manager.show_warning(notice)
-        self.floating_preview.show_notice(notice)
-        self.keyboard_manager.reset_state()
+        self._reject_start(f"请点击 Dock 图标，在设置中连接{self.engine_label}并保存，再开始听写")
+
+    def _reject_start(self, notice: str) -> None:
+        """Always release the key state, even if the feedback UI fails."""
+        try:
+            self.keyboard_manager.show_warning(notice)
+            self.floating_preview.show_notice(
+                notice, is_relevant=lambda: self._current_session is None
+            )
+        finally:
+            self.keyboard_manager.reset_state()
 
     def _stop_unconfigured(self) -> None:
         self.keyboard_manager.reset_state()
@@ -443,16 +476,10 @@ class VoiceAssistant:
     def start_streaming(self) -> None:
         """Start a new ASR session after the event-tap transition is serialized."""
         if getattr(self, "_microphone_test_active", False):
-            self.floating_preview.show_notice("麦克风正在测试，请稍候再开始听写")
-            self.keyboard_manager.reset_state()
+            self._reject_start("麦克风正在测试，请稍候再开始听写")
             return
         if not self.processor or not self.processor.is_available():
             self._start_unconfigured()
-            return
-        if getattr(self.keyboard_manager, "frontmost_is_settings", lambda: False)():
-            notice = "请先点击要输入的文本框，再使用语音快捷键"
-            self.floating_preview.show_notice(notice)
-            self.keyboard_manager.reset_state()
             return
         with self._session_lock:
             # Cancellation can arrive after dequeue but before the session exists.
@@ -469,6 +496,11 @@ class VoiceAssistant:
                 return
 
             target = self.keyboard_manager.capture_output_target()
+            in_settings = getattr(self.keyboard_manager, "frontmost_is_settings", lambda: False)()
+            trial_target = getattr(self.keyboard_manager, "is_setup_trial_target", lambda _: False)(target) is True
+            if in_settings and not trial_target:
+                self._reject_start("请先点击试用文本框，或其他 App 的输入框，再使用语音快捷键")
+                return
             session = VoiceSession(uuid.uuid4().hex, target)
             self._current_session = session
 
