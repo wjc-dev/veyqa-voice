@@ -97,7 +97,7 @@ test("static accessible website with no agent prompt or credential form", () => 
 test("DMG install, permissions and trial have clear instructions", () => {
   assert.ok(
     html.includes(
-      "/releases/download/v0.2.9/Veyqa-Voice-v0.2.9-macOS-arm64.dmg",
+      "/releases/download/v0.2.10/Veyqa-Voice-v0.2.10-macOS-arm64.dmg",
     ),
   );
   for (const text of [
@@ -119,6 +119,9 @@ test("precise service facts and concise vocabulary copy", () => {
     "user_id",
     "seller_id",
     "Qwen Audio 3.0",
+    "推广期间免费体验",
+    "无需填写 API Key",
+    "费用由 Veyqa Voice 承担",
   ])
     assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /不承诺|不等于|≠|零门槛|零配置|不上传云端/);

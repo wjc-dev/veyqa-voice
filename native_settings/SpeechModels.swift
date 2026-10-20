@@ -11,7 +11,7 @@ enum ReleaseFeatures {
     }()
     static let builtinSpeech = flags["builtin_speech"] == true
     static let privateTrial = builtinSpeech && flags["private_trial"] == true
-    static let builtinLabel = privateTrial ? "内测语音" : "免费语音"
+    static let builtinLabel = privateTrial ? "推广语音" : "免费语音"
 
     static func credentialSource(_ environment: [String: String], enabled: Bool = builtinSpeech) -> String {
         guard enabled else { return "personal" }

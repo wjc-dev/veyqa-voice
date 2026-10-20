@@ -4,15 +4,15 @@ set -euo pipefail
 PROJECT_DIR="${0:A:h}"
 source "$PROJECT_DIR/packaging/signing.zsh"
 veyqa_configure_signing
-VERSION="0.2.9"
+VERSION="0.2.10"
 OUTPUT_DIR="${1:-$PROJECT_DIR/dist-$VEYQA_SIGNING_PROFILE}"
-BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-222}"
+BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-224}"
 [[ "$BUILD_NUMBER" == <-> ]] || { print -u2 "Invalid build number"; exit 1; }
 ARTIFACT_SUFFIX=""
 [[ "$VEYQA_SIGNING_PROFILE" == "local" && "${VEYQA_PUBLIC_RELEASE:-false}" != "true" ]] && ARTIFACT_SUFFIX="-local"
 if [[ -n "${VEYQA_PRIVATE_TRIAL_PAYLOAD:-}" ]]; then
-  if [[ "${VEYQA_PUBLIC_RELEASE:-false}" == "true" ]]; then
-    print -u2 "Private trial payloads cannot be included in public releases."
+  if [[ "${VEYQA_PUBLIC_RELEASE:-false}" == "true" && "${VEYQA_PUBLIC_PROMOTION:-false}" != "true" ]]; then
+    print -u2 "Public credential distribution requires VEYQA_PUBLIC_PROMOTION=true."
     exit 1
   fi
   [[ -f "$VEYQA_PRIVATE_TRIAL_PAYLOAD" ]] || { print -u2 "Private trial payload missing"; exit 1; }
@@ -20,12 +20,17 @@ if [[ -n "${VEYQA_PRIVATE_TRIAL_PAYLOAD:-}" ]]; then
     print -u2 "Private trial artifacts must stay in the ignored outputs directory."
     exit 1
   }
-  ARTIFACT_SUFFIX="-private-trial"
+  [[ "${VEYQA_PUBLIC_RELEASE:-false}" != "true" ]] && ARTIFACT_SUFFIX="-private-trial"
   # The artifact directory is private, but files inside the installable app
   # must be readable after a root-owned PKG install.
   umask 022
   mkdir -p "$OUTPUT_DIR"
   chmod 700 "$OUTPUT_DIR"
+fi
+if [[ "${VEYQA_PUBLIC_PROMOTION:-false}" == "true" && \
+      ( "${VEYQA_PUBLIC_RELEASE:-false}" != "true" || -z "${VEYQA_PRIVATE_TRIAL_PAYLOAD:-}" ) ]]; then
+  print -u2 "Public promotion requires both an explicit public release and a credential payload."
+  exit 1
 fi
 if [[ "${VEYQA_PUBLIC_RELEASE:-false}" == "true" && "$VEYQA_SIGNING_IDENTITY" == "-" ]]; then
   print -u2 "Public releases require the fixed signing identity; refusing ad-hoc fallback."
@@ -123,8 +128,10 @@ cp "$SPARKLE_DIR/LICENSE" "$APP_PATH/Contents/Resources/Sparkle-LICENSE"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_PATH/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :VeyqaSigningProfile string $VEYQA_SIGNING_PROFILE" "$APP_PATH/Contents/Info.plist"
 if [[ -n "${VEYQA_PRIVATE_TRIAL_PAYLOAD:-}" ]]; then
+  PROMOTION_ARGS=()
+  [[ "${VEYQA_PUBLIC_PROMOTION:-false}" == "true" ]] && PROMOTION_ARGS=(--public-promotion)
   "$PROJECT_DIR/.venv/bin/python" "$PROJECT_DIR/packaging/configure_private_trial.py" \
-    inject "$APP_PATH" "$VEYQA_PRIVATE_TRIAL_PAYLOAD"
+    inject "$APP_PATH" "$VEYQA_PRIVATE_TRIAL_PAYLOAD" "${PROMOTION_ARGS[@]}"
 fi
 veyqa_sign_app "$APP_PATH" "$PROJECT_DIR/packaging/voice_input.entitlements"
 

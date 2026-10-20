@@ -17,7 +17,7 @@ class BuiltinStreamingProcessor(QwenStreamingProcessor):
         super().__init__(model_name=MODEL)
         self.broker = broker or get_broker()
         self.private_trial = getattr(self.broker, "private_trial", False) is True
-        self.engine_label = "内测语音" if self.private_trial else "免费语音"
+        self.engine_label = "推广语音" if self.private_trial else "免费语音"
         self.api_key = ""
         self.workspace_id = ""
         self.broker.prefetch()
@@ -65,7 +65,7 @@ class BuiltinStreamingProcessor(QwenStreamingProcessor):
 
         self._send_audio = counted_send
         def safe_error(_message):
-            on_error("内测语音暂不可用，请检查网络，或联系分发者检查凭证和额度。")
+            on_error("推广语音暂不可用，请检查网络或切换自己的 API。")
         try:
             await super().process_audio_stream(limited_audio(), on_preview_text,
                 on_final_text, on_complete, safe_error if self.private_trial else on_error, sample_rate)

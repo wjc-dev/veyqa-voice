@@ -14,9 +14,18 @@ def audit(archive):
     prefix = "Veyqa Voice.app/Contents/"
     with zipfile.ZipFile(archive) as package:
         info = plistlib.loads(package.read(prefix + "Info.plist"))
-        if info.get("VeyqaDistribution") != "private-trial" or info.get("SUFeedURL"):
+        public = info.get("VeyqaDistribution") == "public-promotion"
+        config = json.loads((Path(__file__).resolve().parents[1] / "packaging/sparkle.json").read_text())
+        if public:
+            if (info.get("SUFeedURL") != config["feed_url"]
+                    or info.get("SUPublicEDKey") != config["public_key"]
+                    or not info.get("SURequireSignedFeed")
+                    or not info.get("SUVerifyUpdateBeforeExtraction")
+                    or info.get("SUEnableAutomaticChecks") is not True):
+                raise ValueError("Public promotion signed updates misconfigured")
+        elif info.get("VeyqaDistribution") != "private-trial" or info.get("SUFeedURL"):
             raise ValueError("Distribution/update channel mismatch")
-        if info.get("SUEnableAutomaticChecks") is not False:
+        if not public and info.get("SUEnableAutomaticChecks") is not False:
             raise ValueError("Public update checks must be disabled")
         secret = decode(package.read(prefix + "Resources/" + FILENAME))
         for name in package.namelist():
@@ -36,7 +45,7 @@ def audit(archive):
             raise ValueError("Credential resource unreadable after PKG install")
         return {"passed": True, "version": info["CFBundleShortVersionString"],
                 "build": info["CFBundleVersion"], "plaintext_key_found": False,
-                "settings_helper_contains_key": False, "public_updates_enabled": False,
+                "settings_helper_contains_key": False, "public_updates_enabled": public,
                 "main_and_helper_private_gates_match": True}
 
 

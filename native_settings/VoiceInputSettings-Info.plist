@@ -15,7 +15,7 @@
     <key>CFBundleIconFile</key>
     <string>AppIcon.icns</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.2.9</string>
+    <string>0.2.10</string>
     <key>CFBundleVersion</key>
     <string>220</string>
     <key>LSMinimumSystemVersion</key>

@@ -2,19 +2,20 @@
 
 **Lightweight voice input for Mac. Hold to speak, release to type.**
 
-[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.9) · [简体中文](README.md)
+[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.10) · [简体中文](README.md)
 
 [![Veyqa Voice demo](website/product-preview.svg)](https://wjc-dev.github.io/voxtype/#demo)
 
 - Works alongside your existing keyboard and input method.
 - Transcribes your words into the focused input field; you decide when to send.
 - Supports Qwen and Doubao. Add terms such as `user_id` and `seller_id` to improve recognition.
+- Try sponsored speech during the promotion without an account or API Key, or bring your own API credentials.
 
 ## Install
 
 Requires **Apple Silicon and macOS 13+**.
 
-1. [Download and open the DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.9/Veyqa-Voice-v0.2.9-macOS-arm64.dmg).
+1. [Download and open the DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.10/Veyqa-Voice-v0.2.10-macOS-arm64.dmg).
 2. Follow the arrow: drag **Veyqa Voice into Applications**.
 3. Open Veyqa Voice from Applications to begin setup.
 
@@ -43,7 +44,7 @@ For DMG installations, download the new installer above, drag the app into Appli
 
 ## Set up once
 
-1. Paste your own speech-service API Key and connect. Qwen is selected by default; [Key setup guide](https://wjc-dev.github.io/voxtype/#api-key).
+1. Connect to the default sponsored speech service; no account or API Key is required. You can also [use your own Key](https://wjc-dev.github.io/voxtype/#api-key).
 2. Grant microphone, Accessibility, and Input Monitoring permissions. Return to the app for automatic checks. Follow macOS prompts if it requests a relaunch.
 3. Click the trial text field, hold **right Option** to speak, then release. Finish setup and use it in other apps.
 
@@ -51,9 +52,11 @@ Open settings from the menu bar or Dock. Adjust the shortcut, hold/toggle mode, 
 
 ## Speech services
 
-The default is **Qwen Audio 3.0 ASR Streaming**. In Settings → Speech Service, choose Qwen or Doubao models and refresh their official catalogues. You can also add an OpenAI-compatible transcription provider. Qwen and Doubao stream live; custom providers transcribe when recording ends.
+Sponsored speech uses **Qwen Audio 3.0 ASR Streaming**, paid for by Veyqa Voice during the promotion. Existing users keep their personal credentials and model when upgrading; switch to sponsored speech in Settings → Speech Service.
 
-Your API Key stays on your Mac. Audio goes directly to the selected speech service, which bills your account for API usage. Local audio archives are off by default.
+With your own API credentials, choose Qwen or Doubao models and refresh their official catalogues, or add an OpenAI-compatible provider. Qwen and Doubao stream live; custom providers transcribe when recording ends.
+
+Audio goes directly to the selected speech service. Personal API credentials stay on your Mac and usage is billed to your provider account. Local audio archives are off by default.
 
 [Issues](https://github.com/wjc-dev/voxtype/issues) · [Development](docs/development.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 

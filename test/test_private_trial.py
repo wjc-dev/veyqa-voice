@@ -111,3 +111,44 @@ class PrivateTrialTests(unittest.TestCase):
             with patch.object(module, "prepare", side_effect=AssertionError("must reject first")):
                 with self.assertRaisesRegex(ValueError, "Private trial"):
                     module.generate(archive, self.root / "appcast.xml", self.root / "notes.md")
+
+    def test_explicit_public_promotion_keeps_signed_automatic_updates(self):
+        configure = load_packaging_module("configure_private_trial")
+        config = json.loads((ROOT / "packaging/sparkle.json").read_text())
+        app = self.root / "Public.app"
+        for path in ("Resources", "Helpers/VeyqaSettings.app/Contents/Resources", "Frameworks"):
+            (app / "Contents" / path).mkdir(parents=True, exist_ok=True)
+        info_path = app / "Contents/Info.plist"
+        info_path.write_bytes(plistlib.dumps({
+            "SUFeedURL": config["feed_url"], "SUPublicEDKey": config["public_key"],
+            "SURequireSignedFeed": True, "SUVerifyUpdateBeforeExtraction": True,
+            "SUEnableAutomaticChecks": True,
+        }))
+        configure.inject(app, self.root / FILENAME, public_promotion=True)
+        info = plistlib.loads(info_path.read_bytes())
+        self.assertEqual(info["VeyqaDistribution"], "public-promotion")
+        self.assertEqual(info["SUFeedURL"], config["feed_url"])
+        self.assertTrue(info["SUEnableAutomaticChecks"])
+
+    def test_public_promotion_requires_explicit_feed_opt_in_and_valid_config(self):
+        module = load_packaging_module("generate_update_feed")
+        config = json.loads((ROOT / "packaging/sparkle.json").read_text())
+        info = dict(VeyqaDistribution="public-promotion",
+                    SUFeedURL=config["feed_url"], SUPublicEDKey=config["public_key"],
+                    SURequireSignedFeed=True, SUVerifyUpdateBeforeExtraction=True,
+                    SUEnableAutomaticChecks=True, VeyqaSigningProfile="local")
+        archive = self.root / "public.zip"
+        def write():
+            with zipfile.ZipFile(archive, "w") as output:
+                output.writestr("Veyqa Voice.app/Contents/Info.plist", plistlib.dumps(info))
+                output.writestr("Veyqa Voice.app/Contents/Resources/" + FILENAME, self.payload)
+        write()
+        with self.assertRaisesRegex(ValueError, "explicit"):
+            module.generate(archive, self.root / "feed", self.root / "notes")
+        with patch.object(module, "prepare", side_effect=RuntimeError("reached signing")):
+            with self.assertRaisesRegex(RuntimeError, "reached signing"):
+                module.generate(archive, self.root / "feed", self.root / "notes", allow_public_promotion=True)
+            info["SUFeedURL"] = "https://unrelated.example/feed"
+            write()
+            with self.assertRaises(ValueError):
+                module.generate(archive, self.root / "feed", self.root / "notes", allow_public_promotion=True)

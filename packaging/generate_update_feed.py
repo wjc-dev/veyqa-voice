@@ -12,13 +12,22 @@ import zipfile
 from prepare_sparkle import prepare, ROOT
 
 
-def generate(archive: Path, output: Path, notes: Path, prefix: str | None = None):
+def generate(archive: Path, output: Path, notes: Path, prefix: str | None = None, *,
+             allow_public_promotion: bool = False):
     config = json.loads((ROOT / "packaging/sparkle.json").read_text())
     with zipfile.ZipFile(archive) as source:
         info = plistlib.loads(source.read("Veyqa Voice.app/Contents/Info.plist"))
-        if (info.get("VeyqaDistribution") == "private-trial"
-                or any(Path(name).name == "private-trial.dat" for name in source.namelist())):
+        has_payload = any(Path(name).name == "private-trial.dat" for name in source.namelist())
+        distribution = info.get("VeyqaDistribution")
+        if distribution == "private-trial" or (has_payload and distribution != "public-promotion"):
             raise ValueError("Private trial credentials must never enter a public update feed")
+        if distribution == "public-promotion":
+            if not allow_public_promotion:
+                raise ValueError("Public promotion credentials require explicit publication opt-in")
+            if (not has_payload or info.get("SUFeedURL") != config["feed_url"]
+                    or not info.get("SUEnableAutomaticChecks")
+                    or not info.get("SUVerifyUpdateBeforeExtraction")):
+                raise ValueError("Public promotion update configuration is invalid")
     if info.get("SUPublicEDKey") != config["public_key"] or not info.get("SURequireSignedFeed"):
         raise ValueError("Update archive has a different signing key or unsigned feed configuration")
     if info.get("VeyqaSigningProfile") != "local":
@@ -56,5 +65,7 @@ if __name__ == "__main__":
     parser.add_argument("archive", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--notes", type=Path, required=True)
+    parser.add_argument("--allow-public-promotion", action="store_true")
     args = parser.parse_args()
-    generate(args.archive.resolve(), args.output.resolve(), args.notes.resolve())
+    generate(args.archive.resolve(), args.output.resolve(), args.notes.resolve(),
+             allow_public_promotion=args.allow_public_promotion)

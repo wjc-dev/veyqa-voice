@@ -10,14 +10,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.transcription.private_trial_payload import FILENAME, decode, encode
 
 
-def inject(app, payload_path):
+def inject(app, payload_path, *, public_promotion=False):
     payload = payload_path.read_bytes()
     decode(payload)
     info_path = app / "Contents/Info.plist"
     info = plistlib.loads(info_path.read_bytes())
-    info["VeyqaDistribution"] = "private-trial"
-    info["SUEnableAutomaticChecks"] = False
-    info.pop("SUFeedURL", None)
+    if public_promotion:
+        config = json.loads((Path(__file__).parent / "sparkle.json").read_text())
+        if (info.get("SUFeedURL") != config["feed_url"]
+                or info.get("SUPublicEDKey") != config["public_key"]
+                or not info.get("SURequireSignedFeed")
+                or not info.get("SUVerifyUpdateBeforeExtraction")):
+            raise ValueError("Public promotion requires the official signed update channel")
+        info["VeyqaDistribution"] = "public-promotion"
+        info["SUEnableAutomaticChecks"] = True
+    else:
+        info["VeyqaDistribution"] = "private-trial"
+        info["SUEnableAutomaticChecks"] = False
+        info.pop("SUFeedURL", None)
     roots = [app / "Contents/Resources",
              app / "Contents/Helpers/VeyqaSettings.app/Contents/Resources"]
     flags = json.dumps({"builtin_speech": True, "private_trial": True}) + "\n"
@@ -29,7 +39,7 @@ def inject(app, payload_path):
     destination = roots[0] / FILENAME
     destination.write_bytes(payload)
     # PKG installs are root-owned: runtime resources must remain user-readable.
-    # Secrecy comes only from private distribution, not this file's permissions.
+    # A distributed credential is extractable; file permissions do not protect it.
     destination.chmod(0o644)
     # PyInstaller's resource root is Frameworks; data files normally have these
     # cross-directory links created by PyInstaller before our private injection.
@@ -49,6 +59,8 @@ def main():
     install = sub.add_parser("inject")
     install.add_argument("app", type=Path)
     install.add_argument("payload", type=Path)
+    install.add_argument("--public-promotion", action="store_true",
+                         help="Explicitly distribute the credential with signed public updates")
     args = parser.parse_args()
     os.umask(0o077)
     try:
@@ -59,8 +71,9 @@ def main():
                 handle.write(payload)
             print("Private trial payload prepared; no credential printed.")
         else:
-            inject(args.app, args.payload)
-            print("Private trial resources injected; public updates disabled.")
+            inject(args.app, args.payload, public_promotion=args.public_promotion)
+            print("Sponsored resources injected; " +
+                  ("signed public updates enabled." if args.public_promotion else "public updates disabled."))
     except Exception:
         print("Private trial preparation failed; check inputs and output paths.", file=sys.stderr)
         return 1

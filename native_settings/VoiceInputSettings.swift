@@ -1926,7 +1926,7 @@ struct EngineSettingsView: View {
                         LabeledContent("本月剩余", value: "\(max(0, model.promotionRemainingSeconds) / 60) 分钟")
                     }
                     Text(ReleaseFeatures.privateTrial
-                         ? "内测期间无需填写 Key。语音直接发送至百炼进行识别，由分发者承担调用费用。"
+                         ? "推广期间无需填写 Key。语音直接发送至百炼进行识别，由 Veyqa Voice 承担调用费用。"
                          : "无需填写 Key，每台设备每月可用 100 分钟。语音直接发送至百炼进行识别。")
                         .font(.callout).foregroundStyle(.secondary)
                     Button(model.checkingConnection ? "连接中…" :
