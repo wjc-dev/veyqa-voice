@@ -1,5 +1,25 @@
 import Foundation
 
+enum ReleaseFeatures {
+    static let builtinSpeech: Bool = {
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("config/release-features.json")
+        let url = Bundle.main.url(forResource: "release-features", withExtension: "json") ?? source
+        guard let data = try? Data(contentsOf: url),
+              let flags = try? JSONDecoder().decode([String: Bool].self, from: data) else { return false }
+        return flags["builtin_speech"] == true
+    }()
+
+    static func credentialSource(_ environment: [String: String], enabled: Bool = builtinSpeech) -> String {
+        guard enabled else { return "personal" }
+        let source = environment["SPEECH_CREDENTIAL_SOURCE"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !source.isEmpty { return source == "builtin" ? "builtin" : "personal" }
+        let hasCredentials = ["QWEN_API_KEY", "DASHSCOPE_API_KEY", "DOUBAO_ACCESS_KEY", "CUSTOM_ASR_MODEL"]
+            .contains { !(environment[$0]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty }
+        return hasCredentials ? "personal" : "builtin"
+    }
+}
+
 struct SpeechModel: Codable, Identifiable, Hashable {
     var provider: String
     var id: String

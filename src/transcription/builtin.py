@@ -1,6 +1,5 @@
 """Promotional Qwen adapter. Only authentication differs from direct BYOK."""
 import asyncio
-import math
 import time
 import uuid
 

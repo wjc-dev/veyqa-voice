@@ -246,8 +246,9 @@ class VoiceAssistant:
         if promotion_request.exists():
             request_id = promotion_request.read_text()[:80].strip()
             promotion_request.unlink(missing_ok=True)
-            from src.transcription.promotion import get_broker, uses_builtin
-            if uses_builtin() and len(request_id) == 36:
+            from src.transcription.promotion import get_broker
+            from src.release_features import builtin_speech_enabled
+            if builtin_speech_enabled() and len(request_id) == 36:
                 get_broker().request_check(request_id)
         self.status_controller.tick_updates()
         if (DATA_DIR / ".restart-request").exists():

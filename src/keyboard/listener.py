@@ -25,6 +25,7 @@ from ..recovery import RecoveryStore
 from ..text_processing import sanitize_inline_text
 from ..utils.logger import logger
 from .inputState import InputState
+from .modifier_gesture import ModifierGesture
 
 _UNSET_TARGET = object()
 
@@ -371,6 +372,8 @@ class KeyboardManager:
         if self._hotkey_mode not in {"hold", "toggle"}:
             self._hotkey_mode = "hold"
         self._voice_hotkey_pressed = False
+        self._modifier_gesture = None
+        self._other_keys_down = set()
         self._voice_hotkey_spec = self._parse_voice_hotkey(self.voice_hotkey)
         if self._voice_hotkey_spec is None:
             logger.warning("快捷键配置无效，已恢复为 %s", self.DEFAULT_VOICE_HOTKEY_LABEL)
@@ -566,6 +569,10 @@ class KeyboardManager:
         spec = self._parse_voice_hotkey(key)
         if spec is None:
             raise ValueError("快捷键配置无效，请重新选择")
+        if getattr(self, "_modifier_gesture", None) is not None:
+            self._modifier_gesture.reset()
+            self._modifier_gesture = None
+        self._other_keys_down = set()
         backend = self._backend_for_hotkey(spec, os.getenv("GLOBAL_HOTKEY_BACKEND", "passive"))
         # Passive listeners already observe all key events. Reuse the tap when
         # only its matching rule changes; do not create duplicate listeners.
@@ -841,7 +848,11 @@ class KeyboardManager:
     def _recover_hotkey_state(self) -> None:
         self._voice_hotkey_pressed = False
         self._missing_release_polls = 0
-        if getattr(self, "_hotkey_mode", "hold") == "hold" and self.is_recording:
+        self._other_keys_down = set()
+        gesture = getattr(self, "_modifier_gesture", None)
+        if gesture is not None:
+            gesture.reset()
+        elif getattr(self, "_hotkey_mode", "hold") == "hold" and self.is_recording:
             self.cancel_recording()
 
     def _reconcile_hotkey_release(self) -> None:
@@ -863,7 +874,25 @@ class KeyboardManager:
         # This is a lost-event fallback, not the normal stop path. Confirm on
         # two polls; real release events below still stop immediately.
         if self._missing_release_polls >= 2:
-            self._set_voice_hotkey_pressed(False, source="poll-confirmed")
+            if spec["kind"] == "modifier":
+                self._voice_hotkey_pressed = False
+                self._get_modifier_gesture().release(confirmed=False)
+            else:
+                self._set_voice_hotkey_pressed(False, source="poll-confirmed")
+
+    def _get_modifier_gesture(self):
+        if getattr(self, "_modifier_gesture", None) is None:
+            def start():
+                if self.is_recording or self._shortcut_capture_active(force=True):
+                    return False
+                self.start_recording()
+                return self.is_recording
+
+            self._modifier_gesture = ModifierGesture(
+                mode=getattr(self, "_hotkey_mode", getattr(self, "_fn_hotkey_mode", "hold")),
+                start=start, stop=self.stop_recording, cancel=self.cancel_recording,
+                toggle=self.toggle_recording, lock=self._recording_lock)
+        return self._modifier_gesture
 
     @staticmethod
     def _modifier_is_down(spec, flags) -> bool:
@@ -882,9 +911,41 @@ class KeyboardManager:
         if not spec:
             return False
         if spec["kind"] == "modifier":
-            if event_type != kCGEventFlagsChanged or vk != spec["vk"]:
+            gesture = self._get_modifier_gesture()
+            if not hasattr(self, "_other_keys_down"):
+                self._other_keys_down = set()
+            if event_type == kCGEventKeyDown:
+                self._other_keys_down.add(vk)
+                gesture.chord()
                 return False
-            self._set_voice_hotkey_pressed(self._modifier_is_down(spec, flags))
+            if event_type == kCGEventKeyUp:
+                self._other_keys_down.discard(vk)
+                return False
+            if event_type != kCGEventFlagsChanged:
+                return False
+            if vk != spec["vk"]:
+                gesture.chord()
+                return False
+            pressed = self._modifier_is_down(spec, flags)
+            self._voice_hotkey_pressed = pressed
+            self._missing_release_polls = 0
+            if pressed:
+                # A missed key-up (e.g. while the tap was paused) must not
+                # suppress every subsequent standalone modifier indefinitely.
+                if self._other_keys_down:
+                    from Quartz import CGEventSourceKeyState, kCGEventSourceStateCombinedSessionState
+                    self._other_keys_down = {
+                        code for code in self._other_keys_down
+                        if CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, code)
+                    }
+                generic = self._modifier_mask(self.VALID_REGISTERED_MODIFIERS)
+                sides = {58: 0x40, 61: 0x20, 55: 0x10, 54: 0x08,
+                         59: 0x2000, 62: 0x01}
+                gesture.press(blocked=bool(
+                    self._other_keys_down or (flags & generic) != spec["mask"]
+                    or flags & sides.get(spec["vk"], 0)))
+            else:
+                gesture.release()
             return True
         if (
             event_type == kCGEventFlagsChanged
@@ -951,6 +1012,7 @@ class KeyboardManager:
                 self.cancel_recording()
                 return None
             if vk in self._suppress_vks and self._shortcut_capture_active(force=True):
+                self._recover_hotkey_state()
                 return event
             if self._handle_configured_hotkey(event_type, vk, flags):
                 return None
@@ -971,6 +1033,7 @@ class KeyboardManager:
                 self.cancel_recording()
                 return
             if vk in self._suppress_vks and self._shortcut_capture_active(force=True):
+                self._recover_hotkey_state()
                 return
             self._handle_configured_hotkey(event_type, vk, flags)
         except Exception as exc:  # noqa: BLE001

@@ -11,6 +11,10 @@ private func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 @main
 struct SettingsCoreHarness {
     static func main() throws {
+        require(ReleaseFeatures.credentialSource([:], enabled: true) == "builtin", "new sponsored user requires no key")
+        require(ReleaseFeatures.credentialSource(["QWEN_API_KEY": "test-only"], enabled: true) == "personal", "preserve existing key route")
+        require(ReleaseFeatures.credentialSource(["SPEECH_CREDENTIAL_SOURCE": "personal"], enabled: true) == "personal", "preserve explicit personal route")
+        require(ReleaseFeatures.credentialSource(["SPEECH_CREDENTIAL_SOURCE": "builtin"], enabled: false) == "personal", "closed release cannot use sponsored route")
         var draftTracker = SettingsDraftTracker()
         require(!draftTracker.isDirty(["initial"]), "unloaded draft stays clean")
         draftTracker.reset(["original"])

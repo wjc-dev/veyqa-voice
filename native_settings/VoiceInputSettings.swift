@@ -492,8 +492,7 @@ final class SettingsModel: ObservableObject {
         recentMemoryEnabled = Self.bool(environment["QWEN_RECENT_MEMORY_ENABLED"], fallback: false)
         doubaoAppKey = environment["DOUBAO_APP_KEY"] ?? ""
         doubaoAccessKey = environment["DOUBAO_ACCESS_KEY"] ?? ""
-        // Promotional service remains unavailable in this public release.
-        credentialSource = "personal"
+        credentialSource = ReleaseFeatures.credentialSource(environment)
         onboardingComplete = Self.bool(environment["SETUP_COMPLETED"], fallback:
             !qwenAPIKey.isEmpty || !doubaoAccessKey.isEmpty || !customASRModel.isEmpty)
         doubaoBoostingTableID = environment["DOUBAO_BOOSTING_TABLE_ID"] ?? ""
@@ -567,6 +566,7 @@ final class SettingsModel: ObservableObject {
     }
 
     private func checkBuiltinConnection() {
+        guard ReleaseFeatures.builtinSpeech else { return }
         cancelConnectionCheck()
         let id = connectionID
         let requestID = UUID().uuidString
@@ -1910,76 +1910,100 @@ struct EngineSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                Picker("供应商", selection: $model.transcriptionService) {
-                    Text("千问").tag("qwen")
-                    Text("豆包").tag("doubao")
-                    Text("自定义").tag("custom")
-                }
-                .pickerStyle(.segmented)
-            }
-
-            if model.transcriptionService == "qwen" {
-                Section("千问 API 连接") {
-                    CredentialField("API Key", text: $model.qwenAPIKey)
-                    HStack {
-                        credentialHelpButton
-                        Spacer()
-                        Button(model.checkingConnection ? "连接中…" :
-                                (model.onboardingComplete ? "检查连接" : "连接并继续")) { model.checkConnection() }
-                            .disabled(model.checkingConnection || model.applyingSettings)
+            if ReleaseFeatures.builtinSpeech {
+                Section {
+                    Picker("语音服务", selection: $model.credentialSource) {
+                        Text("免费语音").tag("builtin")
+                        Text("自己的 API").tag("personal")
                     }
+                    .pickerStyle(.segmented)
+                }
+            }
+            if model.credentialSource == "builtin" && ReleaseFeatures.builtinSpeech {
+                Section("免费语音") {
+                    LabeledContent("识别模型", value: "千问 3.0 · 实时转写")
+                    LabeledContent("本月剩余", value: "\(max(0, model.promotionRemainingSeconds) / 60) 分钟")
+                    Text("无需填写 Key，每台设备每月可用 100 分钟。语音直接发送至百炼进行识别。")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Button(model.checkingConnection ? "连接中…" :
+                            (model.onboardingComplete ? "检查连接" : "连接并继续")) { model.checkConnection() }
+                        .disabled(model.checkingConnection || model.applyingSettings)
                     if !model.connectionStatus.isEmpty {
                         Text(model.connectionStatus).font(.callout).foregroundStyle(.secondary)
                     }
                 }
-            } else if model.transcriptionService == "doubao" {
-                Section("豆包 API 连接") {
-                    TextField("App ID", text: $model.doubaoAppKey)
-                        .textFieldStyle(.roundedBorder)
-                    CredentialField("Access Token", text: $model.doubaoAccessKey)
-                    credentialHelpButton
-                    if !model.onboardingComplete {
-                        Button("保存并继续") { model.saveSettings(advanceSetup: true) }
-                    }
-                }
             } else {
-                Section("自定义 API 连接") {
-                    TextField("API 地址", text: $model.customASRBaseURL, prompt: Text("https://api.example.com/v1"))
-                        .textFieldStyle(.roundedBorder)
-                    CredentialField("API Key", text: $model.customASRAPIKey)
-                    Text("OpenAI 兼容语音转写 · 录音结束后提交。本机服务可不填 Key。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-
-            if model.serviceCredentialsReady {
-                compactModelSection
-            } else {
-                Text("填写上方凭证后，即可选择识别模型。")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-
-            if model.transcriptionService == "qwen" {
-                DisclosureGroup("高级设置") {
-                    Picker("Key 所属地区", selection: $model.qwenRegion) {
-                        Text("中国内地（北京）").tag("beijing")
-                        Text("新加坡").tag("singapore")
+                Section {
+                    Picker("供应商", selection: $model.transcriptionService) {
+                        Text("千问").tag("qwen")
+                        Text("豆包").tag("doubao")
+                        Text("自定义").tag("custom")
                     }
-                    Picker("识别语言", selection: $model.qwenLanguage) {
-                        Text("中文优先").tag("zh")
-                        Text("自动判断").tag("auto")
-                        Text("粤语").tag("yue")
-                        Text("英语").tag("en")
-                    }
-                    TextField("百炼 API 地址（留空自动选择）", text: $model.qwenAPIHost)
-                        .textFieldStyle(.roundedBorder)
+                    .pickerStyle(.segmented)
                 }
-            } else if model.transcriptionService == "doubao" {
-                DisclosureGroup("高级设置") {
-                    TextField("热词表 ID（可选）", text: $model.doubaoBoostingTableID)
-                        .textFieldStyle(.roundedBorder)
-                    Link("热词表配置说明 ↗", destination: URL(string: "https://www.volcengine.com/docs/6561/155739?lang=zh")!)
+
+                if model.transcriptionService == "qwen" {
+                    Section("千问 API 连接") {
+                        CredentialField("API Key", text: $model.qwenAPIKey)
+                        HStack {
+                            credentialHelpButton
+                            Spacer()
+                            Button(model.checkingConnection ? "连接中…" :
+                                    (model.onboardingComplete ? "检查连接" : "连接并继续")) { model.checkConnection() }
+                                .disabled(model.checkingConnection || model.applyingSettings)
+                        }
+                        if !model.connectionStatus.isEmpty {
+                            Text(model.connectionStatus).font(.callout).foregroundStyle(.secondary)
+                        }
+                    }
+                } else if model.transcriptionService == "doubao" {
+                    Section("豆包 API 连接") {
+                        TextField("App ID", text: $model.doubaoAppKey)
+                            .textFieldStyle(.roundedBorder)
+                        CredentialField("Access Token", text: $model.doubaoAccessKey)
+                        credentialHelpButton
+                        if !model.onboardingComplete {
+                            Button("保存并继续") { model.saveSettings(advanceSetup: true) }
+                        }
+                    }
+                } else {
+                    Section("自定义 API 连接") {
+                        TextField("API 地址", text: $model.customASRBaseURL, prompt: Text("https://api.example.com/v1"))
+                            .textFieldStyle(.roundedBorder)
+                        CredentialField("API Key", text: $model.customASRAPIKey)
+                        Text("OpenAI 兼容语音转写 · 录音结束后提交。本机服务可不填 Key。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+
+                if model.serviceCredentialsReady {
+                    compactModelSection
+                } else {
+                    Text("填写上方凭证后，即可选择识别模型。")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+
+                if model.transcriptionService == "qwen" {
+                    DisclosureGroup("高级设置") {
+                        Picker("Key 所属地区", selection: $model.qwenRegion) {
+                            Text("中国内地（北京）").tag("beijing")
+                            Text("新加坡").tag("singapore")
+                        }
+                        Picker("识别语言", selection: $model.qwenLanguage) {
+                            Text("中文优先").tag("zh")
+                            Text("自动判断").tag("auto")
+                            Text("粤语").tag("yue")
+                            Text("英语").tag("en")
+                        }
+                        TextField("百炼 API 地址（留空自动选择）", text: $model.qwenAPIHost)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                } else if model.transcriptionService == "doubao" {
+                    DisclosureGroup("高级设置") {
+                        TextField("热词表 ID（可选）", text: $model.doubaoBoostingTableID)
+                            .textFieldStyle(.roundedBorder)
+                        Link("热词表配置说明 ↗", destination: URL(string: "https://www.volcengine.com/docs/6561/155739?lang=zh")!)
+                    }
                 }
             }
         }

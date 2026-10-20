@@ -4,6 +4,7 @@ import tempfile
 import threading
 import time
 import unittest
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,7 +15,7 @@ class CredentialCacheTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.now = 1000
+        self.now = 1792454400
         self.calls = []
         def transport(path, body):
             self.calls.append(path)
@@ -22,7 +23,7 @@ class CredentialCacheTests(unittest.TestCase):
                 return {"registered": True}
             return {"token": "st-test-only", "expires_at": self.now + 300,
                     "api_host": "ws-example.cn-beijing.maas.aliyuncs.com",
-                    "model": MODEL, "month": "2026-10", "remaining_seconds": 6000, "enabled": True}
+                    "model": MODEL, "month": self.broker._month(), "remaining_seconds": 6000, "enabled": True}
         self.broker = CredentialBroker(identity_loader=lambda: {"device_id": "a"*32, "secret": "b"*43},
             transport=transport, directory=Path(self.temp.name), clock=lambda: self.now)
         self.addCleanup(self.broker._pool.shutdown)
@@ -77,3 +78,97 @@ class CredentialCacheTests(unittest.TestCase):
             self.assertFalse(uses_builtin())
             os.environ["SPEECH_CREDENTIAL_SOURCE"] = "personal"
             self.assertFalse(uses_builtin())
+
+    def test_enabled_release_preserves_existing_keys_and_explicit_choice(self):
+        with patch("src.transcription.promotion.builtin_speech_enabled", return_value=True), \
+                patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(uses_builtin())
+            os.environ["QWEN_API_KEY"] = "existing-test-key"
+            self.assertFalse(uses_builtin())
+            os.environ["SPEECH_CREDENTIAL_SOURCE"] = "builtin"
+            self.assertTrue(uses_builtin())
+            os.environ["SPEECH_CREDENTIAL_SOURCE"] = "personal"
+            self.assertFalse(uses_builtin())
+
+    def test_month_boundary_refreshes_unexpired_token(self):
+        self.now = 1793462390  # October 31, 23:59:50 Shanghai.
+        self.broker.get()
+        self.now += 20
+        credential = self.broker.get()
+        self.assertEqual(credential.month, "2026-11")
+        self.assertEqual(self.calls.count("/v1/credentials"), 2)
+
+    def test_cache_completed_between_get_and_prefetch(self):
+        credential = self.broker.get()
+        self.broker.invalidate()
+        def finish_concurrently():
+            self.broker._credential = credential
+            return None
+        with patch.object(self.broker, "prefetch", side_effect=finish_concurrently):
+            self.assertIs(self.broker.get(), credential)
+
+    def seed_pending(self, count):
+        records = [{"session_id": uuid.uuid4().hex, "seconds": 1, "started_at": self.now}
+                   for _ in range(count)]
+        self.broker.outbox.write_text(json.dumps(records))
+        return records
+
+    def test_all_pending_batches_flush_before_credential_renewal(self):
+        self.seed_pending(130)
+        self.broker.get()
+        self.assertEqual(self.calls, ["/v1/devices"] + ["/v1/usage"] * 5 + ["/v1/credentials"])
+        self.assertEqual(self.broker._read_outbox(), [])
+
+    def test_failed_report_stays_on_disk_and_blocks_token_renewal(self):
+        records = self.seed_pending(2)
+        original = self.broker.transport
+        def fail_usage(path, body):
+            if path == "/v1/usage":
+                raise OSError("offline")
+            return original(path, body)
+        self.broker.transport = fail_usage
+        with self.assertRaisesRegex(RuntimeError, "用量同步失败"):
+            self.broker.get()
+        self.assertEqual(self.broker._read_outbox(), records)
+        self.assertNotIn("/v1/credentials", self.calls)
+        self.broker.transport = original
+        self.now += 11
+        self.broker.get()
+        self.assertEqual(self.broker._read_outbox(), [])
+
+    def test_report_does_not_drop_old_records_or_refresh_exhausted_allowance(self):
+        self.broker.get()
+        self.seed_pending(130)
+        with patch.object(self.broker._pool, "submit"):
+            self.broker.report(uuid.uuid4().hex, 3600, self.now)
+            self.broker.report(uuid.uuid4().hex, 2400, self.now)
+        self.assertEqual(len(self.broker._read_outbox()), 132)
+        self.calls.clear()
+        with self.assertRaisesRegex(RuntimeError, "100 分钟"):
+            self.broker.get()
+        self.assertEqual(self.calls, [])
+
+    def test_acknowledgement_deducts_concurrent_unreported_usage(self):
+        self.broker.get()
+        self.seed_pending(1)
+        original = self.broker.transport
+        def concurrent(path, body):
+            if path == "/v1/usage":
+                with patch.object(self.broker._pool, "submit"):
+                    self.broker.report(uuid.uuid4().hex, 5, self.now)
+                return {"month": self.broker._month(), "remaining_seconds": 5999, "enabled": True}
+            return original(path, body)
+        self.broker.transport = concurrent
+        self.broker._flush(refresh=False)
+        self.assertEqual(self.broker.get().remaining_seconds, 5994)
+        self.assertEqual(len(self.broker._read_outbox()), 1)
+
+    def test_disabled_service_acknowledgement_invalidates_cached_token(self):
+        self.broker.get()
+        self.seed_pending(1)
+        self.broker.transport = lambda path, body: {
+            "month": self.broker._month(), "remaining_seconds": 5999, "enabled": False}
+        self.broker._flush(refresh=False)
+        self.assertIsNone(self.broker._credential)
+        state = json.loads((Path(self.temp.name) / "promotion.json").read_text())
+        self.assertFalse(state["enabled"])

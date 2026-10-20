@@ -4,6 +4,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 import ctypes
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 import json
 import math
 import os
@@ -13,13 +14,15 @@ import threading
 import time
 import uuid
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from ..diagnostics import DiagnosticsStore
 from ..runtime_paths import DATA_DIR
+from ..release_features import builtin_speech_enabled
 
 SERVICE_URL = "https://rtcut.org/veyqa-api"
 MODEL = "qwen-audio-3.0-asr-flash-streaming"
+MONTH_TIMEZONE = timezone(timedelta(hours=8))
 ERRORS = {
     "monthly_allowance_used": "本月免费 100 分钟已用完，可在设置中使用自己的 Key。",
     "promotion_unavailable": "免费语音服务暂不可用，可稍后重试或使用自己的 Key。",
@@ -27,10 +30,19 @@ ERRORS = {
 }
 
 
+class NoCredentialRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def uses_builtin():
-    # Public builds use personal credentials until the promotional service has
-    # completed network and budget verification. Ignore saved preview routes.
-    return False
+    if not builtin_speech_enabled():
+        return False
+    source = os.getenv("SPEECH_CREDENTIAL_SOURCE", "").strip()
+    if source:
+        return source == "builtin"
+    return not any(os.getenv(key, "").strip() for key in (
+        "QWEN_API_KEY", "DASHSCOPE_API_KEY", "DOUBAO_ACCESS_KEY", "CUSTOM_ASR_MODEL"))
 
 
 def keychain_identity():
@@ -81,6 +93,7 @@ class Credential:
     expires_at: float
     api_host: str
     remaining_seconds: int
+    month: str
 
 
 class CredentialBroker:
@@ -99,13 +112,25 @@ class CredentialBroker:
         self.outbox = directory / "promotion-usage.json"
         self._retry_after = 0
 
+    def _month(self):
+        return datetime.fromtimestamp(self.clock(), MONTH_TIMEZONE).strftime("%Y-%m")
+
+    def _cache_valid(self):
+        return (self._credential is not None
+                and self._credential.expires_at > self.clock() + 20
+                and self._credential.month == self._month())
+
+    def _pending_seconds(self, pending, month):
+        return sum(record["seconds"] for record in pending
+                   if datetime.fromtimestamp(record["started_at"], MONTH_TIMEZONE).strftime("%Y-%m") == month)
+
     def _http(self, path, body):
         headers = {"Content-Type": "application/json", "User-Agent": "Veyqa-Voice"}
         if self.identity and path != "/v1/devices":
             headers["Authorization"] = "Bearer " + self.identity["device_id"] + "." + self.identity["secret"]
         request = Request(SERVICE_URL + path, data=json.dumps(body).encode(), headers=headers)
         try:
-            with urlopen(request, timeout=3) as response:
+            with build_opener(NoCredentialRedirect()).open(request, timeout=3) as response:
                 return json.loads(response.read(16384))
         except HTTPError as exc:
             try:
@@ -124,7 +149,7 @@ class CredentialBroker:
         self.state.update(status=status, model=MODEL,
             month=str(data.get("month", "")),
             remaining_seconds=int(data.get("remaining_seconds", 6000)),
-            enabled=bool(data.get("enabled", True)))
+            enabled=data.get("enabled") is True and data.get("budget_available", True) is True)
 
     def _fetch(self):
         try:
@@ -133,6 +158,8 @@ class CredentialBroker:
             if not self.registered:
                 self.transport("/v1/devices", self.identity)
                 self.registered = True
+            # Never renew the allowance while earlier consumption is unreported.
+            self._flush(strict=True, refresh=False)
             body = self.transport("/v1/credentials", {})
             token, expires, host = body.get("token"), body.get("expires_at"), body.get("api_host")
             if (not isinstance(token, str) or not token.startswith("st-")
@@ -140,14 +167,18 @@ class CredentialBroker:
                     or not isinstance(host, str)
                     or not re.fullmatch(r"[a-z0-9-]+\.cn-beijing\.maas\.aliyuncs\.com", host)
                     or body.get("model") != MODEL
+                    or body.get("month") != self._month()
+                    or body.get("enabled") is not True
                     or type(body.get("remaining_seconds")) is not int
                     or not 0 < body["remaining_seconds"] <= 6000):
                 raise RuntimeError("免费语音服务返回了无效配置，请稍后重试。")
-            credential = Credential(token, expires, host, body["remaining_seconds"])
             with self._lock:
+                remaining = max(0, body["remaining_seconds"] -
+                                self._pending_seconds(self._read_outbox(), body["month"]))
+                credential = Credential(token, expires, host, remaining, body["month"])
                 self._credential = credential
                 self._retry_after = 0
-            self._publish(body)
+            self._publish({**body, "remaining_seconds": remaining})
             return credential
         except Exception as exc:
             with self._lock:
@@ -158,7 +189,7 @@ class CredentialBroker:
 
     def prefetch(self):
         with self._lock:
-            if self._credential and self._credential.expires_at > self.clock()+20:
+            if self._cache_valid():
                 return None
             if self._future and not self._future.done():
                 return self._future
@@ -169,13 +200,21 @@ class CredentialBroker:
 
     def get(self, timeout=4):
         with self._lock:
-            if self._credential and self._credential.expires_at > self.clock()+20:
+            if self._cache_valid():
                 if self._credential.remaining_seconds <= 0:
                     raise RuntimeError(ERRORS["monthly_allowance_used"])
                 return self._credential
         future = self.prefetch()
         try:
-            return future.result(timeout=timeout)
+            # Another thread can complete prefetch between the two cache reads.
+            if future is not None:
+                future.result(timeout=timeout)
+            with self._lock:
+                if self._cache_valid():
+                    if self._credential.remaining_seconds <= 0:
+                        raise RuntimeError(ERRORS["monthly_allowance_used"])
+                    return self._credential
+            raise RuntimeError(ERRORS["promotion_unavailable"])
         except FutureTimeout:
             raise RuntimeError("连接免费语音服务超时，请稍后重试。") from None
 
@@ -202,9 +241,13 @@ class CredentialBroker:
     def _read_outbox(self):
         try:
             data = json.loads(self.outbox.read_text())
-            return data if isinstance(data, list) else []
-        except (OSError, ValueError):
+            if not isinstance(data, list):
+                raise ValueError()
+            return data
+        except FileNotFoundError:
             return []
+        except (OSError, ValueError):
+            raise RuntimeError("免费语音用量记录无法读取，请使用自己的 Key 或联系支持。") from None
 
     def report(self, session_id, seconds, started_at):
         if seconds <= 0:
@@ -212,38 +255,56 @@ class CredentialBroker:
             return
         with self._lock:
             pending = self._read_outbox()
-            pending.append({"session_id": session_id, "seconds": min(3600, math.ceil(seconds)),
-                            "started_at": started_at})
-            DiagnosticsStore(self.outbox)._save(pending[-128:])
+            record = {"session_id": session_id, "seconds": min(3600, math.ceil(seconds)),
+                      "started_at": started_at}
+            if any(item["session_id"] == session_id for item in pending):
+                return
+            pending.append(record)
+            DiagnosticsStore(self.outbox)._save(pending)
             # Reflect consumption immediately even while report is offline.
             if self._credential:
                 old = self._credential
+                consumed = self._pending_seconds([record], old.month)
                 self._credential = Credential(old.token, old.expires_at, old.api_host,
-                    max(0, old.remaining_seconds-math.ceil(seconds)))
-                if self._credential.remaining_seconds == 0:
-                    self._credential = None
+                    max(0, old.remaining_seconds-consumed), old.month)
         self._pool.submit(self._flush)
 
-    def _flush(self):
+    def _flush(self, *, strict=False, refresh=True):
         if not self.identity:
             return
         try:
             with self._lock:
                 pending = self._read_outbox()
-            if pending:
-                status = self.transport("/v1/usage", {"records": pending[:32]})
-                sent = {r["session_id"] for r in pending[:32]}
+            # Drain the snapshot in bounded requests; concurrent reports remain
+            # in the outbox and are subtracted from each server acknowledgement.
+            for offset in range(0, len(pending), 32):
+                batch = pending[offset:offset + 32]
+                status = self.transport("/v1/usage", {"records": batch})
+                if (type(status.get("remaining_seconds")) is not int
+                        or not 0 <= status["remaining_seconds"] <= 6000
+                        or status.get("month") != self._month()):
+                    raise RuntimeError("免费语音用量同步失败，请稍后重试。")
+                sent = {r["session_id"] for r in batch}
                 with self._lock:
-                    DiagnosticsStore(self.outbox)._save(
-                        [r for r in self._read_outbox() if r["session_id"] not in sent])
+                    remaining_records = [r for r in self._read_outbox() if r["session_id"] not in sent]
+                    DiagnosticsStore(self.outbox)._save(remaining_records)
+                    remaining = max(0, status["remaining_seconds"] -
+                                    self._pending_seconds(remaining_records, status["month"]))
+                    status = {**status, "remaining_seconds": remaining}
                     if self._credential:
                         old = self._credential
-                        self._credential = Credential(old.token, old.expires_at, old.api_host,
-                            status["remaining_seconds"])
+                        if status.get("enabled") is not True or status.get("budget_available", True) is not True:
+                            self._credential = None
+                        else:
+                            self._credential = Credential(old.token, old.expires_at, old.api_host,
+                                remaining, old.month)
                 self._publish(status)
-            self.prefetch()
+            if refresh:
+                self.prefetch()
         except Exception:
-            pass  # Retry metadata later; never disrupt successful text insertion.
+            if strict:
+                raise RuntimeError("免费语音用量同步失败，请稍后重试或使用自己的 Key。") from None
+            # Keep pending records for the next report/credential renewal.
 
 
 _broker = None

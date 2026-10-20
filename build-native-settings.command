@@ -18,6 +18,7 @@ mkdir -p "$SETTINGS_APP/Contents/MacOS"
 mkdir -p "$SETTINGS_APP/Contents/Resources"
 cp "$PROJECT_DIR/packaging/AppIcon.icns" "$SETTINGS_APP/Contents/Resources/AppIcon.icns"
 cp "$PROJECT_DIR/config/asr-models.json" "$SETTINGS_APP/Contents/Resources/asr-models.json"
+cp "$PROJECT_DIR/config/release-features.json" "$SETTINGS_APP/Contents/Resources/release-features.json"
 cp "$PROJECT_DIR/native_settings/VoiceInputSettings-Info.plist" \
   "$SETTINGS_APP/Contents/Info.plist"
 

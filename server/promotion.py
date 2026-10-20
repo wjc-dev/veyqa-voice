@@ -198,6 +198,8 @@ def handler_for(ledger, *, key_file, budget_marker, enabled_file, api_host):
                         if not isinstance(record, dict):
                             raise ServiceError(400, "invalid_usage")
                         status = ledger.report(device, record, now)
+                    status["enabled"] = (Path(enabled_file).exists()
+                        and Path(budget_marker).exists() and status["budget_available"])
                     self.respond(200, status)
                     return
                 status = ledger.status(device, now)

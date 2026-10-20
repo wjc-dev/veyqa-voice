@@ -45,6 +45,16 @@ class VoiceHotkeyTests(unittest.TestCase):
             self.assertFalse(manager.listener_ready())
 
     def make_manager(self, value):
+        class ImmediateTimer:
+            def __init__(self, _delay, callback):
+                self.callback = callback
+            def start(self):
+                self.callback()
+            def cancel(self):
+                pass
+        timer_patch = patch("src.keyboard.modifier_gesture.threading.Timer", ImmediateTimer)
+        timer_patch.start()
+        self.addCleanup(timer_patch.stop)
         manager = KeyboardManager.__new__(KeyboardManager)
         manager._recording_lock = threading.RLock()
         manager.single_fn_hotkey = True
@@ -54,9 +64,19 @@ class VoiceHotkeyTests(unittest.TestCase):
         manager.voice_hotkey_label = ""
         manager._voice_hotkey_spec = manager._parse_voice_hotkey(value)
         manager.actions = []
-        manager.start_recording = lambda: manager.actions.append("start")
-        manager.stop_recording = lambda: manager.actions.append("stop")
+        manager.is_recording = False
+        def action(name, recording):
+            manager.actions.append(name)
+            manager.is_recording = recording
+        manager.start_recording = lambda: action("start", True)
+        manager.stop_recording = lambda: action("stop", False)
+        manager.cancel_recording = lambda: action("cancel", False)
         manager.toggle_recording = lambda: manager.actions.append("toggle")
+        capture_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(capture_dir.cleanup)
+        manager._shortcut_capture_lock_file = Path(capture_dir.name) / ".shortcut-capture"
+        manager._shortcut_capture_checked_at = 0.0
+        manager._shortcut_capture_is_active = False
         return manager
 
     def test_right_option_press_and_release(self):
@@ -113,6 +133,7 @@ class VoiceHotkeyTests(unittest.TestCase):
                     kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate
                 )
             )
+            self.assertEqual(len(manager.actions), _)
             self.assertTrue(
                 manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, 0)
             )
@@ -273,7 +294,9 @@ class VoiceHotkeyTests(unittest.TestCase):
         manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate)
         manager._recover_hotkey_state()
         manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate)
-        self.assertEqual(manager.actions, ["toggle", "toggle"])
+        self.assertEqual(manager.actions, [])
+        manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, 0)
+        self.assertEqual(manager.actions, ["toggle"])
 
     def test_poll_reconciles_missing_release_without_new_key_event(self):
         manager = self.make_manager("right_option")
