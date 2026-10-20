@@ -492,10 +492,8 @@ final class SettingsModel: ObservableObject {
         recentMemoryEnabled = Self.bool(environment["QWEN_RECENT_MEMORY_ENABLED"], fallback: false)
         doubaoAppKey = environment["DOUBAO_APP_KEY"] ?? ""
         doubaoAccessKey = environment["DOUBAO_ACCESS_KEY"] ?? ""
-        let savedSource = environment["SPEECH_CREDENTIAL_SOURCE"] ?? "auto"
-        credentialSource = ["builtin", "personal"].contains(savedSource) ? savedSource :
-            ((transcriptionService != "qwen" || !qwenAPIKey.isEmpty || !doubaoAccessKey.isEmpty || !customASRModel.isEmpty)
-                ? "personal" : "builtin")
+        // Promotional service remains unavailable in this public release.
+        credentialSource = "personal"
         onboardingComplete = Self.bool(environment["SETUP_COMPLETED"], fallback:
             !qwenAPIKey.isEmpty || !doubaoAccessKey.isEmpty || !customASRModel.isEmpty)
         doubaoBoostingTableID = environment["DOUBAO_BOOSTING_TABLE_ID"] ?? ""
@@ -1913,32 +1911,6 @@ struct EngineSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker("语音服务", selection: $model.credentialSource) {
-                    Text("免费使用").tag("builtin")
-                    Text("使用自己的 Key").tag("personal")
-                }.pickerStyle(.segmented)
-            }
-            if model.credentialSource == "builtin" {
-                Section("推广期免费语音") {
-                    LabeledContent("模型", value: "千问 3.0 Streaming")
-                    LabeledContent("本月剩余", value: "\(max(0, model.promotionRemainingSeconds) / 60) 分钟")
-                    Text("每台设备每月免费 100 分钟，无需注册或填写 Key。音频直连百炼，边说边识别。")
-                        .font(.callout).foregroundStyle(.secondary)
-                    HStack {
-                        if !model.promotionStatus.isEmpty {
-                            Text(model.promotionStatus).font(.callout).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button(model.checkingConnection ? "连接中…" :
-                            (model.onboardingComplete ? "连接并保存" : "开始使用")) { model.checkConnection() }
-                            .disabled(model.checkingConnection || model.applyingSettings)
-                    }
-                    if !model.connectionStatus.isEmpty {
-                        Text(model.connectionStatus).font(.callout).foregroundStyle(.secondary)
-                    }
-                }
-            } else {
-            Section {
                 Picker("供应商", selection: $model.transcriptionService) {
                     Text("千问").tag("qwen")
                     Text("豆包").tag("doubao")
@@ -2009,7 +1981,6 @@ struct EngineSettingsView: View {
                         .textFieldStyle(.roundedBorder)
                     Link("热词表配置说明 ↗", destination: URL(string: "https://www.volcengine.com/docs/6561/155739?lang=zh")!)
                 }
-            }
             }
         }
         .formStyle(.grouped)

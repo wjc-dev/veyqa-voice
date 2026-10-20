@@ -28,13 +28,9 @@ ERRORS = {
 
 
 def uses_builtin():
-    source = os.getenv("SPEECH_CREDENTIAL_SOURCE", "auto")
-    if source in {"builtin", "personal"}:
-        return source == "builtin"
-    if os.getenv("TRANSCRIPTION_SERVICE", "qwen") in {"doubao", "custom"}:
-        return False
-    return not any(os.getenv(name, "").strip() for name in (
-        "QWEN_API_KEY", "DASHSCOPE_API_KEY", "DOUBAO_ACCESS_KEY", "CUSTOM_ASR_API_KEY", "CUSTOM_ASR_MODEL"))
+    # Public builds use personal credentials until the promotional service has
+    # completed network and budget verification. Ignore saved preview routes.
+    return False
 
 
 def keychain_identity():

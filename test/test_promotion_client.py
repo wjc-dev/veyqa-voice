@@ -68,12 +68,12 @@ class CredentialCacheTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "无效配置"):
             self.broker.get()
 
-    def test_new_users_builtin_but_old_keys_stay_personal(self):
+    def test_release_routes_new_and_existing_users_to_personal_credentials(self):
         with patch.dict(os.environ, {}, clear=True):
-            self.assertTrue(uses_builtin())
+            self.assertFalse(uses_builtin())
             os.environ["QWEN_API_KEY"] = "existing-key"
             self.assertFalse(uses_builtin())
             os.environ["SPEECH_CREDENTIAL_SOURCE"] = "builtin"
-            self.assertTrue(uses_builtin())
+            self.assertFalse(uses_builtin())
             os.environ["SPEECH_CREDENTIAL_SOURCE"] = "personal"
             self.assertFalse(uses_builtin())

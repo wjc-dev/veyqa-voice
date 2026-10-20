@@ -5,47 +5,36 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <title>Veyqa Voice</title>
         <item>
             <title>0.2.9</title>
-            <pubDate>Tue, 20 Oct 2026 10:04:03 +0800</pubDate>
+            <pubDate>Tue, 20 Oct 2026 13:11:26 +0800</pubDate>
             <link>https://wjc-dev.github.io/voxtype/</link>
-            <sparkle:version>220</sparkle:version>
+            <sparkle:version>222</sparkle:version>
             <sparkle:shortVersionString>0.2.9</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.9
+            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.9 Preview
 
-- 新增应用内“检查更新”，可下载、安装并重新打开。
-- 默认每天检查新版，可在设置中关闭；安装前由你确认。
-- 更新会等待当前听写结束及设置保存，保留 API Key、快捷键和词库。
-- 官网、Homebrew 和本机使用同一固定签名安装包。
+- 新增应用内检查更新、下载安装和重新打开；默认每天检查新版。
+- 调整 Dock 图标留白和边框，视觉尺寸更协调。
+- 改进更新窗口打开期间的后台健康检查。
+- 保留模型选择、API 凭证显示与复制、整行展开等设置交互。
 
-## 更新
+本版使用你自己的千问、豆包或自定义服务凭证。Key 和配置在升级时保留。
 
-0.2.8 及更早版本需要先手动更新一次，之后即可在“设置 → 通用 → 应用”检查更新。
+0.2.8 及更早版本请先用新版 DMG 替换，或退出 App 后执行：
 
-Homebrew 用户先退出 App，再运行：
-
-```bash
+```sh
 brew update
 brew upgrade --cask wjc-dev/veyqa/veyqa-voice
 ```
 
-DMG 用户下载新版，拖入“应用程序”并选择“替换”。Key 和配置保留，无需先卸载。
+升级后可在“设置 → 通用 → 应用”中检查后续更新。
 
-需要 Apple Silicon、macOS 13+。当前仍为尚未经 Apple 公证的 Preview；首次打开步骤见官网。
-
-## 验证
-
-- 310 项程序回归测试、16 项官网测试通过。
-- 隔离 App 完成两次真实下载、安装和重新打开；损坏包在安装前被拒绝，旧版本仍可用。
-- 本机固定签名身份保持一致，三项权限保留；用户确认连续三次听写正常。
-- 本轮不包含托管 API、账号、赠送额度或收费功能。
-
-尚未在第二台 Mac 上验证。旧 ad-hoc 安装首次切换到固定身份时，系统可能要求确认权限。
+支持 Apple Silicon、macOS 13 及以上。此 Preview 尚未经过 Apple 公证；首次安装与旧签名迁移的权限提示，按[官网指引](https://wjc-dev.github.io/voxtype/#safety)操作。
 ]]></description>
-            <enclosure url="https://github.com/wjc-dev/voxtype/releases/download/v0.2.9/Veyqa-Voice-v0.2.9-macOS-arm64.zip" length="21389794" type="application/octet-stream" sparkle:edSignature="4hyh4EABT2DApE3whNGuMHCQ4l8b0sNCXcGNGpzkSoq03ffwMb/vx3+MumFG7M40DvqQU72OVisDGUUmbDyADQ=="></enclosure>
+            <enclosure url="https://github.com/wjc-dev/voxtype/releases/download/v0.2.9/Veyqa-Voice-v0.2.9-macOS-arm64.zip" length="21195586" type="application/octet-stream" sparkle:edSignature="0i0WGWmViq7ENuLzBYnNSdY/kNXEVhbBxuxziVQIDhmuRB/T1NUB8OvmpHcxVgcAlDTEVxgzUCUUR98Gmp87BQ=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: ykDlFQIE6dPgF6/czm64pzUmbMxZc2M/oVnky0/hsWVHLbtbzWPnU7mmH4U+e8IaDRItI1cfJsGXtLxmJTY8DQ==
-length: 2565
+edSignature: /PFwm+MjoSdV3KSzKljcodTObnLxfsZg188fWZgYF/qwpnV/Q4/e+3HNNvgI5vkcBxMn20XSkMC+Hp2Amq72BA==
+length: 2126
 -->
