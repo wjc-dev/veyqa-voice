@@ -2,7 +2,7 @@
 
 **Lightweight voice input for Mac. Hold to speak, release to type.**
 
-[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.8) · [简体中文](README.md)
+[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.9) · [简体中文](README.md)
 
 [![Veyqa Voice demo](website/product-preview.svg)](https://wjc-dev.github.io/voxtype/#demo)
 
@@ -14,7 +14,7 @@
 
 Requires **Apple Silicon and macOS 13+**.
 
-1. [Download and open the DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.8/Veyqa-Voice-v0.2.8-macOS-arm64.dmg).
+1. [Download and open the DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.9/Veyqa-Voice-v0.2.9-macOS-arm64.dmg).
 2. Follow the arrow: drag **Veyqa Voice into Applications**.
 3. Open Veyqa Voice from Applications to begin setup.
 
@@ -28,9 +28,11 @@ brew install --cask wjc-dev/veyqa/veyqa-voice
 
 ## Updating
 
-Quit Veyqa Voice from its menu or settings before updating, then reopen it. Your API credentials and settings are retained; no uninstall is needed.
+Open Settings → General → App → Check for Updates, then download and relaunch. New versions are checked daily by default. Your API credentials and settings are retained; no uninstall is needed.
 
-For Homebrew installations:
+Version 0.2.8 and earlier need one manual upgrade using Homebrew or the DMG before in-app updates become available.
+
+Alternatively, quit the app and update with Homebrew:
 
 ```bash
 brew update

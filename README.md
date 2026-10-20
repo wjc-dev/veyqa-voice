@@ -2,7 +2,7 @@
 
 **轻量的 Mac 语音输入工具。按住说话，松开输入。**
 
-[官网](https://wjc-dev.github.io/voxtype/) · [下载安装包](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.8) · [English](README.en.md)
+[官网](https://wjc-dev.github.io/voxtype/) · [下载安装包](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.9) · [English](README.en.md)
 
 [![Veyqa Voice 语音输入演示](website/product-preview.svg)](https://wjc-dev.github.io/voxtype/#demo)
 
@@ -14,7 +14,7 @@
 
 需要 **Apple Silicon（M 系列芯片）、macOS 13+**。
 
-1. [下载 DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.8/Veyqa-Voice-v0.2.8-macOS-arm64.dmg) 并打开。
+1. [下载 DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.9/Veyqa-Voice-v0.2.9-macOS-arm64.dmg) 并打开。
 2. 按窗口中的箭头，将 **Veyqa Voice 拖入 Applications（应用程序）**。
 3. 从“应用程序”打开 Veyqa Voice，完成首次设置。
 
@@ -28,9 +28,11 @@ brew install --cask wjc-dev/veyqa/veyqa-voice
 
 ## 更新
 
-先从菜单或设置中退出 Veyqa Voice，再更新并重新打开。Key 和配置保留，无需先卸载。
+在“设置 → 通用 → 应用”点击“检查更新”，按提示下载并重新打开。默认每天检查新版，Key 和配置保留，无需先卸载。
 
-Homebrew 用户：
+0.2.8 及更早版本需先用下方命令或 DMG 更新一次，之后即可在 App 内更新。
+
+也可以先退出 App，再使用 Homebrew：
 
 ```bash
 brew update

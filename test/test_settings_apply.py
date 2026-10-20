@@ -1,9 +1,17 @@
 import threading
+import pytest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch, create_autospec
 
 from main import VoiceAssistant
 from src.ui.floating_preview import FloatingPreviewWindow
+
+
+@pytest.fixture(autouse=True)
+def personal_service_configuration(monkeypatch):
+    # These tests exercise existing BYOK saves; do not contact the promotional
+    # service or create real Keychain identities during unit tests.
+    monkeypatch.setenv("SPEECH_CREDENTIAL_SOURCE", "personal")
 
 
 def assistant():

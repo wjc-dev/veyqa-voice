@@ -8,13 +8,24 @@ let canvas = NSRect(origin: .zero, size: size)
 NSColor.clear.setFill()
 canvas.fill()
 
+// Match the visual footprint of neighbouring macOS Dock icons. The source
+// artwork has its own shell; leave real transparency outside it, not a second
+// full-canvas plate that makes the Dock icon appear oversized.
+NSGraphicsContext.saveGraphicsState()
+let artworkScale: CGFloat = 0.86
+let artworkTransform = NSAffineTransform()
+artworkTransform.translateX(by: 1024 * (1 - artworkScale) / 2,
+                            yBy: 1024 * (1 - artworkScale) / 2)
+artworkTransform.scale(by: artworkScale)
+artworkTransform.concat()
+
 let shellRect = canvas.insetBy(dx: 22, dy: 22)
 let shell = NSBezierPath(roundedRect: shellRect, xRadius: 225, yRadius: 225)
 NSColor(calibratedWhite: 0.97, alpha: 1).setFill()
 shell.fill()
 
-let tileRect = canvas.insetBy(dx: 76, dy: 76)
-let tile = NSBezierPath(roundedRect: tileRect, xRadius: 188, yRadius: 188)
+let tileRect = canvas.insetBy(dx: 58, dy: 58)
+let tile = NSBezierPath(roundedRect: tileRect, xRadius: 206, yRadius: 206)
 let tileGradient = NSGradient(colorsAndLocations:
     (NSColor(calibratedRed: 0.13, green: 0.08, blue: 0.34, alpha: 1), 0.0),
     (NSColor(calibratedRed: 0.23, green: 0.25, blue: 0.72, alpha: 1), 0.48),
@@ -54,6 +65,7 @@ let caretRect = NSRect(x: 768, y: 315, width: 38, height: 400)
 let caret = NSBezierPath(roundedRect: caretRect, xRadius: 19, yRadius: 19)
 NSColor(calibratedRed: 0.55, green: 0.98, blue: 1.0, alpha: 0.98).setFill()
 caret.fill()
+NSGraphicsContext.restoreGraphicsState()
 NSGraphicsContext.restoreGraphicsState()
 
 image.unlockFocus()

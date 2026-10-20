@@ -39,6 +39,7 @@ final class SettingsAppDelegate: NSObject, NSApplicationDelegate {
     private var closeObserver: NSObjectProtocol?
     private var instanceLockURL: URL?
     private var shortcutCaptureURL: URL?
+    private var updateStateURL: URL?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -62,6 +63,7 @@ final class SettingsAppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let dataURL = URL(fileURLWithPath: root, isDirectory: true)
+        updateStateURL = dataURL.appendingPathComponent(".settings-update-state.json")
         shortcutCaptureURL = dataURL.appendingPathComponent(".shortcut-capture")
         let instanceURL = dataURL.appendingPathComponent(".settings-instance")
         if acquireInstanceLock(instanceURL) {
@@ -82,6 +84,12 @@ final class SettingsAppDelegate: NSObject, NSApplicationDelegate {
         if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
         removeOwnedLock(instanceLockURL)
         removeOwnedLock(shortcutCaptureURL)
+        if let url = updateStateURL,
+           let data = try? Data(contentsOf: url),
+           let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           state["pid"] as? Int32 == getpid() {
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -255,6 +263,15 @@ struct PermissionRequest: Codable {
     }
 }
 
+struct UpdateSnapshot: Decodable, Equatable {
+    var status = ""
+    var available = false
+    var automatic = true
+    var checking = false
+    var version = ""
+    var build = ""
+}
+
 @MainActor
 final class SettingsModel: ObservableObject {
     let rootURL: URL
@@ -283,6 +300,10 @@ final class SettingsModel: ObservableObject {
     @Published var reopenStatus = ""
 
     @Published var transcriptionService = "qwen"
+    @Published var credentialSource = "personal"
+    @Published var promotionStatus = ""
+    @Published var promotionRemainingSeconds = 6000
+    private var promotionContents: Data?
     @Published var qwenModel = SpeechModels.defaultModel("qwen")
     @Published var doubaoModel = SpeechModels.defaultModel("doubao")
     @Published var customASRBaseURL = ""
@@ -304,10 +325,11 @@ final class SettingsModel: ObservableObject {
     @Published var trialText = ""
     @Published var saveStatus = ""
     @Published var saveFailed = false
+    @Published var updateInfo = UpdateSnapshot()
     private var draftTracker = SettingsDraftTracker()
 
     private var editableDraft: [String] {
-        [transcriptionService, qwenModel, doubaoModel, customASRBaseURL, customASRAPIKey,
+        [credentialSource, transcriptionService, qwenModel, doubaoModel, customASRBaseURL, customASRAPIKey,
          customASRModel, qwenAPIKey, qwenAPIHost, qwenWorkspace, qwenRegion, qwenLanguage,
          doubaoAppKey, doubaoAccessKey, doubaoBoostingTableID, hotkeySpec, hotkeyLabel,
          hotkeyMode, punctuationMode, personalContext, customVocabulary,
@@ -316,6 +338,38 @@ final class SettingsModel: ObservableObject {
     }
 
     var hasUnsavedChanges: Bool { draftTracker.isDirty(editableDraft) }
+    func publishUpdateGuard() {
+        let state: [String: Any] = ["pid": getpid(), "dirty": hasUnsavedChanges || applyingSettings]
+        if let data = try? JSONSerialization.data(withJSONObject: state) {
+            try? Self.privateWrite(data, to: dataURL.appendingPathComponent(".settings-update-state.json"))
+        }
+    }
+
+    func reloadUpdateInfo() {
+        guard let data = try? Data(contentsOf: dataURL.appendingPathComponent("updates.json")),
+              let snapshot = try? JSONDecoder().decode(UpdateSnapshot.self, from: data),
+              snapshot != updateInfo else { return }
+        updateInfo = snapshot
+    }
+
+    func requestUpdateCheck(automatic: Bool? = nil) {
+        if hasUnsavedChanges || applyingSettings {
+            errorMessage = "请先保存设置，再检查更新。"
+            return
+        }
+        do {
+            var request: [String: Any] = ["id": UUID().uuidString,
+                "created_at": Date().timeIntervalSince1970, "action": "check"]
+            if let automatic {
+                request["action"] = "automatic"
+                request["enabled"] = automatic
+                updateInfo.automatic = automatic
+            }
+            try Self.privateWrite(JSONSerialization.data(withJSONObject: request),
+                to: dataURL.appendingPathComponent(".update-request.json"))
+            if automatic == nil { updateInfo.status = "正在检查更新…" }
+        } catch { errorMessage = "未能检查更新，请重试。" }
+    }
     var saveFeedback: String {
         if applyingSettings || saveFailed { return saveStatus }
         return hasUnsavedChanges ? "有未保存的修改" : saveStatus
@@ -428,7 +482,7 @@ final class SettingsModel: ObservableObject {
         showMenuBarIcon = Self.bool(environment["SHOW_MENU_BAR_ICON"], fallback: false)
 
         qwenRegion = environment["QWEN_REGION"] ?? "beijing"
-        qwenAPIKey = environment["QWEN_API_KEY"] ?? ""
+        qwenAPIKey = environment["QWEN_API_KEY"] ?? environment["DASHSCOPE_API_KEY"] ?? ""
         qwenAPIHost = environment["QWEN_API_HOST"]?.trimmingCharacters(
             in: .whitespacesAndNewlines
         ) ?? ""
@@ -438,6 +492,10 @@ final class SettingsModel: ObservableObject {
         recentMemoryEnabled = Self.bool(environment["QWEN_RECENT_MEMORY_ENABLED"], fallback: false)
         doubaoAppKey = environment["DOUBAO_APP_KEY"] ?? ""
         doubaoAccessKey = environment["DOUBAO_ACCESS_KEY"] ?? ""
+        let savedSource = environment["SPEECH_CREDENTIAL_SOURCE"] ?? "auto"
+        credentialSource = ["builtin", "personal"].contains(savedSource) ? savedSource :
+            ((transcriptionService != "qwen" || !qwenAPIKey.isEmpty || !doubaoAccessKey.isEmpty || !customASRModel.isEmpty)
+                ? "personal" : "builtin")
         onboardingComplete = Self.bool(environment["SETUP_COMPLETED"], fallback:
             !qwenAPIKey.isEmpty || !doubaoAccessKey.isEmpty || !customASRModel.isEmpty)
         doubaoBoostingTableID = environment["DOUBAO_BOOSTING_TABLE_ID"] ?? ""
@@ -497,6 +555,52 @@ final class SettingsModel: ObservableObject {
             return
         }
         diagnostics = snapshot
+    }
+
+    func reloadPromotionInfo() {
+        guard let data = try? Data(contentsOf: dataURL.appendingPathComponent("promotion.json")),
+              data != promotionContents,
+              let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        promotionContents = data
+        let status = state["status"] as? String ?? ""
+        let remaining = state["remaining_seconds"] as? Int ?? promotionRemainingSeconds
+        if promotionStatus != status { promotionStatus = status }
+        if promotionRemainingSeconds != remaining { promotionRemainingSeconds = remaining }
+    }
+
+    private func checkBuiltinConnection() {
+        cancelConnectionCheck()
+        let id = connectionID
+        let requestID = UUID().uuidString
+        checkingConnection = true
+        connectionStatus = "正在准备免费语音服务…"
+        do {
+            try Self.privateWrite(Data(requestID.utf8),
+                to: dataURL.appendingPathComponent(".promotion-prefetch-request"))
+        } catch {
+            checkingConnection = false
+            connectionStatus = "无法连接后台，请重新打开设置后重试。"
+            return
+        }
+        Task { @MainActor in
+            for _ in 0..<40 {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard self.connectionID == id else { return }
+                self.reloadPromotionInfo()
+                guard let data = self.promotionContents,
+                      let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      state["request_id"] as? String == requestID else { continue }
+                self.checkingConnection = false
+                self.connectionStatus = self.promotionStatus
+                if state["enabled"] as? Bool == true && self.promotionRemainingSeconds > 0 {
+                    self.saveSettings(advanceSetup: !self.onboardingComplete)
+                }
+                return
+            }
+            guard self.connectionID == id else { return }
+            self.checkingConnection = false
+            self.connectionStatus = "连接超时，请检查网络后重试；也可以使用自己的 Key。"
+        }
     }
 
     func reloadPermissions() {
@@ -656,6 +760,7 @@ final class SettingsModel: ObservableObject {
     }
 
     var selectedModelID: String {
+        if credentialSource == "builtin" { return "qwen-audio-3.0-asr-flash-streaming" }
         switch transcriptionService {
         case "custom": return customASRModel
         case "doubao": return doubaoModel
@@ -664,6 +769,7 @@ final class SettingsModel: ObservableObject {
     }
 
     var serviceCredentialsReady: Bool {
+        if credentialSource == "builtin" { return true }
         switch transcriptionService {
         case "custom":
             return CustomASRConnection.credentialsReady(
@@ -695,7 +801,7 @@ final class SettingsModel: ObservableObject {
     func refreshModels(ifStale: Bool = false) {
         cancelModelRefresh()
         let provider = transcriptionService
-        guard provider != "custom", serviceCredentialsReady else { return }
+        guard credentialSource == "personal", provider != "custom", serviceCredentialsReady else { return }
         modelCatalogStatus = ""
         if ifStale {
             if let snapshot = modelSnapshots[provider], Date().timeIntervalSince(snapshot.checkedAt) < 86400 { return }
@@ -724,6 +830,7 @@ final class SettingsModel: ObservableObject {
     }
 
     func checkConnection() {
+        if credentialSource == "builtin" { checkBuiltinConnection(); return }
         cancelConnectionCheck()
         guard SpeechModels.compatible(qwenModel, provider: "qwen") else {
             connectionStatus = "请先选择支持实时听写的千问模型。"
@@ -810,13 +917,16 @@ final class SettingsModel: ObservableObject {
         customASRModel = customASRModel.trimmingCharacters(in: .whitespacesAndNewlines)
         customASRAPIKey = customASRAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         customASRBaseURL = customASRBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard transcriptionService == "custom"
+        guard credentialSource == "builtin" || (transcriptionService == "custom"
                 ? (!customASRModel.isEmpty && !customASRModel.contains(where: { $0.isWhitespace }))
-                : SpeechModels.compatible(selectedModelID, provider: transcriptionService) else {
+                : SpeechModels.compatible(selectedModelID, provider: transcriptionService)) else {
             errorMessage = "请选择支持实时听写的模型，或检查手动填写的型号。"
             return
         }
-        if transcriptionService == "qwen" {
+        if credentialSource == "builtin" {
+            // Preserve every personal credential and selected model while using
+            // the promotional route; only the route switch is new.
+        } else if transcriptionService == "qwen" {
             guard normalizedKey.count >= 20,
                   !normalizedKey.contains(where: { $0.isWhitespace }) else {
                 errorMessage = "千问 API Key 格式不正确。"
@@ -853,6 +963,7 @@ final class SettingsModel: ObservableObject {
         disfluencyMode = "off"
 
         var updates: [String: String] = [
+            "SPEECH_CREDENTIAL_SOURCE": credentialSource,
             "SETUP_COMPLETED": String(onboardingComplete || completeSetup),
             "TRANSCRIPTION_SERVICE": transcriptionService,
             "QWEN_ASR_MODEL": qwenModel,
@@ -1691,6 +1802,19 @@ struct GeneralSettingsView: View {
             }
             if model.isBundled {
                 Section("应用") {
+                    HStack {
+                        Text("版本 \(model.updateInfo.version.isEmpty ? (model.diagnostics.version ?? "") : model.updateInfo.version)")
+                        Spacer()
+                        Button("检查更新…") { model.requestUpdateCheck() }
+                            .disabled(!model.updateInfo.available || model.hasUnsavedChanges || model.applyingSettings)
+                    }
+                    SettingsToggleRow(title: "自动检查更新", isOn: Binding(
+                        get: { model.updateInfo.automatic },
+                        set: { model.requestUpdateCheck(automatic: $0) }))
+                        .disabled(!model.updateInfo.available || model.hasUnsavedChanges || model.applyingSettings)
+                    if !model.updateInfo.status.isEmpty {
+                        Text(model.updateInfo.status).font(.callout).foregroundStyle(.secondary)
+                    }
                     SettingsToggleRow(title: "登录后自动启动", isOn: $model.launchAtLogin)
                     SettingsToggleRow(title: "显示菜单栏图标", isOn: $model.showMenuBarIcon)
                     Text("点击菜单栏或 Dock 图标，随时打开设置。")
@@ -1789,6 +1913,32 @@ struct EngineSettingsView: View {
     var body: some View {
         Form {
             Section {
+                Picker("语音服务", selection: $model.credentialSource) {
+                    Text("免费使用").tag("builtin")
+                    Text("使用自己的 Key").tag("personal")
+                }.pickerStyle(.segmented)
+            }
+            if model.credentialSource == "builtin" {
+                Section("推广期免费语音") {
+                    LabeledContent("模型", value: "千问 3.0 Streaming")
+                    LabeledContent("本月剩余", value: "\(max(0, model.promotionRemainingSeconds) / 60) 分钟")
+                    Text("每台设备每月免费 100 分钟，无需注册或填写 Key。音频直连百炼，边说边识别。")
+                        .font(.callout).foregroundStyle(.secondary)
+                    HStack {
+                        if !model.promotionStatus.isEmpty {
+                            Text(model.promotionStatus).font(.callout).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button(model.checkingConnection ? "连接中…" :
+                            (model.onboardingComplete ? "连接并保存" : "开始使用")) { model.checkConnection() }
+                            .disabled(model.checkingConnection || model.applyingSettings)
+                    }
+                    if !model.connectionStatus.isEmpty {
+                        Text(model.connectionStatus).font(.callout).foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+            Section {
                 Picker("供应商", selection: $model.transcriptionService) {
                     Text("千问").tag("qwen")
                     Text("豆包").tag("doubao")
@@ -1860,11 +2010,15 @@ struct EngineSettingsView: View {
                     Link("热词表配置说明 ↗", destination: URL(string: "https://www.volcengine.com/docs/6561/155739?lang=zh")!)
                 }
             }
+            }
         }
         .formStyle(.grouped)
         .disabled(model.applyingSettings)
         .task(id: "\(model.transcriptionService)-\(model.serviceCredentialsReady)") { model.refreshModels(ifStale: true) }
         .onDisappear { model.cancelModelRefresh() }
+        .onChange(of: model.credentialSource) { _ in
+            model.cancelConnectionCheck(); model.cancelModelRefresh()
+        }
         .onChange(of: model.qwenModel) { _ in model.cancelConnectionCheck() }
         .onChange(of: model.transcriptionService) { _ in
             showKeyHelp = false
@@ -2342,12 +2496,19 @@ struct SettingsRootView: View {
             if !model.onboardingComplete { selectedTab = "engine" }
             model.reloadDiagnostics()
             model.reloadPermissions()
+            model.reloadUpdateInfo()
+            model.reloadPromotionInfo()
+            model.publishUpdateGuard()
             evaluatePermissionGate()
         }
+        .onChange(of: model.hasUnsavedChanges) { _ in model.publishUpdateGuard() }
+        .onChange(of: model.applyingSettings) { _ in model.publishUpdateGuard() }
         .onReceive(permissionTimer) { _ in
             // Finish an in-flight save even if the user switches to another app.
             guard NSApp.isActive || model.applyingSettings else { return }
             model.reloadDiagnostics()
+            model.reloadUpdateInfo()
+            model.reloadPromotionInfo()
             model.reloadPermissions()
             model.reloadRecoveries()
             model.checkAppliedSettings()

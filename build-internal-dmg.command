@@ -4,12 +4,16 @@ set -euo pipefail
 PROJECT_DIR="${0:A:h}"
 source "$PROJECT_DIR/packaging/signing.zsh"
 veyqa_configure_signing
-VERSION="0.2.8"
+VERSION="0.2.9"
 OUTPUT_DIR="${1:-$PROJECT_DIR/dist-$VEYQA_SIGNING_PROFILE}"
-BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-217}"
+BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-220}"
 [[ "$BUILD_NUMBER" == <-> ]] || { print -u2 "Invalid build number"; exit 1; }
 ARTIFACT_SUFFIX=""
-[[ "$VEYQA_SIGNING_PROFILE" == "local" ]] && ARTIFACT_SUFFIX="-local"
+[[ "$VEYQA_SIGNING_PROFILE" == "local" && "${VEYQA_PUBLIC_RELEASE:-false}" != "true" ]] && ARTIFACT_SUFFIX="-local"
+if [[ "${VEYQA_PUBLIC_RELEASE:-false}" == "true" && "$VEYQA_SIGNING_IDENTITY" == "-" ]]; then
+  print -u2 "Public releases require the fixed signing identity; refusing ad-hoc fallback."
+  exit 1
+fi
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
 WORK_DIR="$PROJECT_DIR/.package-build/$RUN_ID"
 PYINSTALLER_WORK="$WORK_DIR/pyinstaller"
@@ -65,6 +69,12 @@ fi
 
 zsh "$PROJECT_DIR/build-native-settings.command"
 
+SPARKLE_DIR="$("$PROJECT_DIR/.venv/bin/python" "$PROJECT_DIR/packaging/prepare_sparkle.py")"
+xcrun clang -dynamiclib -fobjc-arc -O2 -arch arm64 -mmacosx-version-min=13.0 \
+  -framework AppKit -framework Sparkle -F "$SPARKLE_DIR" \
+  -Wl,-rpath,@loader_path -install_name @rpath/VeyqaUpdates.dylib \
+  "$PROJECT_DIR/native_settings/VeyqaUpdates.m" -o "$PROJECT_DIR/build/VeyqaUpdates.dylib"
+
 "$PROJECT_DIR/.venv/bin/pyinstaller" \
   --noconfirm \
   --distpath "$PYINSTALLER_DIST" \
@@ -72,6 +82,7 @@ zsh "$PROJECT_DIR/build-native-settings.command"
   "$PROJECT_DIR/packaging/VoiceInput.spec"
 
 mkdir -p "$APP_PATH/Contents/Helpers" \
+  "$APP_PATH/Contents/Frameworks" \
   "$APP_PATH/Contents/Library/LaunchAgents" \
   "$APP_PATH/Contents/Resources"
 ditto "$PROJECT_DIR/build/VeyqaSettings.app" \
@@ -86,6 +97,10 @@ if [[ "$VEYQA_SIGNING_PROFILE" == "local" ]]; then
 fi
 cp "$PROJECT_DIR/build/VeyqaSupervisor" \
   "$APP_PATH/Contents/Resources/VeyqaSupervisor"
+ditto "$SPARKLE_DIR/Sparkle.framework" "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+cp "$PROJECT_DIR/build/VeyqaUpdates.dylib" "$APP_PATH/Contents/Frameworks/VeyqaUpdates.dylib"
+cp "$SPARKLE_DIR/LICENSE" "$APP_PATH/Contents/Resources/Sparkle-LICENSE"
+"$PROJECT_DIR/.venv/bin/python" "$PROJECT_DIR/packaging/configure_updates.py" "$APP_PATH"
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_PATH/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :VeyqaSigningProfile string $VEYQA_SIGNING_PROFILE" "$APP_PATH/Contents/Info.plist"

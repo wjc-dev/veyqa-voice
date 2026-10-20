@@ -40,12 +40,12 @@ veyqa_sign_app() {
   # No --deep signing, no trust overrides and no weakening of system policies.
   while IFS= read -r -d '' item; do
     if [[ "$(/usr/bin/file -b "$item")" == *Mach-O* ]]; then
-      veyqa_sign "$item" || return 1
+      veyqa_sign --preserve-metadata=entitlements "$item" || return 1
     fi
   done < <(find "$app_path/Contents" -type f -print0)
   while IFS= read -r -d '' item; do
-    veyqa_sign "$item" || return 1
-  done < <(find "$app_path/Contents" -depth -type d \( -name '*.framework' -o -name '*.app' \) -print0)
+    veyqa_sign --preserve-metadata=entitlements "$item" || return 1
+  done < <(find "$app_path/Contents" -depth -type d \( -name '*.framework' -o -name '*.app' -o -name '*.xpc' \) -print0)
   veyqa_sign --entitlements "$entitlements" "$app_path" || return 1
   codesign --verify --deep --strict --verbose=2 "$app_path"
 }

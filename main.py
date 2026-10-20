@@ -37,7 +37,7 @@ except Exception as _truststore_err:  # noqa: BLE001
     # bundle.  Home users without corporate proxies won't notice.
     pass
 
-from src.runtime_paths import DATA_DIR, ENV_FILE, IS_FROZEN, ensure_runtime_layout
+from src.runtime_paths import DATA_DIR, ENV_FILE, IS_FROZEN, app_bundle_path, ensure_runtime_layout
 
 ensure_runtime_layout()
 load_dotenv(ENV_FILE, override=True)
@@ -66,7 +66,7 @@ from src.utils.logger import logger
 from src.setup_feedback import empty_result_notice
 
 
-__version__ = "0.2.8"
+__version__ = "0.2.9"
 __author__ = "Mor-Li"
 __description__ = "Qwen and Doubao realtime voice input for macOS"
 
@@ -136,6 +136,8 @@ class VoiceAssistant:
         self._current_session: Optional[VoiceSession] = None
         self._streaming_thread: Optional[threading.Thread] = None
         self._microphone_test_active = False
+        self._update_installing = False
+        self._update_pause_previous = None
 
         self.floating_preview = FloatingPreviewWindow()
 
@@ -152,6 +154,10 @@ class VoiceAssistant:
         )
         self.status_controller = StatusBarController(
             on_restart=self._restart_application,
+            on_update_check=self._update_may_check,
+            on_update_prepare=self._prepare_update,
+            on_update_cancel=self._cancel_update,
+            on_update_relaunch=self._update_will_relaunch,
             open_settings_on_start=_should_open_settings_on_start(
                 processor_present=bool(processor),
                 is_frozen=IS_FROZEN,
@@ -232,15 +238,78 @@ class VoiceAssistant:
             self._restart_application(show_settings=False)
 
     def _tick_health(self) -> None:
-        from PyObjCTools import AppHelper
         self.health.tick_main()
         self._apply_pending_settings()
         self._refresh_permission_listener()
         self._check_microphone_test_request()
+        promotion_request = DATA_DIR / ".promotion-prefetch-request"
+        if promotion_request.exists():
+            request_id = promotion_request.read_text()[:80].strip()
+            promotion_request.unlink(missing_ok=True)
+            from src.transcription.promotion import get_broker
+            if len(request_id) == 36:
+                get_broker().request_check(request_id)
+        self.status_controller.tick_updates()
         if (DATA_DIR / ".restart-request").exists():
             self._restart_application()
             return
-        AppHelper.callLater(2, self._tick_health)
+
+    def _update_busy(self):
+        return (self._current_session is not None
+                or self._microphone_test_active
+                or self.keyboard_manager.is_recording
+                or getattr(self.keyboard_manager, "_transition_started_at", None) is not None
+                or (self._streaming_thread is not None and self._streaming_thread.is_alive()))
+
+    def _update_may_check(self):
+        from src.updater import settings_block_install
+        with self._session_lock:
+            return (not self._update_busy() and not self._update_installing
+                    and os.getenv("SETUP_COMPLETED", "true").lower() == "true"
+                    and not settings_block_install(DATA_DIR))
+
+    def _prepare_update(self):
+        from src.updater import settings_block_install
+        from src.login_item import SUPERVISOR_PAUSE_FILE
+        with self._session_lock:
+            if self._update_installing:
+                return True
+            if self._update_busy() or settings_block_install(DATA_DIR):
+                return False
+            try:
+                previous = (SUPERVISOR_PAUSE_FILE.read_bytes()
+                            if SUPERVISOR_PAUSE_FILE.exists() else None)
+                SUPERVISOR_PAUSE_FILE.write_text("paused-for-update", encoding="utf-8")
+            except OSError:
+                return False
+            self._update_pause_previous = previous
+            self._update_installing = True
+            return True
+
+    def _cancel_update(self):
+        from src.login_item import SUPERVISOR_PAUSE_FILE
+        with self._session_lock:
+            if not self._update_installing:
+                return
+            try:
+                if self._update_pause_previous is None:
+                    SUPERVISOR_PAUSE_FILE.unlink(missing_ok=True)
+                else:
+                    SUPERVISOR_PAUSE_FILE.write_bytes(self._update_pause_previous)
+            except OSError:
+                logger.exception("更新取消后未能恢复后台状态，请重新打开应用")
+            finally:
+                self._update_installing = False
+
+    def _update_will_relaunch(self):
+        from AppKit import NSRunningApplication
+        bundle = app_bundle_path()
+        if bundle is not None:
+            expected = str(bundle / "Contents/Helpers/VeyqaSettings.app/Contents/MacOS/VeyqaSettings")
+            for app in NSRunningApplication.runningApplicationsWithBundleIdentifier_("com.wjcdev.veyqa.settings"):
+                if app.executableURL() and os.path.realpath(app.executableURL().path()) == os.path.realpath(expected):
+                    app.terminate()
+        self.audio_recorder.reset_streaming_state(reason="安装更新")
 
     def _refresh_permission_listener(self):
         """Rebind once after a TCC grant, never restart the app or poll AX here."""
@@ -287,6 +356,9 @@ class VoiceAssistant:
                     return
                 load_dotenv(ENV_FILE, override=True)
                 service = os.getenv("TRANSCRIPTION_SERVICE", "qwen").lower()
+                from src.transcription.promotion import uses_builtin
+                if uses_builtin():
+                    service = "qwen"
                 processor = make_processor(service)
                 if not processor.is_available():
                     raise ValueError("语音服务凭证尚未配置")
@@ -491,6 +563,9 @@ class VoiceAssistant:
             self._start_unconfigured()
             return
         with self._session_lock:
+            if getattr(self, "_update_installing", False):
+                self._reject_start("正在安装更新，即将重新打开，请稍候")
+                return
             # Cancellation can arrive after dequeue but before the session exists.
             # The same lock is used by cancel_streaming, closing that race too.
             if getattr(self.keyboard_manager, "transition_was_cancelled", lambda: False)():
@@ -707,7 +782,7 @@ class VoiceAssistant:
                 reason = ("API Key 未通过验证，请检查 Key 和模型权限" if self.service == "custom"
                           else "API Key 未通过验证，请在设置中检查 Key、地区和服务权限")
                 outcome = "authentication_error"
-            elif self.service == "custom":
+            elif self.service == "custom" or getattr(self.processor, "builtin", False):
                 # The adapter emits only local, sanitized messages, never server bodies.
                 reason, outcome = error, "custom_provider_error"
             else:
@@ -788,6 +863,12 @@ class VoiceAssistant:
         self.permission_monitor.start()
         self.health.start()
         from PyObjCTools import AppHelper
+        from Foundation import NSTimer, NSRunLoop, NSRunLoopCommonModes
+        # A re-armed callLater chain stops while Sparkle enters a modal loop.
+        # A retained common-mode timer continues heartbeats inside native UI.
+        self._health_timer = NSTimer.timerWithTimeInterval_repeats_block_(
+            2.0, True, lambda timer: self._tick_health())
+        NSRunLoop.currentRunLoop().addTimer_forMode_(self._health_timer, NSRunLoopCommonModes)
         AppHelper.callAfter(self._tick_health)
         threading.Thread(
             target=self.keyboard_manager.start_listening,
@@ -807,6 +888,10 @@ class VoiceAssistant:
 
 
 def make_processor(service: str):
+    from src.transcription.promotion import uses_builtin
+    if uses_builtin():
+        from src.transcription.builtin import BuiltinStreamingProcessor
+        return BuiltinStreamingProcessor()
     if service == "doubao":
         return DoubaoStreamingProcessor()
     if service == "custom":
@@ -818,6 +903,9 @@ def main() -> None:
     try:
         resume_supervisor_for_manual_launch(sys.argv[1:])
         service = os.getenv("TRANSCRIPTION_SERVICE", "qwen").strip().lower()
+        from src.transcription.promotion import uses_builtin
+        if uses_builtin():
+            service = "qwen"
         if service not in {"qwen", "doubao", "custom"}:
             service = "qwen"
         processor = make_processor(service)

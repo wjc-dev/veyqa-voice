@@ -24,6 +24,8 @@ from Cocoa import (
     NSApplicationActivateIgnoringOtherApps,
     NSApplicationActivationPolicyRegular,
     NSImage,
+    NSMenu,
+    NSMenuItem,
     NSRunningApplication,
     NSSquareStatusItemLength,
     NSStatusBar,
@@ -272,6 +274,32 @@ class _MenuActionHandler(NSObject):
         _write_status_log("status item left-clicked")
         _launch_settings_window(getattr(self, "on_restart", None))
 
+    @objc.IBAction
+    def checkUpdates_(self, _sender):
+        if self.controller._updater is not None:
+            self.controller._updater.check()
+
+    @objc.IBAction
+    def openSettings_(self, _sender):
+        self.controller._open_settings()
+
+
+class _UpdateGate(NSObject):
+    @objc.typedSelector(objc._C_NSBOOL + b"@:")
+    def updateMayCheck(self):
+        return bool(self.controller._on_update_check())
+
+    @objc.typedSelector(objc._C_NSBOOL + b"@:")
+    def updatePrepareToInstall(self):
+        return bool(self.controller._on_update_prepare())
+
+    def updateDidCancel(self):
+        self.controller._on_update_cancel()
+
+    def updateWillRelaunch(self):
+        # Settings is a separate process. Only stop our verified, clean helper.
+        self.controller._on_update_relaunch()
+
 
 class _ApplicationDelegate(NSObject):
     """Make a second Finder/Dock launch reopen the already-running settings."""
@@ -299,6 +327,10 @@ class StatusBarController:
         *,
         on_restart=None,
         open_settings_on_start: bool = False,
+        on_update_check=lambda: False,
+        on_update_prepare=lambda: False,
+        on_update_cancel=lambda: None,
+        on_update_relaunch=lambda: None,
     ) -> None:
         self._status_item = None
         self._menu = None
@@ -309,6 +341,12 @@ class StatusBarController:
         self._open_settings_on_start = open_settings_on_start
         self._application_delegate = None
         self._status_health_check_scheduled = False
+        self._updater = None
+        self._update_gate = None
+        self._on_update_check = on_update_check
+        self._on_update_prepare = on_update_prepare
+        self._on_update_cancel = on_update_cancel
+        self._on_update_relaunch = on_update_relaunch
 
         self._custom_icons: Dict[str, NSImage] = {}
         self._load_custom_icons()
@@ -378,6 +416,18 @@ class StatusBarController:
         self._application_delegate.controller = self
         app.setDelegate_(self._application_delegate)
 
+        if bundle is not None and IS_FROZEN:
+            try:
+                from src.updater import AppUpdater
+                self._update_gate = _UpdateGate.alloc().init()
+                self._update_gate.controller = self
+                self._updater = AppUpdater(bundle, DATA_DIR, self._update_gate)
+            except Exception as exc:
+                from src.updater import unavailable
+                unavailable(DATA_DIR)
+                _write_status_log(f"updater unavailable: {type(exc).__name__}")
+        self._install_app_menu(app)
+
         if _menu_bar_enabled():
             self._install_status_item()
             self._schedule_status_health_check()
@@ -390,6 +440,31 @@ class StatusBarController:
             )
         if os.getenv("DOCK_ENTRY_SELF_TEST", "false").lower() == "true":
             AppHelper.callLater(1.2, self._open_settings)
+
+    def tick_updates(self):
+        if getattr(self, "_updater", None) is not None:
+            self._updater.tick()
+
+    def _install_app_menu(self, app):
+        self._menu_action_handler = _MenuActionHandler.alloc().init()
+        self._menu_action_handler.controller = self
+        self._menu_action_handler.on_restart = self._on_restart
+        bar = NSMenu.alloc().init()
+        top = NSMenuItem.alloc().init()
+        menu = NSMenu.alloc().initWithTitle_("Veyqa Voice")
+        for title, action, key in [("设置…", "openSettings:", ","),
+                                   ("检查更新…", "checkUpdates:", "")]:
+            item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(title, action, key)
+            item.setTarget_(self._menu_action_handler)
+            item.setEnabled_(action != "checkUpdates:" or self._updater is not None)
+            menu.addItem_(item)
+        menu.addItem_(NSMenuItem.separatorItem())
+        menu.addItem_(NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "退出 Veyqa Voice", "terminate:", "q"))
+        top.setSubmenu_(menu)
+        bar.addItem_(top)
+        app.setMainMenu_(bar)
+        self._menu = bar
 
     def _open_startup_settings(self):
         # A delayed startup callback must never steal a dictation's target.

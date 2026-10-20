@@ -44,8 +44,8 @@ class QwenStreamingProcessor:
     engine_label = "千问"
     model_name = MODEL_NAME
 
-    def __init__(self) -> None:
-        self.model_name = selected_model("qwen", os.getenv("QWEN_ASR_MODEL", ""))
+    def __init__(self, *, model_name: str | None = None) -> None:
+        self.model_name = selected_model("qwen", model_name if model_name is not None else os.getenv("QWEN_ASR_MODEL", ""))
         self.api_key = os.getenv("QWEN_API_KEY") or os.getenv("DASHSCOPE_API_KEY", "")
         self.workspace_id = os.getenv("QWEN_WORKSPACE_ID", "").strip()
         self.api_host = os.getenv("QWEN_API_HOST", "").strip()
