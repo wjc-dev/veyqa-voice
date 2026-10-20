@@ -6,13 +6,22 @@ from .runtime_paths import RESOURCE_ROOT
 
 
 @lru_cache(maxsize=1)
-def builtin_speech_enabled():
+def _flags():
     paths = (RESOURCE_ROOT / "release-features.json",
              RESOURCE_ROOT / "config" / "release-features.json")
     for path in paths:
         if path.exists():
             try:
-                return json.loads(path.read_text()).get("builtin_speech") is True
+                flags = json.loads(path.read_text())
+                return flags if isinstance(flags, dict) else {}
             except (OSError, ValueError, AttributeError):
-                return False
-    return False
+                return {}
+    return {}
+
+
+def builtin_speech_enabled():
+    return _flags().get("builtin_speech") is True
+
+
+def private_trial_enabled():
+    return builtin_speech_enabled() and _flags().get("private_trial") is True

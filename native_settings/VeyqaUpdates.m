@@ -24,6 +24,10 @@
         if (!_host) return nil;
         _gate = gate;
         _stateURL = [[NSURL fileURLWithPath:dataPath isDirectory:YES] URLByAppendingPathComponent:@"updates.json"];
+        if ([[_host objectForInfoDictionaryKey:@"VeyqaDistribution"] isEqual:@"private-trial"]) {
+            _status = @"私测版本由分发者提供更新";
+            return self;
+        }
         SPUStandardUserDriver *driver = [[SPUStandardUserDriver alloc] initWithHostBundle:_host delegate:nil];
         _updater = [[SPUUpdater alloc] initWithHostBundle:_host applicationBundle:_host userDriver:driver delegate:self];
         _status = @"";
@@ -47,6 +51,10 @@
 }
 
 - (void)start {
+    if ([[self.host objectForInfoDictionaryKey:@"VeyqaDistribution"] isEqual:@"private-trial"]) {
+        [self publish:@"私测版本由分发者提供更新，不连接公开更新源"];
+        return;
+    }
     NSError *error = nil;
     self.started = [self.updater startUpdater:&error];
     [self publish:self.started ? @"自动检查新版，安装前由你确认" : @"暂时无法检查更新，请从官网下载新版"];
@@ -66,6 +74,7 @@
 }
 
 - (void)setAutomaticChecks:(BOOL)enabled {
+    if (!self.updater) return;
     self.updater.automaticallyChecksForUpdates = enabled;
     [self publish:enabled ? @"已开启每日检查更新" : @"已关闭自动检查，可手动检查更新"];
 }

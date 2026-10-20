@@ -571,7 +571,7 @@ final class SettingsModel: ObservableObject {
         let id = connectionID
         let requestID = UUID().uuidString
         checkingConnection = true
-        connectionStatus = "正在准备免费语音服务…"
+        connectionStatus = "正在连接\(ReleaseFeatures.builtinLabel)…"
         do {
             try Self.privateWrite(Data(requestID.utf8),
                 to: dataURL.appendingPathComponent(".promotion-prefetch-request"))
@@ -1913,17 +1913,21 @@ struct EngineSettingsView: View {
             if ReleaseFeatures.builtinSpeech {
                 Section {
                     Picker("语音服务", selection: $model.credentialSource) {
-                        Text("免费语音").tag("builtin")
+                        Text(ReleaseFeatures.builtinLabel).tag("builtin")
                         Text("自己的 API").tag("personal")
                     }
                     .pickerStyle(.segmented)
                 }
             }
             if model.credentialSource == "builtin" && ReleaseFeatures.builtinSpeech {
-                Section("免费语音") {
+                Section(ReleaseFeatures.builtinLabel) {
                     LabeledContent("识别模型", value: "千问 3.0 · 实时转写")
-                    LabeledContent("本月剩余", value: "\(max(0, model.promotionRemainingSeconds) / 60) 分钟")
-                    Text("无需填写 Key，每台设备每月可用 100 分钟。语音直接发送至百炼进行识别。")
+                    if !ReleaseFeatures.privateTrial {
+                        LabeledContent("本月剩余", value: "\(max(0, model.promotionRemainingSeconds) / 60) 分钟")
+                    }
+                    Text(ReleaseFeatures.privateTrial
+                         ? "内测期间无需填写 Key。语音直接发送至百炼进行识别，由分发者承担调用费用。"
+                         : "无需填写 Key，每台设备每月可用 100 分钟。语音直接发送至百炼进行识别。")
                         .font(.callout).foregroundStyle(.secondary)
                     Button(model.checkingConnection ? "连接中…" :
                             (model.onboardingComplete ? "检查连接" : "连接并继续")) { model.checkConnection() }

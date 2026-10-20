@@ -1,14 +1,17 @@
 import Foundation
 
 enum ReleaseFeatures {
-    static let builtinSpeech: Bool = {
+    private static let flags: [String: Bool] = {
         let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().appendingPathComponent("config/release-features.json")
         let url = Bundle.main.url(forResource: "release-features", withExtension: "json") ?? source
         guard let data = try? Data(contentsOf: url),
-              let flags = try? JSONDecoder().decode([String: Bool].self, from: data) else { return false }
-        return flags["builtin_speech"] == true
+              let flags = try? JSONDecoder().decode([String: Bool].self, from: data) else { return [:] }
+        return flags
     }()
+    static let builtinSpeech = flags["builtin_speech"] == true
+    static let privateTrial = builtinSpeech && flags["private_trial"] == true
+    static let builtinLabel = privateTrial ? "内测语音" : "免费语音"
 
     static func credentialSource(_ environment: [String: String], enabled: Bool = builtinSpeech) -> String {
         guard enabled else { return "personal" }

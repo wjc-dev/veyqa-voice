@@ -16,6 +16,8 @@ class BuiltinStreamingProcessor(QwenStreamingProcessor):
     def __init__(self, broker=None):
         super().__init__(model_name=MODEL)
         self.broker = broker or get_broker()
+        self.private_trial = getattr(self.broker, "private_trial", False) is True
+        self.engine_label = "内测语音" if self.private_trial else "免费语音"
         self.api_key = ""
         self.workspace_id = ""
         self.broker.prefetch()
@@ -37,7 +39,7 @@ class BuiltinStreamingProcessor(QwenStreamingProcessor):
                 return
             except aiohttp.WSServerHandshakeError as exc:
                 if exc.status != 401 or attempt:
-                    raise RuntimeError("免费语音服务鉴权失败，请稍后重试或使用自己的 Key。") from None
+                    raise RuntimeError(f"{self.engine_label}服务鉴权失败，请稍后重试或使用自己的 Key。") from None
                 self.broker.invalidate()
 
     async def process_audio_stream(self, audio_chunk_generator, on_preview_text, on_final_text,
@@ -62,9 +64,11 @@ class BuiltinStreamingProcessor(QwenStreamingProcessor):
                 yield chunk
 
         self._send_audio = counted_send
+        def safe_error(_message):
+            on_error("内测语音暂不可用，请检查网络，或联系分发者检查凭证和额度。")
         try:
             await super().process_audio_stream(limited_audio(), on_preview_text,
-                on_final_text, on_complete, on_error, sample_rate)
+                on_final_text, on_complete, safe_error if self.private_trial else on_error, sample_rate)
         finally:
             self._send_audio = original_send
             self.api_key = ""  # Shared in-memory cache owns credential lifetime.

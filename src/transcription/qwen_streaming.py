@@ -70,7 +70,7 @@ class QwenStreamingProcessor:
         self._ws: Optional[aiohttp.ClientWebSocketResponse] = None
         self.correction_store = CorrectionStore()
 
-        if not self.api_key:
+        if not self.is_available():
             logger.info("千问 API Key 未配置，千问 ASR 暂不可用")
 
     def is_available(self) -> bool:

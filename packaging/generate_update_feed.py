@@ -14,13 +14,16 @@ from prepare_sparkle import prepare, ROOT
 
 def generate(archive: Path, output: Path, notes: Path, prefix: str | None = None):
     config = json.loads((ROOT / "packaging/sparkle.json").read_text())
-    tools = prepare() / "bin"
     with zipfile.ZipFile(archive) as source:
         info = plistlib.loads(source.read("Veyqa Voice.app/Contents/Info.plist"))
+        if (info.get("VeyqaDistribution") == "private-trial"
+                or any(Path(name).name == "private-trial.dat" for name in source.namelist())):
+            raise ValueError("Private trial credentials must never enter a public update feed")
     if info.get("SUPublicEDKey") != config["public_key"] or not info.get("SURequireSignedFeed"):
         raise ValueError("Update archive has a different signing key or unsigned feed configuration")
     if info.get("VeyqaSigningProfile") != "local":
         raise ValueError("Refusing to publish an ad-hoc update archive")
+    tools = prepare() / "bin"
     version = info["CFBundleShortVersionString"]
     prefix = prefix or f"https://github.com/wjc-dev/voxtype/releases/download/v{version}/"
     if not prefix.startswith("https://github.com/wjc-dev/voxtype/releases/download/v"):

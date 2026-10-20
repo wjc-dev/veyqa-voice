@@ -10,6 +10,23 @@ BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-222}"
 [[ "$BUILD_NUMBER" == <-> ]] || { print -u2 "Invalid build number"; exit 1; }
 ARTIFACT_SUFFIX=""
 [[ "$VEYQA_SIGNING_PROFILE" == "local" && "${VEYQA_PUBLIC_RELEASE:-false}" != "true" ]] && ARTIFACT_SUFFIX="-local"
+if [[ -n "${VEYQA_PRIVATE_TRIAL_PAYLOAD:-}" ]]; then
+  if [[ "${VEYQA_PUBLIC_RELEASE:-false}" == "true" ]]; then
+    print -u2 "Private trial payloads cannot be included in public releases."
+    exit 1
+  fi
+  [[ -f "$VEYQA_PRIVATE_TRIAL_PAYLOAD" ]] || { print -u2 "Private trial payload missing"; exit 1; }
+  [[ "$OUTPUT_DIR" == "$PROJECT_DIR"/outputs/* ]] || {
+    print -u2 "Private trial artifacts must stay in the ignored outputs directory."
+    exit 1
+  }
+  ARTIFACT_SUFFIX="-private-trial"
+  # The artifact directory is private, but files inside the installable app
+  # must be readable after a root-owned PKG install.
+  umask 022
+  mkdir -p "$OUTPUT_DIR"
+  chmod 700 "$OUTPUT_DIR"
+fi
 if [[ "${VEYQA_PUBLIC_RELEASE:-false}" == "true" && "$VEYQA_SIGNING_IDENTITY" == "-" ]]; then
   print -u2 "Public releases require the fixed signing identity; refusing ad-hoc fallback."
   exit 1
@@ -36,6 +53,7 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$WORK_DIR" "$PYINSTALLER_WORK" "$PYINSTALLER_DIST" "$ICONSET" "$OUTPUT_DIR" "$CLANG_CACHE" "$PROJECT_DIR/build"
+[[ -n "${VEYQA_PRIVATE_TRIAL_PAYLOAD:-}" ]] && chmod 700 "$WORK_DIR"
 export CLANG_MODULE_CACHE_PATH="$CLANG_CACHE"
 export SWIFT_MODULECACHE_PATH="$CLANG_CACHE"
 
@@ -104,6 +122,10 @@ cp "$SPARKLE_DIR/LICENSE" "$APP_PATH/Contents/Resources/Sparkle-LICENSE"
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_PATH/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :VeyqaSigningProfile string $VEYQA_SIGNING_PROFILE" "$APP_PATH/Contents/Info.plist"
+if [[ -n "${VEYQA_PRIVATE_TRIAL_PAYLOAD:-}" ]]; then
+  "$PROJECT_DIR/.venv/bin/python" "$PROJECT_DIR/packaging/configure_private_trial.py" \
+    inject "$APP_PATH" "$VEYQA_PRIVATE_TRIAL_PAYLOAD"
+fi
 veyqa_sign_app "$APP_PATH" "$PROJECT_DIR/packaging/voice_input.entitlements"
 
 /usr/bin/pkgbuild \

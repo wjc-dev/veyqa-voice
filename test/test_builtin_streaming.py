@@ -72,3 +72,16 @@ class BuiltinStreamingTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancellation_reports_only_sent_audio_and_clears_key(self):
         sent = await self.exercise_stream(cancel=True)
         self.assertEqual([len(chunk) for chunk in sent], [24000])
+
+    async def test_private_trial_never_exposes_reflected_provider_credentials(self):
+        self.processor.private_trial = True
+        errors = []
+        async def reflected_error(instance, chunks, preview, final, complete, error, rate):
+            error("provider echoed sk-test-secret")
+        async def empty():
+            if False:
+                yield b""
+        with patch.object(QwenStreamingProcessor, "process_audio_stream", new=reflected_error):
+            await self.processor.process_audio_stream(empty(), Mock(), Mock(), Mock(), errors.append)
+        self.assertEqual(len(errors), 1)
+        self.assertNotIn("sk-test-secret", errors[0])

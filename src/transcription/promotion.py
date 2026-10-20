@@ -314,5 +314,10 @@ def get_broker():
     global _broker
     with _broker_lock:
         if _broker is None:
-            _broker = CredentialBroker()
+            from ..release_features import private_trial_enabled
+            if private_trial_enabled():
+                from .private_trial import PrivateTrialBroker
+                _broker = PrivateTrialBroker()
+            else:
+                _broker = CredentialBroker()
         return _broker
