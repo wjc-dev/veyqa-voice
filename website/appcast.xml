@@ -4,25 +4,25 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Veyqa Voice</title>
         <item>
-            <title>0.2.11</title>
-            <pubDate>Wed, 21 Oct 2026 11:34:50 +0800</pubDate>
+            <title>0.2.12</title>
+            <pubDate>Wed, 21 Oct 2026 13:37:49 +0800</pubDate>
             <link>https://wjc-dev.github.io/voxtype/</link>
-            <sparkle:version>225</sparkle:version>
-            <sparkle:shortVersionString>0.2.11</sparkle:shortVersionString>
+            <sparkle:version>226</sparkle:version>
+            <sparkle:shortVersionString>0.2.12</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.11 · 构建 225
+            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.12 · 构建 226
 
-- 改善更新检查的连接稳定性，更新清单改由 GitHub 官方仓库提供。
-- 保留每日自动检查、点击安装并重新打开，以及更新包和清单的签名校验。
-- 推广语音继续免填 Key；已有个人 Key、模型、快捷键和词库保持不变。
+- 更新清单连接失败时，自动通过 GitHub 官方备用入口重试一次。
+- 保留每日检查、点击安装并重新打开；更新清单与安装包继续验证签名。
+- 推广语音免填 Key，已有个人 Key、模型、快捷键和词库保持不变。
 
 需要 Apple Silicon、macOS 13+。当前为 Preview。
 ]]></description>
-            <enclosure url="https://github.com/wjc-dev/voxtype/releases/download/v0.2.11/Veyqa-Voice-v0.2.11-macOS-arm64.zip" length="21225943" type="application/octet-stream" sparkle:edSignature="xHfBW6rFi0HClzC1H+eZH8Ug7DPTBJMzgt4Lpufgg4ZBODH5YErcTNqyntURW9Fyh18PONfJuVBwUi+VD6ydAQ=="></enclosure>
+            <enclosure url="https://github.com/wjc-dev/voxtype/releases/download/v0.2.12/Veyqa-Voice-v0.2.12-macOS-arm64.zip" length="21232292" type="application/octet-stream" sparkle:edSignature="jGCQr3NuR47QlNPpBitxH5XLeWTMDNjwMZfsZ1dlzQSLHNgsm6wjLQn59STDYxZmw3lay/8rxYc06TP+jPw9CA=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: hYuy0cpANyiGoU2QtvjBoDlz3FS6aLI9o/XGuyBz2Sfb4R86Er002xWGQ/1vgIi2sOc5zEFWzA1jAegniup/BA==
-length: 1661
+edSignature: DkCkCiV4SgXwIimXqiXTzK7bs0+a4DXeTClrbJ6cyXKWtCiLpj8hj82B0OiyzJwcd5khwD8hsUZUtTBjmSeMBQ==
+length: 1649
 -->
