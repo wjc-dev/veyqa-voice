@@ -4,7 +4,7 @@ set -euo pipefail
 PROJECT_DIR="${0:A:h}"
 PROJECT_PARENT="${PROJECT_DIR:h}"
 VERSION_DATE="$(date +%Y-%m-%d)"
-PACKAGE_NAME="Veyqa-Voice-v0.2.11"
+PACKAGE_NAME="Veyqa-Voice-v0.2.12"
 OUTPUT_DIR="${VOICE_INPUT_PACKAGE_OUTPUT_DIR:-$PROJECT_PARENT}"
 OUTPUT_PATH="${OUTPUT_DIR}/${PACKAGE_NAME}-macOS-source-${VERSION_DATE}.tar.gz"
 STAGING_DIR="$(mktemp -d)"

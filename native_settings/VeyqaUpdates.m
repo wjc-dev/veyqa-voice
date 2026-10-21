@@ -4,6 +4,45 @@
 #import <Sparkle/Sparkle.h>
 #import "VeyqaUpdates.h"
 
+static NSString *const VeyqaPrimaryFeed = @"https://raw.githubusercontent.com/wjc-dev/voxtype/main/website/appcast.xml";
+static NSString *const VeyqaFallbackFeed = @"https://github.com/wjc-dev/voxtype/releases/download/update-feed/appcast.xml";
+
+static BOOL VeyqaIsFeedConnectionError(NSError *error) {
+    // Retry transport failures only, never cancellation, TLS, validation or
+    // installation errors. Bound traversal of untrusted underlying errors.
+    for (NSUInteger depth = 0; error && depth < 8; depth++) {
+        if ([error.domain isEqual:NSURLErrorDomain]) {
+            switch (error.code) {
+                case NSURLErrorTimedOut:
+                case NSURLErrorCannotFindHost:
+                case NSURLErrorCannotConnectToHost:
+                case NSURLErrorDNSLookupFailed:
+                case NSURLErrorNetworkConnectionLost:
+                    return YES;
+                default: return NO;
+            }
+        }
+        if (![error.domain isEqual:SUSparkleErrorDomain] ||
+            (error.code != SUAppcastError && error.code != SUDownloadError)) return NO;
+        error = error.userInfo[NSUnderlyingErrorKey];
+    }
+    return NO;
+}
+
+@interface VeyqaUpdateUserDriver : SPUStandardUserDriver
+@property(nonatomic, copy) BOOL (^retryFeedError)(NSError *);
+@end
+
+@implementation VeyqaUpdateUserDriver
+- (void)showUpdaterError:(NSError *)error acknowledgement:(void (^)(void))acknowledgement {
+    if (self.retryFeedError && self.retryFeedError(error)) {
+        acknowledgement();
+        return;
+    }
+    [super showUpdaterError:error acknowledgement:acknowledgement];
+}
+@end
+
 @interface VeyqaUpdateController ()
 @property(nonatomic, strong) SPUUpdater *updater;
 @property(nonatomic, strong) id<VeyqaUpdateGate> gate;
@@ -15,6 +54,10 @@
 @property(nonatomic) BOOL pendingCheck;
 @property(nonatomic) BOOL started;
 @property(nonatomic) BOOL relaunching;
+@property(nonatomic) BOOL usingFallback;
+@property(nonatomic) BOOL retryFeedPending;
+@property(nonatomic) BOOL feedLoaded;
+@property(nonatomic) SPUUpdateCheck retryCheck;
 @end
 
 @implementation VeyqaUpdateController
@@ -28,7 +71,9 @@
             _status = @"私测版本由分发者提供更新";
             return self;
         }
-        SPUStandardUserDriver *driver = [[SPUStandardUserDriver alloc] initWithHostBundle:_host delegate:nil];
+        VeyqaUpdateUserDriver *driver = [[VeyqaUpdateUserDriver alloc] initWithHostBundle:_host delegate:nil];
+        __weak typeof(self) weakSelf = self;
+        driver.retryFeedError = ^BOOL(NSError *error) { return [weakSelf retryFeedAfterError:error]; };
         _updater = [[SPUUpdater alloc] initWithHostBundle:_host applicationBundle:_host userDriver:driver delegate:self];
         _status = @"";
     }
@@ -63,6 +108,7 @@
 
 - (void)checkForUpdates {
     if (!self.started) return;
+    if (self.retryFeedPending) { [self resumeIfReady]; return; }
     if (![self.gate updateMayCheck]) {
         self.pendingCheck = YES;
         [self publish:@"请先完成听写或保存设置，随后检查更新"];
@@ -80,7 +126,17 @@
 }
 
 - (void)resumeIfReady {
-    if (self.pendingInstall && [self.gate updatePrepareToInstall]) {
+    if (self.retryFeedPending) {
+        if (self.updater.sessionInProgress || ![self.gate updateMayCheck]) return;
+        self.retryFeedPending = NO;
+        self.usingFallback = YES;
+        [self publish:@"正在通过备用入口检查更新…"];
+        switch (self.retryCheck) {
+            case SPUUpdateCheckUpdatesInBackground: [self.updater checkForUpdatesInBackground]; break;
+            case SPUUpdateCheckUpdateInformation: [self.updater checkForUpdateInformation]; break;
+            default: [self.updater checkForUpdates]; break;
+        }
+    } else if (self.pendingInstall && [self.gate updatePrepareToInstall]) {
         void (^install)(void) = self.pendingInstall;
         self.pendingInstall = nil;
         [self publish:@"正在安装，即将重新打开…"];
@@ -91,10 +147,30 @@
 }
 
 - (BOOL)updater:(SPUUpdater *)updater mayPerformUpdateCheck:(SPUUpdateCheck)check error:(NSError **)error {
-    if ([self.gate updateMayCheck]) return YES;
+    if ([self.gate updateMayCheck]) {
+        self.feedLoaded = NO;
+        return YES;
+    }
     if (error) *error = [NSError errorWithDomain:@"com.wjcdev.veyqa.updates" code:1
         userInfo:@{NSLocalizedDescriptionKey: @"请先完成听写或保存设置，再检查更新。"}];
     return NO;
+}
+
+- (BOOL)retryFeedAfterError:(NSError *)error {
+    if (self.usingFallback || self.feedLoaded ||
+        ![[self.host objectForInfoDictionaryKey:@"SUFeedURL"] isEqual:VeyqaPrimaryFeed] ||
+        !VeyqaIsFeedConnectionError(error)) return NO;
+    self.retryFeedPending = YES;
+    [self publish:@"连接暂时中断，正在切换官方备用入口…"];
+    return YES;
+}
+
+- (NSString *)feedURLStringForUpdater:(SPUUpdater *)updater {
+    return self.usingFallback ? VeyqaFallbackFeed : nil;
+}
+
+- (void)updater:(SPUUpdater *)updater didFinishLoadingAppcast:(SUAppcast *)appcast {
+    self.feedLoaded = YES;
 }
 
 - (void)updater:(SPUUpdater *)updater didFindValidUpdate:(SUAppcastItem *)item {
@@ -125,6 +201,7 @@
     self.relaunching = NO;
     self.pendingInstall = nil;
     [self.gate updateDidCancel];
+    if ([self retryFeedAfterError:error]) return;
     if (error.code != SUNoUpdateError) {
         [self publish:@"更新未完成，当前版本可继续使用；请重试或从官网下载"];
         NSLog(@"Veyqa update aborted: %@", error);
@@ -133,6 +210,13 @@
 
 - (void)updater:(SPUUpdater *)updater didFinishUpdateCycleForUpdateCheck:(SPUUpdateCheck)check error:(NSError *)error {
     if (!self.pendingInstall && !self.relaunching) [self.gate updateDidCancel];
+    if (self.retryFeedPending) {
+        self.retryCheck = check;
+        // Sparkle must finish its current driver before another check starts.
+        dispatch_async(dispatch_get_main_queue(), ^{ [self resumeIfReady]; });
+    } else {
+        self.usingFallback = NO;
+    }
     [self publish:self.status];
 }
 @end
