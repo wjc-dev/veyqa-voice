@@ -4,9 +4,9 @@ set -euo pipefail
 PROJECT_DIR="${0:A:h}"
 source "$PROJECT_DIR/packaging/signing.zsh"
 veyqa_configure_signing
-VERSION="0.2.10"
+VERSION="0.2.11"
 OUTPUT_DIR="${1:-$PROJECT_DIR/dist-$VEYQA_SIGNING_PROFILE}"
-BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-224}"
+BUILD_NUMBER="${VEYQA_BUILD_NUMBER:-225}"
 [[ "$BUILD_NUMBER" == <-> ]] || { print -u2 "Invalid build number"; exit 1; }
 ARTIFACT_SUFFIX=""
 [[ "$VEYQA_SIGNING_PROFILE" == "local" && "${VEYQA_PUBLIC_RELEASE:-false}" != "true" ]] && ARTIFACT_SUFFIX="-local"
