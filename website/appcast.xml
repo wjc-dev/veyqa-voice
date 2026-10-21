@@ -4,27 +4,25 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Veyqa Voice</title>
         <item>
-            <title>0.2.10</title>
-            <pubDate>Tue, 20 Oct 2026 17:53:25 +0800</pubDate>
+            <title>0.2.11</title>
+            <pubDate>Wed, 21 Oct 2026 11:34:50 +0800</pubDate>
             <link>https://wjc-dev.github.io/voxtype/</link>
-            <sparkle:version>224</sparkle:version>
-            <sparkle:shortVersionString>0.2.10</sparkle:shortVersionString>
+            <sparkle:version>225</sparkle:version>
+            <sparkle:shortVersionString>0.2.11</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.10 · 构建 224
+            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.11 · 构建 225
 
-- 推广期间免注册、免填 Key，使用千问 3.0 Streaming；音频直连百炼。
-- 保留“自己的 API”选项，升级不覆盖已有 Key、模型、快捷键和词库。
-- 推广语音与个人 API 使用同一更新渠道：默认每日检查新版，点击更新后安装并重新打开。
-- 修饰键防误触：Command+A/C/V 等组合键不会作为单独语音快捷键提交；按住模式中途形成组合键会取消该次输入。
-- Dock 图标尺寸与原生设置交互改进。
+- 改善更新检查的连接稳定性，更新清单改由 GitHub 官方仓库提供。
+- 保留每日自动检查、点击安装并重新打开，以及更新包和清单的签名校验。
+- 推广语音继续免填 Key；已有个人 Key、模型、快捷键和词库保持不变。
 
-需要 Apple Silicon、macOS 13+。当前为尚未经过 Apple 公证的 Preview，首次打开请按官网引导完成系统确认与权限设置。
+需要 Apple Silicon、macOS 13+。当前为 Preview。
 ]]></description>
-            <enclosure url="https://github.com/wjc-dev/voxtype/releases/download/v0.2.10/Veyqa-Voice-v0.2.10-macOS-arm64.zip" length="21226364" type="application/octet-stream" sparkle:edSignature="7qGJNHG/DRfXcmOLc2cJee768k3BY8bxg9XSuFP5LGXxSR9vme0cK9w55tmSZASUM13N1RGDGGxHb+fVEJ5ZDA=="></enclosure>
+            <enclosure url="https://github.com/wjc-dev/voxtype/releases/download/v0.2.11/Veyqa-Voice-v0.2.11-macOS-arm64.zip" length="21225943" type="application/octet-stream" sparkle:edSignature="xHfBW6rFi0HClzC1H+eZH8Ug7DPTBJMzgt4Lpufgg4ZBODH5YErcTNqyntURW9Fyh18PONfJuVBwUi+VD6ydAQ=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: b9m8O0XyztGGBujTJD5XitnwNuymCSuf27Jh6XTUSCd7z/E+me7NWrttupPLRZAqNzX8qNtWWf2IlpKzpqLxAA==
-length: 1975
+edSignature: hYuy0cpANyiGoU2QtvjBoDlz3FS6aLI9o/XGuyBz2Sfb4R86Er002xWGQ/1vgIi2sOc5zEFWzA1jAegniup/BA==
+length: 1661
 -->
