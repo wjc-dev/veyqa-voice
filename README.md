@@ -2,7 +2,7 @@
 
 **轻量的 Mac 语音输入工具。按住说话，松开输入。**
 
-[官网](https://wjc-dev.github.io/voxtype/) · [下载安装包](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.12) · [English](README.en.md)
+[官网](https://wjc-dev.github.io/voxtype/) · [下载安装包](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.13) · [English](README.en.md)
 
 [![Veyqa Voice 语音输入演示](website/product-preview.svg)](https://wjc-dev.github.io/voxtype/#demo)
 
@@ -15,7 +15,7 @@
 
 需要 **Apple Silicon（M 系列芯片）、macOS 13+**。
 
-1. [下载 DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.12/Veyqa-Voice-v0.2.12-macOS-arm64.dmg) 并打开。
+1. [下载 DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.13/Veyqa-Voice-v0.2.13-macOS-arm64.dmg) 并打开。
 2. 按窗口中的箭头，将 **Veyqa Voice 拖入 Applications（应用程序）**。
 3. 从“应用程序”打开 Veyqa Voice，完成首次设置。
 
@@ -52,7 +52,7 @@ DMG 用户：下载上方新版安装包，将 App 拖入“应用程序”，�
 
 ## 语音服务
 
-推广语音使用 **Qwen Audio 3.0 ASR Streaming**，由 Veyqa Voice 承担调用费用。已有用户升级保留自己的 Key 和模型，可在“设置 → 语音服务”切换推广语音。
+推广语音使用 **Qwen Audio 3.1 ASR Message**（`qwen-audio-3.1-asr-flash-message`），支持边说边显示，默认保留原话，由 Veyqa Voice 承担调用费用。已有用户升级保留自己的 Key 和模型，可在“设置 → 语音服务”切换推广语音。
 
 使用自己的 API 时，可选择千问或豆包模型、刷新官方目录，也可添加 OpenAI 兼容的自定义转写服务。千问和豆包保持流式识别，自定义服务在录音结束后转写。[模型与配置说明](https://wjc-dev.github.io/voxtype/#engines)。
 

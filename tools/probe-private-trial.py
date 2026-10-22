@@ -54,6 +54,7 @@ async def run():
             chunks(), preview, lambda text: final.append(text),
             lambda: completed.append(True), lambda error: errors.append(True)), timeout=45)
         result = {
+            "model": processor.model_name,
             "completed": bool(completed) and not errors and bool(final),
             "audio_seconds": round(len(pcm) / 32000, 3),
             "first_text_ms": round((first_text - started) * 1000) if first_text else None,

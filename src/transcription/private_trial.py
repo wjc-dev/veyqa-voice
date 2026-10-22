@@ -16,8 +16,11 @@ import aiohttp
 
 from ..diagnostics import DiagnosticsStore
 from ..runtime_paths import DATA_DIR, RESOURCE_ROOT
-from .promotion import Credential, MODEL, MONTH_TIMEZONE
+from .promotion import Credential, MONTH_TIMEZONE
 from .private_trial_payload import FILENAME, decode
+from .speech_models import DEFAULT_MODELS
+
+MODEL = DEFAULT_MODELS["promotion"]
 
 
 class PrivateTrialBroker:
@@ -76,10 +79,14 @@ class PrivateTrialBroker:
                         break
                     event = json.loads(message.data).get("header", {}).get("event")
                     if event == "task-started":
+                        # Some provider ACL failures arrive after task-started.
+                        # Finish a small silent request before declaring success.
+                        await socket.send_bytes(bytes(3200))
                         await socket.send_json({
                             "header": {"action": "finish-task", "task_id": task, "streaming": "duplex"},
                             "payload": {"input": {}},
                         })
+                    if event == "task-finished":
                         return
                     if event == "task-failed":
                         break

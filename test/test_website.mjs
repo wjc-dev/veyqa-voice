@@ -97,7 +97,7 @@ test("static accessible website with no agent prompt or credential form", () => 
 test("DMG install, permissions and trial have clear instructions", () => {
   assert.ok(
     html.includes(
-      "/releases/download/v0.2.12/Veyqa-Voice-v0.2.12-macOS-arm64.dmg",
+      "/releases/download/v0.2.13/Veyqa-Voice-v0.2.13-macOS-arm64.dmg",
     ),
   );
   for (const text of [

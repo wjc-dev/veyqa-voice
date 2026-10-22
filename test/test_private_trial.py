@@ -6,10 +6,14 @@ import plistlib
 import sys
 import tempfile
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+from types import SimpleNamespace
+import aiohttp
 import zipfile
 
-from src.transcription.private_trial import PrivateTrialBroker
+from src.transcription.private_trial import PrivateTrialBroker, MODEL
+from src.transcription.builtin import BuiltinStreamingProcessor
+from src.transcription.promotion import MODEL as REMOTE_MODEL
 from src.transcription.private_trial_payload import FILENAME, decode, encode
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,6 +51,23 @@ class PrivateTrialTests(unittest.TestCase):
         self.assertNotIn(KEY, repr(decode(self.payload)))
         self.assertNotEqual(self.payload, encode(KEY, HOST))
 
+    def test_promotion_uses_message_model_without_changing_personal_or_remote_defaults(self):
+        from src.transcription.speech_models import DEFAULT_MODELS
+        from src.transcription.qwen_streaming import QwenStreamingProcessor
+        import os
+
+        with patch.dict(os.environ, {"QWEN_ASR_MODEL": "qwen-audio-3.1-asr-flash-streaming"}):
+            processor = BuiltinStreamingProcessor(self.broker())
+            personal = QwenStreamingProcessor()
+        request = processor._run_task_event(16000, "test")["payload"]
+        self.assertEqual(request["model"], "qwen-audio-3.1-asr-flash-message")
+        self.assertEqual(processor.model_name, MODEL)
+        self.assertTrue(request["parameters"]["intermediate_result_enabled"])
+        self.assertFalse(request["parameters"]["disfluency_removal_enabled"])
+        self.assertEqual(personal.model_name, "qwen-audio-3.1-asr-flash-streaming")
+        self.assertEqual(REMOTE_MODEL, "qwen-audio-3.0-asr-flash-streaming")
+        self.assertEqual(DEFAULT_MODELS["qwen"], REMOTE_MODEL)
+
     def test_payload_corruption_and_nonofficial_endpoint_rejected(self):
         for value in (b"", b"plain text", self.payload[:-1], self.payload[:-1] + b"x"):
             with self.assertRaises(ValueError):
@@ -74,11 +95,36 @@ class PrivateTrialTests(unittest.TestCase):
         self.assertNotIn(KEY, text)
         self.assertTrue(json.loads(text)["enabled"])
         self.assertEqual(json.loads(text)["request_id"], "request-1")
+        self.assertEqual(json.loads(text)["model"], "qwen-audio-3.1-asr-flash-message")
         with patch.object(broker, "_probe", new=AsyncMock(side_effect=RuntimeError(KEY))):
             broker.request_check("request-2").result(timeout=2)
         text = (self.root / "promotion.json").read_text()
         self.assertNotIn(KEY, text)
         self.assertFalse(json.loads(text)["enabled"])
+
+    def test_connection_check_waits_for_model_acceptance_after_task_started(self):
+        broker = self.broker()
+        for terminal, accepted in (("task-finished", True), ("task-failed", False)):
+            socket = AsyncMock()
+            socket.receive.side_effect = [SimpleNamespace(
+                type=aiohttp.WSMsgType.TEXT,
+                data=json.dumps({"header": {"event": event}}),
+            ) for event in ("task-started", terminal)]
+            connection = MagicMock()
+            connection.__aenter__ = AsyncMock(return_value=socket)
+            session = MagicMock()
+            session.ws_connect.return_value = connection
+            context = MagicMock()
+            context.__aenter__ = AsyncMock(return_value=session)
+            with patch("src.transcription.private_trial.aiohttp.ClientSession", return_value=context):
+                if accepted:
+                    asyncio.run(broker._probe())
+                else:
+                    with self.assertRaises(RuntimeError):
+                        asyncio.run(broker._probe())
+            request = socket.send_json.call_args_list[0].args[0]
+            self.assertEqual(request["payload"]["model"], "qwen-audio-3.1-asr-flash-message")
+            socket.send_bytes.assert_awaited_once_with(bytes(3200))
 
     def test_injection_separates_helper_and_disables_public_updates(self):
         configure = load_packaging_module("configure_private_trial")

@@ -1,5 +1,6 @@
 {
   "defaults": {
+    "promotion": "qwen-audio-3.1-asr-flash-message",
     "qwen": "qwen-audio-3.0-asr-flash-streaming",
     "doubao": "volc.seedasr.sauc.duration"
   },

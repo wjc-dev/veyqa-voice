@@ -7,6 +7,7 @@ import aiohttp
 
 from .promotion import ERRORS, MODEL, get_broker
 from .qwen_streaming import QwenStreamingProcessor
+from .speech_models import DEFAULT_MODELS
 
 
 class BuiltinStreamingProcessor(QwenStreamingProcessor):
@@ -14,9 +15,9 @@ class BuiltinStreamingProcessor(QwenStreamingProcessor):
     builtin = True
 
     def __init__(self, broker=None):
-        super().__init__(model_name=MODEL)
         self.broker = broker or get_broker()
         self.private_trial = getattr(self.broker, "private_trial", False) is True
+        super().__init__(model_name=DEFAULT_MODELS["promotion"] if self.private_trial else MODEL)
         self.engine_label = "推广语音" if self.private_trial else "免费语音"
         self.api_key = ""
         self.workspace_id = ""

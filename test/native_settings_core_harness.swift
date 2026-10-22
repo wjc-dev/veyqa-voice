@@ -51,6 +51,7 @@ struct SettingsCoreHarness {
         require(snapshotGate.changed(nil), "deleted snapshot resets")
         require(QwenConnection.host(custom: "", region: "beijing") == "dashscope.aliyuncs.com", "key-only defaults")
         let messageModel = "qwen-audio-3.1-asr-flash-message"
+        require(SpeechModels.defaultModel("promotion") == messageModel, "promotion model matches runtime catalogue")
         let request = QwenConnection.startRequest(taskID: "probe", model: messageModel)
         let requestPayload = request["payload"] as! [String: Any]
         require(requestPayload["model"] as? String == messageModel, "connection check uses selected model")

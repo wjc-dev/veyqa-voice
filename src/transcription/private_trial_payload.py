@@ -9,6 +9,8 @@ import json
 import re
 import secrets
 
+# Legacy envelope marker, not the runtime model. Keep existing credentials valid;
+# the current sponsored model comes from config/asr-models.json.
 MODEL = "qwen-audio-3.0-asr-flash-streaming"
 MAGIC = b"VEYQA-PRIVATE-1\x00"
 FILENAME = "private-trial.dat"

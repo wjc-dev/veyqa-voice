@@ -758,7 +758,7 @@ final class SettingsModel: ObservableObject {
     }
 
     var selectedModelID: String {
-        if credentialSource == "builtin" { return "qwen-audio-3.0-asr-flash-streaming" }
+        if credentialSource == "builtin" { return ReleaseFeatures.builtinModel }
         switch transcriptionService {
         case "custom": return customASRModel
         case "doubao": return doubaoModel
@@ -1921,7 +1921,7 @@ struct EngineSettingsView: View {
             }
             if model.credentialSource == "builtin" && ReleaseFeatures.builtinSpeech {
                 Section(ReleaseFeatures.builtinLabel) {
-                    LabeledContent("识别模型", value: "千问 3.0 · 实时转写")
+                    LabeledContent("识别模型", value: SpeechModels.option(ReleaseFeatures.builtinModel, provider: "qwen").name)
                     if !ReleaseFeatures.privateTrial {
                         LabeledContent("本月剩余", value: "\(max(0, model.promotionRemainingSeconds) / 60) 分钟")
                     }
