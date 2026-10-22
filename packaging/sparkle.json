@@ -4,5 +4,5 @@
   "url": "https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz",
   "public_key": "0LsMD9edTYW+cc1emzlg6LB3y8O6yNDE0bDnVR651Ys=",
   "keychain_account": "com.wjcdev.veyqa.updates",
-  "feed_url": "https://raw.githubusercontent.com/wjc-dev/voxtype/main/website/appcast.xml"
+  "feed_url": "https://raw.githubusercontent.com/wjc-dev/veyqa-voice/main/website/appcast.xml"
 }

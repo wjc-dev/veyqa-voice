@@ -588,11 +588,6 @@ code {
   gap: 28px;
   margin: 34px 0 22px;
 }
-.safety-steps {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 28px;
-  margin: 34px 0 28px;
-}
 .key-steps li {
   position: relative;
   display: block;
@@ -848,9 +843,6 @@ details[open] summary {
   .key-steps {
     grid-template-columns: 1fr;
     gap: 28px;
-  }
-  .safety-steps {
-    grid-template-columns: 1fr;
   }
   .key-steps li > div {
     display: grid;

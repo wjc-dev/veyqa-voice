@@ -4,8 +4,8 @@
 #import <Sparkle/Sparkle.h>
 #import "VeyqaUpdates.h"
 
-static NSString *const VeyqaPrimaryFeed = @"https://raw.githubusercontent.com/wjc-dev/voxtype/main/website/appcast.xml";
-static NSString *const VeyqaFallbackFeed = @"https://github.com/wjc-dev/voxtype/releases/download/update-feed/appcast.xml";
+static NSString *const VeyqaPrimaryFeed = @"https://raw.githubusercontent.com/wjc-dev/veyqa-voice/main/website/appcast.xml";
+static NSString *const VeyqaFallbackFeed = @"https://github.com/wjc-dev/veyqa-voice/releases/download/update-feed/appcast.xml";
 
 static BOOL VeyqaIsFeedConnectionError(NSError *error) {
     // Retry transport failures only, never cancellation, TLS, validation or

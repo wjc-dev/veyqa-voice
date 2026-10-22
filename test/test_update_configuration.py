@@ -20,7 +20,7 @@ def test_public_feed_uses_official_repository_and_keeps_verification(tmp_path):
     info = plistlib.loads(path.read_bytes())
     config = json.loads((ROOT / "packaging/sparkle.json").read_text())
     assert info["SUFeedURL"] == (
-        "https://raw.githubusercontent.com/wjc-dev/voxtype/main/website/appcast.xml"
+        "https://raw.githubusercontent.com/wjc-dev/veyqa-voice/main/website/appcast.xml"
     )
     assert info["SUPublicEDKey"] == config["public_key"]
     assert info["SURequireSignedFeed"] is True

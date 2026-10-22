@@ -34,8 +34,8 @@ def generate(archive: Path, output: Path, notes: Path, prefix: str | None = None
         raise ValueError("Refusing to publish an ad-hoc update archive")
     tools = prepare() / "bin"
     version = info["CFBundleShortVersionString"]
-    prefix = prefix or f"https://github.com/wjc-dev/voxtype/releases/download/v{version}/"
-    if not prefix.startswith("https://github.com/wjc-dev/voxtype/releases/download/v"):
+    prefix = prefix or f"https://github.com/wjc-dev/veyqa-voice/releases/download/v{version}/"
+    if not prefix.startswith("https://github.com/wjc-dev/veyqa-voice/releases/download/v"):
         raise ValueError("Only official HTTPS release URLs may be published")
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="appcast-", suffix=".noindex", dir=ROOT / "outputs") as directory:
@@ -45,7 +45,7 @@ def generate(archive: Path, output: Path, notes: Path, prefix: str | None = None
         generated = staging / "appcast.xml"
         subprocess.run([str(tools / "generate_appcast"), "--account", config["keychain_account"],
                         "--maximum-deltas", "0", "--embed-release-notes", "--download-url-prefix", prefix,
-                        "--link", "https://wjc-dev.github.io/voxtype/", "-o", str(generated), str(staging)], check=True)
+                        "--link", "https://wjc-dev.github.io/veyqa-voice/", "-o", str(generated), str(staging)], check=True)
         subprocess.run([str(tools / "sign_update"), "--account", config["keychain_account"],
                         "--verify", str(generated)], check=True)
         ns = "{http://www.andymatuschak.org/xml-namespaces/sparkle}"

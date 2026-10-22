@@ -149,7 +149,7 @@ struct SettingsCoreHarness {
         )
 
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "voxtype-settings-core-\(UUID().uuidString)", isDirectory: true
+            "veyqa-settings-core-\(UUID().uuidString)", isDirectory: true
         )
         defer { try? FileManager.default.removeItem(at: directory) }
         let envURL = directory.appendingPathComponent(".env")

@@ -14,7 +14,7 @@
       content="按住说话，松开输入。与你的输入法一起使用。"
     />
     <meta property="og:type" content="website" />
-    <link rel="canonical" href="https://wjc-dev.github.io/voxtype/" />
+    <link rel="canonical" href="https://wjc-dev.github.io/veyqa-voice/" />
     <link rel="icon" href="./mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./style.css?v=0.2.9-222" />
     <script src="./app.js?v=0.2.9-222" defer></script>
@@ -31,7 +31,7 @@
       >
       <nav aria-label="主导航">
         <a href="#demo">看演示</a><a href="#install">安装</a
-        ><a href="https://github.com/wjc-dev/voxtype">GitHub ↗</a>
+        ><a href="https://github.com/wjc-dev/veyqa-voice">GitHub ↗</a>
       </nav>
     </header>
     <main id="main">
@@ -151,19 +151,18 @@
           </div>
           <a
             class="button primary"
-            href="https://github.com/wjc-dev/voxtype/releases/download/v0.2.13/Veyqa-Voice-v0.2.13-macOS-arm64.dmg"
+            href="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.14/Veyqa-Voice-v0.2.14-macOS-arm64.dmg"
             >下载 Mac 版 ↓</a
           >
           <p class="fine">
             M 系列 Mac · macOS 13+ ·
-            <a href="https://github.com/wjc-dev/voxtype/releases/tag/v0.2.13"
-              >0.2.13 Preview ↗</a
+            <a href="https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.14"
+              >0.2.14 Preview ↗</a
             >
           </p>
-          <p>
-            <a class="text-link" href="#safety"
-              >首次打开提示“无法验证开发者”？查看步骤 ↓</a
-            >
+          <p class="fine" id="safety">
+            首次打开若提示“无法验证开发者”，前往“系统设置 → 隐私与安全性”，点击“仍要打开”。
+            <a href="https://support.apple.com/zh-cn/102445">查看说明 ↗</a>
           </p>
           <details class="brew-details">
             <summary>
@@ -187,7 +186,7 @@
           <p class="fine">
             以后更新：在 App 设置中点击“检查更新”，下载并重新打开，Key 和配置保留。
             0.2.8 及更早版本需先退出 App，用新版 DMG 替换一次。
-            <a href="https://github.com/wjc-dev/voxtype#更新">Homebrew 更新方法 ↗</a>
+            <a href="https://github.com/wjc-dev/veyqa-voice#更新">Homebrew 更新方法 ↗</a>
           </p>
         </div>
         <div class="install-content">
@@ -317,59 +316,13 @@
         </div>
         <p class="fine">也支持自定义 OpenAI 兼容语音服务：填入 API 地址、Key 和模型型号，录音结束后转写。</p>
       </section>
-      <section class="shell section" id="safety" aria-labelledby="safety-title">
-        <div class="section-heading">
-          <p class="eyebrow">FIRST OPEN</p>
-          <h2 id="safety-title">首次打开，跟着这三步。</h2>
-          <p>
-            当前为尚未经过 Apple 公证的
-            Preview。遇到“无法验证开发者”提示，确认来自官网并信任其来源后：
-          </p>
-        </div>
-        <ol class="steps safety-steps">
-          <li>
-            <span>1</span>
-            <div>
-              <h3>打开系统设置</h3>
-              <p>选择“隐私与安全性”，向下滚动到“安全性”。</p>
-            </div>
-          </li>
-          <li>
-            <span>2</span>
-            <div>
-              <h3>点击“仍要打开”</h3>
-              <p>
-                找到 Veyqa Voice 对应的提示，点击“仍要打开”，按系统提示确认。
-              </p>
-            </div>
-          </li>
-          <li>
-            <span>3</span>
-            <div>
-              <h3>返回 App 继续设置</h3>
-              <p>连接推广语音、完成权限设置，再按住右 Option 试一句。</p>
-            </div>
-          </li>
-        </ol>
-        <p class="fine">
-          <a href="https://support.apple.com/zh-cn/102445"
-            >Apple 官方图文说明 ↗</a
-          >
-        </p>
-        <p class="fine">
-          恶意软件或文件损坏提示：暂停安装并<a
-            href="https://github.com/wjc-dev/voxtype/issues"
-            >反馈</a
-          >。公司安全软件拦截：联系管理员处理。
-        </p>
-      </section>
     </main>
     <footer class="shell footer">
       <a class="brand" href="#">Veyqa<span>Voice</span></a
       ><span class="fine">Lightweight voice input for Mac.</span>
       <div>
-        <a href="https://github.com/wjc-dev/voxtype/issues">反馈问题 ↗</a
-        ><a href="https://github.com/wjc-dev/voxtype/blob/main/LICENSE"
+        <a href="https://github.com/wjc-dev/veyqa-voice/issues">反馈问题 ↗</a
+        ><a href="https://github.com/wjc-dev/veyqa-voice/blob/main/LICENSE"
           >MIT 开源</a
         >
       </div>

@@ -13,7 +13,7 @@ Veyqa Voice 是本地 macOS 客户端，不是离线识别模型。一次正常�
 ## 本地保存
 
 - 默认不保存录音：`AUDIO_ARCHIVE_ENABLED=false`。
-- API 凭证与设置位于当前用户的 `~/Library/Application Support/Veyqa`；首次运行会从旧版 VoxType 迁移设置；源码模式位于项目的 `.env`。
+- API 凭证与设置位于当前用户的 `~/Library/Application Support/Veyqa`；首次运行会迁移旧版设置；源码模式位于项目的 `.env`。
 - 本机纠错可能保存“识别错误 → 人工改为”及次数，因此可能含有私人词汇。
 - 写入失败时的恢复记录可能包含最近的转写文字。
 - 这些文件只应由当前用户读取，不应上传到 Git、Issue、聊天或安装包。
@@ -24,7 +24,7 @@ Veyqa Voice 是本地 macOS 客户端，不是离线识别模型。一次正常�
 
 ## 凭证
 
-- 每位用户应创建并使用自己的凭证。
+- 推广语音使用维护者提供的凭证，由维护者承担调用费用；用户也可以选择自己的 API 凭证。
 - 千问需要百炼 API Key 与匹配的 API Host；不要填写阿里云 AccessKey ID/Secret。
 - 豆包需要语音应用的 App ID 与 Access Token。
 - 当前版本把凭证保存在权限受限的本地配置文件中，尚未使用 macOS Keychain。不要在共享账号或不受信任电脑上保存生产凭证。

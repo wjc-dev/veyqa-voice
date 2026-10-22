@@ -97,7 +97,7 @@ test("static accessible website with no agent prompt or credential form", () => 
 test("DMG install, permissions and trial have clear instructions", () => {
   assert.ok(
     html.includes(
-      "/releases/download/v0.2.13/Veyqa-Voice-v0.2.13-macOS-arm64.dmg",
+      "/releases/download/v0.2.14/Veyqa-Voice-v0.2.14-macOS-arm64.dmg",
     ),
   );
   for (const text of [
@@ -126,23 +126,14 @@ test("precise service facts and concise vocabulary copy", () => {
     assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /不承诺|不等于|≠|零门槛|零配置|不上传云端/);
 });
-test("security guide distinguishes verification from malware and managed blocks", () => {
-  for (const text of [
-    "仍要打开",
-    "隐私与安全性",
-    "恶意软件",
-    "文件损坏",
-    "公司安全软件",
-    "联系管理员",
-  ])
+test("first-open help stays compact beside the download", () => {
+  for (const text of ["仍要打开", "隐私与安全性"])
     assert.ok(html.includes(text), text);
   assert.ok(html.includes('href="https://support.apple.com/zh-cn/102445"'));
+  assert.match(html, /<p class="fine" id="safety">/);
+  assert.ok(html.indexOf('id="safety"') < html.indexOf('class="install-content"'));
+  assert.doesNotMatch(html, /safety-steps|FIRST OPEN|首次打开，跟着这三步/);
   assert.doesNotMatch(html, /spctl\s+--|xattr\s+-/);
-});
-test("first-open steps are independent of picture-card numbering", () => {
-  const safety = html.slice(html.indexOf('id="safety"'));
-  assert.match(safety, /class="steps safety-steps"/);
-  assert.doesNotMatch(safety, /key-steps/);
 });
 test("Homebrew is an alternative near the download, not a fourth setup step", () => {
   assert.ok(html.indexOf('class="brew-details"') < html.indexOf('class="install-content"'));

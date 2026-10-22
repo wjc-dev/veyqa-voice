@@ -7,8 +7,8 @@
 需要 Apple Silicon、macOS 13+、Xcode Command Line Tools 和 Python 3.13。
 
 ```bash
-git clone https://github.com/wjc-dev/voxtype.git
-cd voxtype
+git clone https://github.com/wjc-dev/veyqa-voice.git
+cd veyqa-voice
 uv venv --python 3.13 .venv
 uv pip install -r requirements-dev.txt
 cp env.example .env

@@ -2,9 +2,9 @@
 
 **Lightweight voice input for Mac. Hold to speak, release to type.**
 
-[Website](https://wjc-dev.github.io/voxtype/) · [Download](https://github.com/wjc-dev/voxtype/releases/tag/v0.2.13) · [简体中文](README.md)
+[Website](https://wjc-dev.github.io/veyqa-voice/) · [Download](https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.14) · [简体中文](README.md)
 
-[![Veyqa Voice demo](website/product-preview.svg)](https://wjc-dev.github.io/voxtype/#demo)
+[![Veyqa Voice demo](website/product-preview.svg)](https://wjc-dev.github.io/veyqa-voice/#demo)
 
 - Works alongside your existing keyboard and input method.
 - Transcribes your words into the focused input field; you decide when to send.
@@ -15,11 +15,11 @@
 
 Requires **Apple Silicon and macOS 13+**.
 
-1. [Download and open the DMG](https://github.com/wjc-dev/voxtype/releases/download/v0.2.13/Veyqa-Voice-v0.2.13-macOS-arm64.dmg).
+1. [Download and open the DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.14/Veyqa-Voice-v0.2.14-macOS-arm64.dmg).
 2. Follow the arrow: drag **Veyqa Voice into Applications**.
 3. Open Veyqa Voice from Applications to begin setup.
 
-This Preview is not yet Apple-notarized. For an unidentified-developer prompt, see the [first-open guide](https://wjc-dev.github.io/voxtype/#safety).
+For an unidentified-developer prompt, open System Settings → Privacy & Security → Open Anyway. [See Apple's guide](https://support.apple.com/en-us/102445).
 
 Or install with Homebrew:
 
@@ -44,7 +44,7 @@ For DMG installations, download the new installer above, drag the app into Appli
 
 ## Set up once
 
-1. Connect to the default sponsored speech service; no account or API Key is required. You can also [use your own Key](https://wjc-dev.github.io/voxtype/#api-key).
+1. Connect to the default sponsored speech service; no account or API Key is required. You can also [use your own Key](https://wjc-dev.github.io/veyqa-voice/#api-key).
 2. Grant microphone, Accessibility, and Input Monitoring permissions. Return to the app for automatic checks. Follow macOS prompts if it requests a relaunch.
 3. Click the trial text field, hold **right Option** to speak, then release. Finish setup and use it in other apps.
 
@@ -58,7 +58,7 @@ With your own API credentials, choose Qwen or Doubao models and refresh their of
 
 Audio goes directly to the selected speech service. Personal API credentials stay on your Mac and usage is billed to your provider account. Local audio archives are off by default.
 
-[Issues](https://github.com/wjc-dev/voxtype/issues) · [Development](docs/development.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+[Issues](https://github.com/wjc-dev/veyqa-voice/issues) · [Development](docs/development.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ## License
 
