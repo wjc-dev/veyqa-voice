@@ -66,7 +66,7 @@ from src.utils.logger import logger
 from src.setup_feedback import empty_result_notice
 
 
-__version__ = "0.2.14"
+__version__ = "0.2.15"
 __author__ = "Mor-Li"
 __description__ = "Qwen and Doubao realtime voice input for macOS"
 
@@ -900,7 +900,7 @@ def make_processor(service: str):
     return QwenStreamingProcessor()
 
 
-def main() -> None:
+def _run_application() -> None:
     try:
         resume_supervisor_for_manual_launch(sys.argv[1:])
         service = os.getenv("TRANSCRIPTION_SERVICE", "qwen").strip().lower()
@@ -924,6 +924,15 @@ def main() -> None:
         else:
             logger.error("应用启动失败: %s", message, exc_info=True)
         sys.exit(1)
+
+
+def main() -> None:
+    from src.instance_lock import app_instance
+    with app_instance(DATA_DIR) as acquired:
+        if not acquired:
+            logger.info("已有 Veyqa Voice 正在运行，跳过重复启动")
+            return
+        _run_application()
 
 
 if __name__ == "__main__":

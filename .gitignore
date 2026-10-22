@@ -65,3 +65,4 @@ dist-local/
 trash/
 report*/
 permissions.json
+.app-instance.lock
