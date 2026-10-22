@@ -4,25 +4,28 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Veyqa Voice</title>
         <item>
-            <title>0.2.15</title>
-            <pubDate>Thu, 22 Oct 2026 14:40:01 +0800</pubDate>
+            <title>0.2.16</title>
+            <pubDate>Thu, 22 Oct 2026 17:28:45 +0800</pubDate>
             <link>https://wjc-dev.github.io/veyqa-voice/</link>
-            <sparkle:version>229</sparkle:version>
-            <sparkle:shortVersionString>0.2.15</sparkle:shortVersionString>
+            <sparkle:version>230</sparkle:version>
+            <sparkle:shortVersionString>0.2.16</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.15
+            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.16
 
-- 仓库、官网、下载和应用更新入口统一为 Veyqa Voice（veyqa-voice）。
-- 官网安装提示更简洁，首次打开说明收进下载区。
-- 安装包说明同步推广语音流程，无需填写 API Key。
-- 修复更新后可能同时启动两份主程序的问题，保持一套录音与快捷键监听。
-- 保留现有凭证、模型、快捷键和系统权限。
+- 语音服务统一命名为“内置服务 / 个人 API”。新安装默认使用内置服务，已有配置保持不变。
+- 设置页新增滑动选中背景、轻弹反馈与页面淡入过渡，标签、服务来源和供应商切换更流畅。
+- 展开内容轻盈呈现，标题位置保持稳定，支持原地再次点击收起。
+- 适配 macOS“减少动态效果”，动画仅在交互时运行。
+
+内置服务使用 Qwen Audio 3.1 Message，无需填写 API Key。也可使用千问、豆包或自定义供应商的个人 API。
+
+升级保留 Key、模型、快捷键和其他设置。支持在 App 内检查更新、下载安装并重新打开。
 ]]></description>
-            <enclosure url="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.15/Veyqa-Voice-v0.2.15-macOS-arm64.zip" length="21230002" type="application/octet-stream" sparkle:edSignature="8neD19IpA3YHmc8I2mu/WTedistftCuJc83hTEM0Ywb8QsBPAMgkSn0N2Wftt+Pgms6KV3LvsqZqeBjxKuqjAA=="></enclosure>
+            <enclosure url="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.16/Veyqa-Voice-v0.2.16-macOS-arm64.zip" length="21044990" type="application/octet-stream" sparkle:edSignature="6mHsP3p16q62fGIcC2LpiI3GK28kAldybjHu/VvobtO+xC2O4DdMcNWQYbarH/hMg6qlzBj8K3H92LObifE0DA=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: 7QuGaLp9XnWjqx2l6JUOMjxRAxIbeJhqup5xSSi1hGnQoY7KJbnVpDj7k74u5nESmRD2uRV2G0OEStyD1A7bCg==
-length: 1700
+edSignature: 1F5sPD1j1X09ftICNt7bkfcai0IjwU0nc/wmEGteEAnPeyy856CeSTmPMKDX0m6BHUxffrfeLSurD/kRZTWbCg==
+length: 1979
 -->
