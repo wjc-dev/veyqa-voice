@@ -9,7 +9,7 @@ a = Analysis(
     pathex=[str(project)],
     binaries=[],
     datas=[
-        (str(project / "env.example"), "."),
+        (str(project / "config" / "env.example"), "."),
         (str(project / "config" / "asr-models.json"), "."),
         (str(project / "config" / "release-features.json"), "."),
         (str(project / "packaging" / "StatusBarIcon.png"), "."),

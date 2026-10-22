@@ -1,6 +1,8 @@
 #!/bin/zsh
 set -euo pipefail
 
+# Removes the source-development service; packaged app installs use Homebrew/Finder.
+
 LABEL="com.whisper-input-next"
 USER_ID="$(id -u)"
 PLIST_PATH="$HOME/Library/LaunchAgents/${LABEL}.plist"

@@ -10,8 +10,8 @@ class PackagingIdentityTests(unittest.TestCase):
     def test_release_version_is_consistent(self):
         main = (ROOT / "main.py").read_text(encoding="utf-8")
         spec = (ROOT / "packaging" / "VoiceInput.spec").read_text(encoding="utf-8")
-        build = (ROOT / "build-internal-dmg.command").read_text(encoding="utf-8")
-        source_package = (ROOT / "package-source.command").read_text(encoding="utf-8")
+        build = (ROOT / "scripts/build-macos.command").read_text(encoding="utf-8")
+        source_package = (ROOT / "scripts/package-source.command").read_text(encoding="utf-8")
         settings_info = (
             ROOT / "native_settings" / "VoiceInputSettings-Info.plist"
         ).read_text(encoding="utf-8")
@@ -39,7 +39,7 @@ class PackagingIdentityTests(unittest.TestCase):
         settings = (ROOT / "native_settings" / "VoiceInputSettings.swift").read_text(
             encoding="utf-8"
         )
-        build = (ROOT / "build-internal-dmg.command").read_text(encoding="utf-8")
+        build = (ROOT / "scripts/build-macos.command").read_text(encoding="utf-8")
 
         self.assertIn('bundle_identifier="com.wjcdev.veyqa"', spec)
         agent = (ROOT / "packaging" / "com.wjcdev.veyqa.agent.plist").read_text(
@@ -54,7 +54,7 @@ class PackagingIdentityTests(unittest.TestCase):
 
     def test_old_identity_is_only_kept_for_login_item_migration(self):
         spec = (ROOT / "packaging" / "VoiceInput.spec").read_text(encoding="utf-8")
-        build = (ROOT / "build-internal-dmg.command").read_text(encoding="utf-8")
+        build = (ROOT / "scripts/build-macos.command").read_text(encoding="utf-8")
 
         self.assertNotIn("com.voiceinputnext.app", spec)
         self.assertNotIn("com.voiceinputnext.app", build)
@@ -62,7 +62,7 @@ class PackagingIdentityTests(unittest.TestCase):
         self.assertNotIn("com.voiceinputnext.qwen", build)
 
     def test_packaging_cleans_nested_app_bundles_by_default(self):
-        build = (ROOT / "build-internal-dmg.command").read_text(encoding="utf-8")
+        build = (ROOT / "scripts/build-macos.command").read_text(encoding="utf-8")
 
         self.assertIn("trap cleanup EXIT", build)
         self.assertIn('rm -rf "$WORK_DIR"', build)
@@ -78,8 +78,8 @@ class PackagingIdentityTests(unittest.TestCase):
         self.assertIn('appendingPathComponent("Contents/MacOS/VeyqaVoice")', settings)
 
     def test_packaging_embeds_modern_service_management_agent(self):
-        build = (ROOT / "build-internal-dmg.command").read_text(encoding="utf-8")
-        native_build = (ROOT / "build-native-settings.command").read_text(
+        build = (ROOT / "scripts/build-macos.command").read_text(encoding="utf-8")
+        native_build = (ROOT / "scripts/build-settings.command").read_text(
             encoding="utf-8"
         )
         spec = (ROOT / "packaging" / "VoiceInput.spec").read_text(encoding="utf-8")
@@ -108,7 +108,7 @@ class PackagingIdentityTests(unittest.TestCase):
         self.assertNotIn("VoiceInputSettings.appbin", spec)
 
     def test_uv_created_environment_does_not_require_bundled_pip(self):
-        build = (ROOT / "build-internal-dmg.command").read_text(encoding="utf-8")
+        build = (ROOT / "scripts/build-macos.command").read_text(encoding="utf-8")
 
         self.assertIn("uv pip install --python", build)
         self.assertIn("-m ensurepip --upgrade", build)

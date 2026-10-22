@@ -99,7 +99,7 @@ print "[1/7] Running unit tests"
 env -u VOICE_INPUT_DISABLE_LOGIN_SYNC "$PROJECT_DIR/.venv/bin/python" -m pytest test/
 
 print "[2/7] Building isolated internal artifacts"
-zsh "$PROJECT_DIR/build-internal-dmg.command" "$OUTPUT_DIR"
+zsh "$PROJECT_DIR/scripts/build-macos.command" "$OUTPUT_DIR"
 
 print "[3/7] Verifying bundle structure, version, and signature"
 mkdir -p "$EXTRACT_DIR" "$DATA_DIR"

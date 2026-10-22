@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-PROJECT_DIR="${0:A:h}"
+PROJECT_DIR="${0:A:h:h}"
 PROJECT_PARENT="${PROJECT_DIR:h}"
 VERSION_DATE="$(date +%Y-%m-%d)"
 PACKAGE_NAME="Veyqa-Voice-v0.2.15"

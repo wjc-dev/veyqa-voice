@@ -2,6 +2,22 @@
 
 用户安装和使用请看 [README](../README.md)。本文面向贡献者；历史开发验收记录仅在维护者本地归档，不作为公开产品说明。
 
+## 目录结构
+
+```text
+src/               Python 应用逻辑
+native_settings/   macOS 原生设置与后台守护
+config/            默认配置和模型目录
+scripts/           构建、源码安装与打包入口
+packaging/         签名、安装包与更新清单工具
+requirements/      运行与开发依赖
+test/              自动化测试
+tools/             开发与诊断工具
+server/            可选推广服务
+website/           官网静态资源
+.github/           工作流、贡献说明与安全说明
+```
+
 ## 本地开发
 
 需要 Apple Silicon、macOS 13+、Xcode Command Line Tools 和 Python 3.13。
@@ -10,8 +26,8 @@
 git clone https://github.com/wjc-dev/veyqa-voice.git
 cd veyqa-voice
 uv venv --python 3.13 .venv
-uv pip install -r requirements-dev.txt
-cp env.example .env
+uv pip install -r requirements/dev.txt
+cp config/env.example .env
 .venv/bin/python main.py
 ```
 
@@ -42,9 +58,9 @@ ad-hoc 身份随构建变化，仅固定名称、Bundle ID 或路径不能保证
 
 - 本机可用用户批准的专用自签名代码签名证书。其 SHA-1 指纹保存在 `~/Library/Application Support/Veyqa Build/signing-identity.sha1`；私钥留在钥匙串，不提交或上传。构建身份缺失时失败，不自动降级。
 - 默认复用本机身份，产物在 `dist-local/`，带 `-local` 后缀；未配置身份则输出 `dist-internal/` ad-hoc 包。
-- 显式公开测试构建：`VEYQA_SIGNING_IDENTITY=- zsh build-internal-dmg.command`。它不修改保存的身份，但不可直接覆盖固定签名的日用 App。
-- `zsh build-internal-dmg.command` 生成 DMG、ZIP、PKG。当前流程不是 Developer ID / Installer 签名与公证流程。
-- DMG 使用 `dmgbuild` 写入 Finder 图标布局与静态安装背景，并附带安装与权限说明；构建依赖在 `requirements-dev.txt`。
+- 显式公开测试构建：`VEYQA_SIGNING_IDENTITY=- zsh scripts/build-macos.command`。它不修改保存的身份，但不可直接覆盖固定签名的日用 App。
+- `zsh scripts/build-macos.command` 生成 DMG、ZIP、PKG。当前流程不是 Developer ID / Installer 签名与公证流程。
+- DMG 使用 `dmgbuild` 写入 Finder 图标布局与静态安装背景，并附带安装与权限说明；构建依赖在 `requirements/dev.txt`。
 - 首次切换身份可能需授权。只请求缺失的必要权限，不修改 TCC 数据库、不移除隔离属性、不关闭系统或终端防护。固定身份也不保证所有系统永不重新询问。
 
 ## 模型目录与选择

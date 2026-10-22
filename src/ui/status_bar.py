@@ -142,7 +142,7 @@ def _launch_settings_window(on_restart=None) -> int:
             return _settings_process.pid
 
     root_dir = str(RESOURCE_ROOT)
-    settings_script = os.path.join(root_dir, "settings_ui.py")
+    settings_script = os.path.join(root_dir, "tools", "settings_ui.py")
     native_source = os.path.join(root_dir, "native_settings", "VoiceInputSettings.swift")
     native_core = os.path.join(root_dir, "native_settings", "SettingsCore.swift")
     native_models = os.path.join(root_dir, "native_settings", "SpeechModels.swift")
@@ -199,7 +199,7 @@ def _launch_settings_window(on_restart=None) -> int:
         )
         if needs_build:
             build_result = subprocess.run(
-                [os.path.join(root_dir, "build-native-settings.command")],
+                [os.path.join(root_dir, "scripts", "build-settings.command")],
                 cwd=root_dir,
                 capture_output=True,
                 text=True,

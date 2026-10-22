@@ -1,4 +1,4 @@
-# Veyqa Voice — Qwen / Doubao macOS runtime
+# Veyqa Voice — macOS runtime dependencies
 aiohttp>=3.9,<4
 colorlog>=6.9,<7
 numpy>=2.0,<3

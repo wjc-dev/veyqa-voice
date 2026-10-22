@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-PROJECT_DIR="${0:A:h}"
+PROJECT_DIR="${0:A:h:h}"
 source "$PROJECT_DIR/packaging/signing.zsh"
 veyqa_configure_signing
 cd "$PROJECT_DIR"

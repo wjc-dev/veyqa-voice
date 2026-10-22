@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-PROJECT_DIR="${0:A:h}"
+PROJECT_DIR="${0:A:h:h}"
 cd "$PROJECT_DIR"
 
 if [[ -x build/VeyqaSettings.app/Contents/MacOS/VeyqaSettings ]]; then
@@ -17,8 +17,8 @@ if [[ -x build/VeyqaSettings.app/Contents/MacOS/VeyqaSettings ]]; then
   VOICE_INPUT_PARENT_PID="$SERVICE_PID" \
   exec "$SETTINGS_BINARY"
 elif [[ -x .venv/bin/python ]]; then
-  exec .venv/bin/python settings_ui.py
+  exec .venv/bin/python tools/settings_ui.py
 else
-  print -u2 "尚未安装，请先双击 install.command。"
+  print -u2 "尚未准备源码环境，请先运行 scripts/install-source.command。"
   read -k 1 "?按任意键退出…"
 fi

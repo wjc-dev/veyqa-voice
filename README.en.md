@@ -58,7 +58,7 @@ With your own API credentials, choose Qwen or Doubao models and refresh their of
 
 Audio goes directly to the selected speech service. Personal API credentials stay on your Mac and usage is billed to your provider account. Local audio archives are off by default.
 
-[Issues](https://github.com/wjc-dev/veyqa-voice/issues) · [Development](docs/development.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+[Issues](https://github.com/wjc-dev/veyqa-voice/issues) · [Development](docs/development.md) · [Contributing](.github/CONTRIBUTING.md) · [Security](.github/SECURITY.md)
 
 ## License
 

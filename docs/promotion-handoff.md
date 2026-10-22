@@ -43,7 +43,7 @@
 - 自动测试：`python -m pytest test -q`，358 项通过（28.53 秒）。
   包括真实 localhost HTTP 服务联调、模拟云端凭证、流式发送长度限制、取消后的用量及临时 Key 清理。
   没有使用真实收费接口或开启远程签发。
-- `./build-native-settings.command` 编译及签名验证通过；`git diff --check` 通过。
+- `./scripts/build-settings.command` 编译及签名验证通过；`git diff --check` 通过。
   尚未替换 `/Applications` 中的应用，未发布新 Release、官网或 Homebrew。
 
 ### 启用前仍须完成

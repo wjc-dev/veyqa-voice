@@ -144,7 +144,7 @@ class SettingsLaunchTests(unittest.TestCase):
         swift = (root / "native_settings" / "VoiceInputSettings.swift").read_text(
             encoding="utf-8"
         )
-        fallback = (root / "settings_ui.py").read_text(encoding="utf-8")
+        fallback = (root / "tools" / "settings_ui.py").read_text(encoding="utf-8")
         self.assertNotIn("企业兼容", swift)
         self.assertNotIn("企业电脑推荐", fallback)
         self.assertNotIn("Karabiner 用户", swift)

@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-PROJECT_DIR="${0:A:h}"
+PROJECT_DIR="${0:A:h:h}"
 cd "$PROJECT_DIR"
 
 LABEL="com.whisper-input-next"
@@ -42,18 +42,18 @@ fi
 .venv/bin/python -m pip install --upgrade pip
 
 print "[2/5] 安装依赖（首次可能需要几分钟）…"
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements/runtime.txt
 
 print "[3/5] 准备本机配置…"
 if [[ ! -f .env ]]; then
-  cp env.example .env
+  cp config/env.example .env
 fi
 chmod 600 .env
 mkdir -p logs build "$HOME/Library/LaunchAgents"
 
 print "[4/5] 构建原生 macOS 设置窗口…"
 if xcrun --find swiftc >/dev/null 2>&1; then
-  "$PROJECT_DIR/build-native-settings.command"
+  "$PROJECT_DIR/scripts/build-settings.command"
 else
   print "未检测到 Swift 编译器，将使用兼容设置窗口。"
   print "如需原生设置窗口，请安装：xcode-select --install"
@@ -101,7 +101,7 @@ print ""
 print "安装完成。接下来会打开设置窗口，请填写你自己的千问凭证。"
 print "首次使用时，macOS 还会要求麦克风和辅助功能权限。"
 
-"$PROJECT_DIR/open-settings.command" >/dev/null 2>&1 &!
+"$PROJECT_DIR/scripts/open-settings.command" >/dev/null 2>&1 &!
 
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" || true
 

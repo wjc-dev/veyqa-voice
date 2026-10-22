@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-PROJECT_DIR="${0:A:h}"
+PROJECT_DIR="${0:A:h:h}"
 source "$PROJECT_DIR/packaging/signing.zsh"
 veyqa_configure_signing
 VERSION="0.2.15"
@@ -90,7 +90,7 @@ if [[ ! -f "$PROJECT_DIR/packaging/AppIcon.icns" || \
   iconutil -c icns "$ICONSET" -o "$PROJECT_DIR/packaging/AppIcon.icns"
 fi
 
-zsh "$PROJECT_DIR/build-native-settings.command"
+zsh "$PROJECT_DIR/scripts/build-settings.command"
 
 SPARKLE_DIR="$("$PROJECT_DIR/.venv/bin/python" "$PROJECT_DIR/packaging/prepare_sparkle.py")"
 xcrun clang -dynamiclib -fobjc-arc -O2 -arch arm64 -mmacosx-version-min=13.0 \
@@ -151,7 +151,7 @@ ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
 print "完成：$ZIP_PATH"
 
 if ! "$PROJECT_DIR/.venv/bin/python" -c 'import dmgbuild' >/dev/null 2>&1; then
-  print -u2 "Install packaging dependencies: uv pip install --python .venv/bin/python -r requirements-dev.txt"
+  print -u2 "Install packaging dependencies: uv pip install --python .venv/bin/python -r requirements/dev.txt"
   exit 1
 fi
 xcrun swift "$PROJECT_DIR/packaging/generate_dmg_background.swift" "$WORK_DIR/dmg-background.png"

@@ -35,10 +35,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT_DIR))
 from src.correction_learning import CorrectionStore
-
-
-ROOT_DIR = Path(__file__).resolve().parent
 ENV_PATH = ROOT_DIR / ".env"
 LAUNCH_AGENT_LABEL = "com.whisper-input-next"
 CONTEXT_PATH = ROOT_DIR / "personal_context.txt"

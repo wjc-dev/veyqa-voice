@@ -58,7 +58,7 @@ DMG 用户：下载上方新版安装包，将 App 拖入“应用程序”，�
 
 音频直接发送至所选语音服务，本地录音存档默认关闭。个人 API Key 保存在本机，对应费用由你的服务商账户承担。
 
-[反馈问题](https://github.com/wjc-dev/veyqa-voice/issues) · [开发文档](docs/development.md) · [贡献](CONTRIBUTING.md) · [安全问题](SECURITY.md)
+[反馈问题](https://github.com/wjc-dev/veyqa-voice/issues) · [开发文档](docs/development.md) · [贡献](.github/CONTRIBUTING.md) · [安全问题](.github/SECURITY.md)
 
 ## 许可证
 
