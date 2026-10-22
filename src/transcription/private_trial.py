@@ -96,10 +96,10 @@ class PrivateTrialBroker:
         def run():
             try:
                 asyncio.run(asyncio.wait_for(self._probe(), timeout=10))
-                status, enabled = "推广语音已连接，正在保存并应用…", True
+                status, enabled = "内置服务已连接，正在保存并应用…", True
             except Exception:
                 # Never expose provider errors, URLs with headers, or key values.
-                status, enabled = "推广语音连接失败，请检查网络或切换自己的 API。", False
+                status, enabled = "内置服务连接失败，请检查网络或切换个人 API。", False
             with self._lock:
                 self.state.update(status=status, enabled=enabled, model=MODEL,
                                   remaining_seconds=3600, request_id=self._request_id, private_trial=True)

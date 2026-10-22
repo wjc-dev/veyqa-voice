@@ -597,7 +597,7 @@ final class SettingsModel: ObservableObject {
             }
             guard self.connectionID == id else { return }
             self.checkingConnection = false
-            self.connectionStatus = "连接超时，请检查网络后重试；也可以使用自己的 Key。"
+            self.connectionStatus = "连接超时，请检查网络后重试；也可以使用个人 API。"
         }
     }
 
@@ -1907,18 +1907,69 @@ struct CredentialField: View {
 struct EngineSettingsView: View {
     @ObservedObject var model: SettingsModel
     @State private var showKeyHelp = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var servicePage: String { "\(model.credentialSource)-\(model.transcriptionService)" }
 
     var body: some View {
-        Form {
+        VStack(spacing: 0) {
+            VStack(spacing: 12) {
             if ReleaseFeatures.builtinSpeech {
-                Section {
-                    Picker("语音服务", selection: $model.credentialSource) {
-                        Text(ReleaseFeatures.builtinLabel).tag("builtin")
-                        Text("自己的 API").tag("personal")
-                    }
-                    .pickerStyle(.segmented)
+                HStack {
+                    Text("语音服务").fontWeight(.medium)
+                    Spacer(minLength: 24)
+                    SettingsSegmentedControl(title: "语音服务", selection: $model.credentialSource, options: [
+                        SettingsSegment(id: "builtin", title: ReleaseFeatures.builtinLabel, symbol: "waveform"),
+                        SettingsSegment(id: "personal", title: "个人 API", symbol: "key")
+                    ]).frame(width: 360)
                 }
             }
+            if model.credentialSource != "builtin" || !ReleaseFeatures.builtinSpeech {
+                HStack {
+                    Text("供应商").fontWeight(.medium)
+                    Spacer(minLength: 24)
+                    SettingsSegmentedControl(title: "供应商", selection: $model.transcriptionService, options: [
+                        SettingsSegment(id: "qwen", title: "千问"),
+                        SettingsSegment(id: "doubao", title: "豆包"),
+                        SettingsSegment(id: "custom", title: "自定义")
+                    ]).frame(width: 360)
+                }
+            }
+            }
+            .padding(16)
+            .background(.background, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5))
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+
+            ZStack(alignment: .top) {
+                serviceForm
+                    .id(servicePage)
+                    .transition(reduceMotion ? .identity : .opacity.combined(with: .offset(y: 6)))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .clipped()
+            .animation(reduceMotion ? nil : SettingsMotion.page, value: servicePage)
+        }
+        .disabled(model.applyingSettings)
+        .task(id: "\(model.transcriptionService)-\(model.serviceCredentialsReady)") { model.refreshModels(ifStale: true) }
+        .onDisappear { model.cancelModelRefresh() }
+        .onChange(of: model.credentialSource) { _ in
+            model.cancelConnectionCheck(); model.cancelModelRefresh()
+        }
+        .onChange(of: model.qwenModel) { _ in model.cancelConnectionCheck() }
+        .onChange(of: model.transcriptionService) { _ in
+            showKeyHelp = false
+            model.cancelConnectionCheck()
+        }
+        .onChange(of: model.qwenAPIKey) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
+        .onChange(of: model.qwenAPIHost) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
+        .onChange(of: model.qwenRegion) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
+        .onChange(of: model.qwenWorkspace) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
+    }
+
+    private var serviceForm: some View {
+        Form {
             if model.credentialSource == "builtin" && ReleaseFeatures.builtinSpeech {
                 Section(ReleaseFeatures.builtinLabel) {
                     LabeledContent("识别模型", value: SpeechModels.option(ReleaseFeatures.builtinModel, provider: "qwen").name)
@@ -1926,7 +1977,7 @@ struct EngineSettingsView: View {
                         LabeledContent("本月剩余", value: "\(max(0, model.promotionRemainingSeconds) / 60) 分钟")
                     }
                     Text(ReleaseFeatures.privateTrial
-                         ? "推广期间无需填写 Key。语音直接发送至百炼进行识别，由 Veyqa Voice 承担调用费用。"
+                         ? "无需填写 Key。语音直接发送至百炼进行识别，调用费用由 Veyqa Voice 承担。"
                          : "无需填写 Key，每台设备每月可用 100 分钟。语音直接发送至百炼进行识别。")
                         .font(.callout).foregroundStyle(.secondary)
                     Button(model.checkingConnection ? "连接中…" :
@@ -1937,15 +1988,6 @@ struct EngineSettingsView: View {
                     }
                 }
             } else {
-                Section {
-                    Picker("供应商", selection: $model.transcriptionService) {
-                        Text("千问").tag("qwen")
-                        Text("豆包").tag("doubao")
-                        Text("自定义").tag("custom")
-                    }
-                    .pickerStyle(.segmented)
-                }
-
                 if model.transcriptionService == "qwen" {
                     Section("千问 API 连接") {
                         CredentialField("API Key", text: $model.qwenAPIKey)
@@ -2012,21 +2054,6 @@ struct EngineSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .disabled(model.applyingSettings)
-        .task(id: "\(model.transcriptionService)-\(model.serviceCredentialsReady)") { model.refreshModels(ifStale: true) }
-        .onDisappear { model.cancelModelRefresh() }
-        .onChange(of: model.credentialSource) { _ in
-            model.cancelConnectionCheck(); model.cancelModelRefresh()
-        }
-        .onChange(of: model.qwenModel) { _ in model.cancelConnectionCheck() }
-        .onChange(of: model.transcriptionService) { _ in
-            showKeyHelp = false
-            model.cancelConnectionCheck()
-        }
-        .onChange(of: model.qwenAPIKey) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
-        .onChange(of: model.qwenAPIHost) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
-        .onChange(of: model.qwenRegion) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
-        .onChange(of: model.qwenWorkspace) { _ in model.cancelConnectionCheck(); model.cancelModelRefresh() }
     }
 
     private var credentialHelpButton: some View {
@@ -2425,6 +2452,7 @@ struct FirstRunView: View {
 
 struct SettingsRootView: View {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var model: SettingsModel
     @State private var showPermissions = false
     @State private var showVocabulary = false
@@ -2440,7 +2468,14 @@ struct SettingsRootView: View {
         if !model.onboardingComplete {
             FirstRunView(model: model, showPermissions: $showPermissions)
         } else {
-        TabView(selection: $selectedTab) {
+        SettingsSegmentedControl(title: "设置页面", selection: $selectedTab, options: [
+            SettingsSegment(id: "general", title: "通用", symbol: "slider.horizontal.3"),
+            SettingsSegment(id: "engine", title: "语音服务", symbol: "waveform")
+        ])
+        .frame(width: 280)
+        .disabled(model.applyingSettings)
+        ZStack(alignment: .top) {
+            if selectedTab == "general" {
             GeneralSettingsView(
                 model: model,
                 showPermissions: $showPermissions,
@@ -2448,12 +2483,15 @@ struct SettingsRootView: View {
                 showRecovery: $showRecovery
             )
                 .disabled(model.applyingSettings)
-                .tabItem { Label("通用", systemImage: "slider.horizontal.3") }
-                .tag("general")
+                .transition(reduceMotion ? .identity : .opacity.combined(with: .offset(x: -8)))
+            } else {
             EngineSettingsView(model: model)
-                .tabItem { Label("语音服务", systemImage: "waveform.badge.magnifyingglass") }
-                .tag("engine")
+                .transition(reduceMotion ? .identity : .opacity.combined(with: .offset(x: 8)))
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .clipped()
+        .animation(reduceMotion ? nil : SettingsMotion.page, value: selectedTab)
         }
         HStack(spacing: 7) {
             if !model.saveFeedback.isEmpty {

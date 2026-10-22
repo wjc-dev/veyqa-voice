@@ -9,7 +9,7 @@
 - Works alongside your existing keyboard and input method.
 - Transcribes your words into the focused input field; you decide when to send.
 - Supports Qwen and Doubao. Add terms such as `user_id` and `seller_id` to improve recognition.
-- Try sponsored speech during the promotion without an account or API Key, or bring your own API credentials.
+- Try the built-in service during the promotion without an account or API Key, or bring your own API credentials.
 
 ## Install
 
@@ -44,7 +44,7 @@ For DMG installations, download the new installer above, drag the app into Appli
 
 ## Set up once
 
-1. Connect to the default sponsored speech service; no account or API Key is required. You can also [use your own Key](https://wjc-dev.github.io/veyqa-voice/#api-key).
+1. Connect to the default built-in service; no account or API Key is required. You can also [use your own Key](https://wjc-dev.github.io/veyqa-voice/#api-key).
 2. Grant microphone, Accessibility, and Input Monitoring permissions. Return to the app for automatic checks. Follow macOS prompts if it requests a relaunch.
 3. Click the trial text field, hold **right Option** to speak, then release. Finish setup and use it in other apps.
 
@@ -52,7 +52,7 @@ Open settings from the menu bar or Dock. Adjust the shortcut, hold/toggle mode, 
 
 ## Speech services
 
-Sponsored speech uses **Qwen Audio 3.1 ASR Message** (`qwen-audio-3.1-asr-flash-message`) with live transcription and text polishing off by default, paid for by Veyqa Voice during the promotion. Existing users keep their personal credentials and model when upgrading; switch to sponsored speech in Settings → Speech Service.
+The built-in service uses **Qwen Audio 3.1 ASR Message** (`qwen-audio-3.1-asr-flash-message`) with live transcription and text polishing off by default, paid for by Veyqa Voice during the promotion. Existing users keep their personal credentials and model when upgrading; switch to built-in service in Settings → Speech Service.
 
 With your own API credentials, choose Qwen or Doubao models and refresh their official catalogues, or add an OpenAI-compatible provider. Qwen and Doubao stream live; custom providers transcribe when recording ends.
 

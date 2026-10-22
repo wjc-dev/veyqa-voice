@@ -11,14 +11,13 @@ from .speech_models import DEFAULT_MODELS
 
 
 class BuiltinStreamingProcessor(QwenStreamingProcessor):
-    engine_label = "免费语音"
+    engine_label = "内置服务"
     builtin = True
 
     def __init__(self, broker=None):
         self.broker = broker or get_broker()
         self.private_trial = getattr(self.broker, "private_trial", False) is True
         super().__init__(model_name=DEFAULT_MODELS["promotion"] if self.private_trial else MODEL)
-        self.engine_label = "推广语音" if self.private_trial else "免费语音"
         self.api_key = ""
         self.workspace_id = ""
         self.broker.prefetch()
@@ -40,7 +39,7 @@ class BuiltinStreamingProcessor(QwenStreamingProcessor):
                 return
             except aiohttp.WSServerHandshakeError as exc:
                 if exc.status != 401 or attempt:
-                    raise RuntimeError(f"{self.engine_label}服务鉴权失败，请稍后重试或使用自己的 Key。") from None
+                    raise RuntimeError(f"{self.engine_label}鉴权失败，请稍后重试或使用个人 API。") from None
                 self.broker.invalidate()
 
     async def process_audio_stream(self, audio_chunk_generator, on_preview_text, on_final_text,
@@ -66,7 +65,7 @@ class BuiltinStreamingProcessor(QwenStreamingProcessor):
 
         self._send_audio = counted_send
         def safe_error(_message):
-            on_error("推广语音暂不可用，请检查网络或切换自己的 API。")
+            on_error("内置服务暂不可用，请检查网络或切换个人 API。")
         try:
             await super().process_audio_stream(limited_audio(), on_preview_text,
                 on_final_text, on_complete, safe_error if self.private_trial else on_error, sample_rate)

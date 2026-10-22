@@ -24,8 +24,8 @@ SERVICE_URL = "https://rtcut.org/veyqa-api"
 MODEL = "qwen-audio-3.0-asr-flash-streaming"
 MONTH_TIMEZONE = timezone(timedelta(hours=8))
 ERRORS = {
-    "monthly_allowance_used": "本月免费 100 分钟已用完，可在设置中使用自己的 Key。",
-    "promotion_unavailable": "免费语音服务暂不可用，可稍后重试或使用自己的 Key。",
+    "monthly_allowance_used": "本月免费 100 分钟已用完，可在设置中使用个人 API。",
+    "promotion_unavailable": "内置服务暂不可用，可稍后重试或使用个人 API。",
     "try_later": "连接请求较多，请稍后再试。",
 }
 
@@ -139,9 +139,9 @@ class CredentialBroker:
                 code = ""
             if exc.code == 401:
                 self.registered = False
-            raise RuntimeError(ERRORS.get(code, "免费语音连接失败，请稍后重试。")) from None
+            raise RuntimeError(ERRORS.get(code, "内置服务连接失败，请稍后重试。")) from None
         except (OSError, ValueError):
-            raise RuntimeError("无法连接免费语音服务，请检查网络或使用自己的 Key。") from None
+            raise RuntimeError("无法连接内置服务，请检查网络或使用个人 API。") from None
 
     def _publish(self, data, status="已就绪"):
         # Deliberately whitelist fields: provider token and device secret must
@@ -171,7 +171,7 @@ class CredentialBroker:
                     or body.get("enabled") is not True
                     or type(body.get("remaining_seconds")) is not int
                     or not 0 < body["remaining_seconds"] <= 6000):
-                raise RuntimeError("免费语音服务返回了无效配置，请稍后重试。")
+                raise RuntimeError("内置服务返回了无效配置，请稍后重试。")
             with self._lock:
                 remaining = max(0, body["remaining_seconds"] -
                                 self._pending_seconds(self._read_outbox(), body["month"]))
@@ -183,7 +183,7 @@ class CredentialBroker:
         except Exception as exc:
             with self._lock:
                 self._retry_after = self.clock() + 10
-            message = str(exc) if isinstance(exc, RuntimeError) else "免费语音暂不可用，请稍后重试。"
+            message = str(exc) if isinstance(exc, RuntimeError) else "内置服务暂不可用，请稍后重试。"
             self.state.update(status=message, model=MODEL, enabled=False)
             raise RuntimeError(message) from None
 
@@ -216,7 +216,7 @@ class CredentialBroker:
                     return self._credential
             raise RuntimeError(ERRORS["promotion_unavailable"])
         except FutureTimeout:
-            raise RuntimeError("连接免费语音服务超时，请稍后重试。") from None
+            raise RuntimeError("连接内置服务超时，请稍后重试。") from None
 
     def invalidate(self):
         with self._lock:
@@ -247,7 +247,7 @@ class CredentialBroker:
         except FileNotFoundError:
             return []
         except (OSError, ValueError):
-            raise RuntimeError("免费语音用量记录无法读取，请使用自己的 Key 或联系支持。") from None
+            raise RuntimeError("内置服务用量记录无法读取，请使用个人 API 或联系支持。") from None
 
     def report(self, session_id, seconds, started_at):
         if seconds <= 0:
@@ -283,7 +283,7 @@ class CredentialBroker:
                 if (type(status.get("remaining_seconds")) is not int
                         or not 0 <= status["remaining_seconds"] <= 6000
                         or status.get("month") != self._month()):
-                    raise RuntimeError("免费语音用量同步失败，请稍后重试。")
+                    raise RuntimeError("内置服务用量同步失败，请稍后重试。")
                 sent = {r["session_id"] for r in batch}
                 with self._lock:
                     remaining_records = [r for r in self._read_outbox() if r["session_id"] not in sent]
@@ -303,7 +303,7 @@ class CredentialBroker:
                 self.prefetch()
         except Exception:
             if strict:
-                raise RuntimeError("免费语音用量同步失败，请稍后重试或使用自己的 Key。") from None
+                raise RuntimeError("内置服务用量同步失败，请稍后重试或使用个人 API。") from None
             # Keep pending records for the next report/credential renewal.
 
 

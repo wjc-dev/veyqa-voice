@@ -1,5 +1,111 @@
 import SwiftUI
 
+enum SettingsMotion {
+    static let selection = Animation.spring(response: 0.28, dampingFraction: 0.86)
+    static let page = Animation.easeOut(duration: 0.18)
+    static let reveal = Animation.easeOut(duration: 0.16)
+}
+
+struct SettingsSegment: Identifiable {
+    let id: String
+    let title: String
+    var symbol: String? = nil
+}
+
+/// One shared selection surface for tabs, service modes and providers.
+/// The highlight moves; labels and hit targets stay in place.
+struct SettingsSegmentedControl: View {
+    let title: String
+    @Binding var selection: String
+    let options: [SettingsSegment]
+    @Namespace private var highlight
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private func select(_ id: String) {
+        guard selection != id else { return }
+        selection = id
+    }
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(options) { option in
+                Button { select(option.id) } label: {
+                    HStack(spacing: 6) {
+                        if let symbol = option.symbol {
+                            Image(systemName: symbol)
+                                .foregroundStyle(selection == option.id ? Color.accentColor : Color.secondary)
+                                .accessibilityHidden(true)
+                        }
+                        Text(option.title).fontWeight(selection == option.id ? .semibold : .medium)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 30)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(SettingsSegmentButtonStyle())
+                .background {
+                    if selection == option.id {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(.background)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(LinearGradient(colors: [Color.accentColor.opacity(0.08), .clear],
+                                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                            }
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
+                            }
+                            .shadow(color: .black.opacity(0.09), radius: 3, y: 1)
+                            .matchedGeometryEffect(id: "selection", in: highlight)
+                    }
+                }
+                .accessibilityLabel(option.title)
+                .accessibilityAddTraits(selection == option.id ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .animation(reduceMotion ? nil : SettingsMotion.selection, value: selection)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(title)
+        .onMoveCommand { direction in
+            guard let index = options.firstIndex(where: { $0.id == selection }) else { return }
+            if direction == .right { select(options[min(index + 1, options.count - 1)].id) }
+            if direction == .left { select(options[max(index - 1, 0)].id) }
+        }
+    }
+}
+
+private struct SettingsSegmentButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.primary)
+            .background(Color.primary.opacity(hovered ? 0.035 : 0), in: RoundedRectangle(cornerRadius: 8))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.65 : 1) : 0.45)
+            .scaleEffect(reduceMotion || !configuration.isPressed ? 1 : 0.985)
+            .onHover { hovered = $0 }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.10), value: hovered)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.10), value: configuration.isPressed)
+    }
+}
+
+/// Animate content appearance without moving the disclosure header or scrolling it away.
+private struct SettingsReveal: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var visible = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(visible || reduceMotion ? 1 : 0)
+            .offset(y: visible || reduceMotion ? 0 : 5)
+            .onAppear { withAnimation(reduceMotion ? nil : SettingsMotion.reveal) { visible = true } }
+    }
+}
+
 /// Feedback changes appearance, never geometry or the control's hit target.
 struct SettingsRowButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
@@ -37,7 +143,7 @@ struct SettingsIconButtonStyle: ButtonStyle {
     }
 }
 
-/// The header stays above its content. Only the chevron animates, not layout.
+/// The header stays above its content. Content fades in without animating layout.
 struct SettingsDisclosureStyle: DisclosureGroupStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -71,6 +177,7 @@ struct SettingsDisclosureStyle: DisclosureGroupStyle {
                     .padding(.horizontal, 6)
                     .padding(.bottom, 6)
                     .transition(.identity)
+                    .modifier(SettingsReveal())
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)

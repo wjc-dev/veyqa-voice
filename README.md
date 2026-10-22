@@ -44,7 +44,7 @@ DMG 用户：下载上方新版安装包，将 App 拖入“应用程序”，�
 
 ## 首次设置
 
-1. **连接服务**：默认“推广语音”，无需填写 Key，点击“连接并继续”。也可使用自己的 API，[配置步骤](https://wjc-dev.github.io/veyqa-voice/#api-key)。
+1. **连接服务**：默认“内置服务”，无需填写 Key，点击“连接并继续”。也可使用个人 API，[配置步骤](https://wjc-dev.github.io/veyqa-voice/#api-key)。
 2. **开启权限**：按引导开启麦克风、辅助功能和输入监控，返回后自动检查。系统要求重新打开时按提示操作即可。
 3. **试用输入**：点击试用文本框，按住 **右 Option** 说话，松开写入。完成后即可在其他 App 的输入框使用。
 
@@ -52,9 +52,9 @@ DMG 用户：下载上方新版安装包，将 App 拖入“应用程序”，�
 
 ## 语音服务
 
-推广语音使用 **Qwen Audio 3.1 ASR Message**（`qwen-audio-3.1-asr-flash-message`），支持边说边显示，默认保留原话，由 Veyqa Voice 承担调用费用。已有用户升级保留自己的 Key 和模型，可在“设置 → 语音服务”切换推广语音。
+内置服务使用 **Qwen Audio 3.1 ASR Message**（`qwen-audio-3.1-asr-flash-message`），支持边说边显示，默认保留原话，由 Veyqa Voice 承担调用费用。已有用户升级保留自己的 Key 和模型，可在“设置 → 语音服务”切换内置服务。
 
-使用自己的 API 时，可选择千问或豆包模型、刷新官方目录，也可添加 OpenAI 兼容的自定义转写服务。千问和豆包保持流式识别，自定义服务在录音结束后转写。[模型与配置说明](https://wjc-dev.github.io/veyqa-voice/#engines)。
+使用个人 API 时，可选择千问或豆包模型、刷新官方目录，也可添加 OpenAI 兼容的自定义转写服务。千问和豆包保持流式识别，自定义服务在录音结束后转写。[模型与配置说明](https://wjc-dev.github.io/veyqa-voice/#engines)。
 
 音频直接发送至所选语音服务，本地录音存档默认关闭。个人 API Key 保存在本机，对应费用由你的服务商账户承担。
 

@@ -20,5 +20,5 @@ def test_dmg_is_drag_to_install_with_local_help():
     assert settings["show_sidebar"] is False
     assert "Veyqa Voice.app" not in settings["hide_extensions"]
     guide = (ROOT / "packaging/install-guide.html").read_text()
-    for instruction in ("Applications", "隐私与安全性", "仍要打开", "推广语音", "无需填写 Key", "菜单栏"):
+    for instruction in ("Applications", "隐私与安全性", "仍要打开", "内置服务", "无需填写 Key", "菜单栏"):
         assert instruction in guide
