@@ -4,25 +4,24 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Veyqa Voice</title>
         <item>
-            <title>0.2.12</title>
-            <pubDate>Wed, 21 Oct 2026 13:37:49 +0800</pubDate>
+            <title>0.2.13</title>
+            <pubDate>Thu, 22 Oct 2026 12:52:00 +0800</pubDate>
             <link>https://wjc-dev.github.io/voxtype/</link>
-            <sparkle:version>226</sparkle:version>
-            <sparkle:shortVersionString>0.2.12</sparkle:shortVersionString>
+            <sparkle:version>227</sparkle:version>
+            <sparkle:shortVersionString>0.2.13</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.12 · 构建 226
+            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.13
 
-- 更新清单连接失败时，自动通过 GitHub 官方备用入口重试一次。
-- 保留每日检查、点击安装并重新打开；更新清单与安装包继续验证签名。
-- 推广语音免填 Key，已有个人 Key、模型、快捷键和词库保持不变。
-
-需要 Apple Silicon、macOS 13+。当前为 Preview。
+- 推广语音升级为 Qwen Audio 3.1 ASR Message，边说边显示，默认保留原话。
+- 改进推广语音连接检查：完整核验模型访问权限，再显示连接成功。
+- 保留已有 API Key、个人模型、快捷键和其他设置。
+- 支持应用内检查更新、下载并重新打开，也可通过 DMG 或 Homebrew 更新。
 ]]></description>
-            <enclosure url="https://github.com/wjc-dev/voxtype/releases/download/v0.2.12/Veyqa-Voice-v0.2.12-macOS-arm64.zip" length="21232292" type="application/octet-stream" sparkle:edSignature="jGCQr3NuR47QlNPpBitxH5XLeWTMDNjwMZfsZ1dlzQSLHNgsm6wjLQn59STDYxZmw3lay/8rxYc06TP+jPw9CA=="></enclosure>
+            <enclosure url="https://github.com/wjc-dev/voxtype/releases/download/v0.2.13/Veyqa-Voice-v0.2.13-macOS-arm64.zip" length="21229787" type="application/octet-stream" sparkle:edSignature="VIfTYngIVbyOoaXbiajPeOpnDfYZUks8FkeLjNEJOj/VoVhuAxuFofVlZmH46q5nItpmjm6hNX3bOtrMRvk6CA=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: DkCkCiV4SgXwIimXqiXTzK7bs0+a4DXeTClrbJ6cyXKWtCiLpj8hj82B0OiyzJwcd5khwD8hsUZUtTBjmSeMBQ==
-length: 1649
+edSignature: egQa5sIwAh+Klnh/j/MC7/brmvpwY9kWmYDeHe3sqZ3G+FO5sIAPk+za+lMBdDA44YpGz4C7hPxM/yvFFgVRBw==
+length: 1654
 -->
