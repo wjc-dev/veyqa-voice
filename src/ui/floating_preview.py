@@ -332,8 +332,16 @@ class FloatingPreviewWindow:
         self._width = 320.0
         self._height = 58.0
 
-    def show(self) -> None:
-        AppHelper.callAfter(self._show_now)
+    def show(self, *, preparing=False, is_relevant=None) -> None:
+        def display():
+            if is_relevant is not None and not is_relevant():
+                return
+            self._show_now()
+            if preparing:
+                self._stop_animation()
+                self._text_label.setStringValue_("准备录音…")
+                self._last_text = "准备录音…"
+        AppHelper.callAfter(display)
 
     def _show_now(self) -> None:
         """Main-thread rendering shared by dictation and brief static notices."""
@@ -350,12 +358,15 @@ class FloatingPreviewWindow:
         self._reduced_motion = _reduce_motion()
         self._waveform.resetMotion_(self._reduced_motion)
         self._start_animation()
-        self._panel.setAlphaValue_(0.0)
+        was_visible = self._is_visible
+        self._panel.setAlphaValue_(1.0 if was_visible else 0.0)
         self._panel.orderFrontRegardless()
         self._is_visible = True
+        if was_visible:
+            return
 
         def animations(context) -> None:
-            context.setDuration_(0.0 if self._reduced_motion else 0.16)
+            context.setDuration_(0.0 if self._reduced_motion else 0.06)
             self._panel.animator().setAlphaValue_(1.0)
 
         NSAnimationContext.runAnimationGroup_completionHandler_(animations, None)

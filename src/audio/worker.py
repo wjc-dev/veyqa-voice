@@ -44,15 +44,15 @@ def run_worker():
         command = commands.get(timeout=30)
         if command.get("type") != "start":
             return
-        from .recorder import AudioRecorder, sd
-        selector = AudioRecorder()
-        for key in ("AUDIO_INPUT_DEVICE", "AUDIO_DEVICE_POLICY"):
-            os.environ[key] = str(command.get(key, ""))
-        device, info = selector._get_best_input_device()
+        import sounddevice as sd
+        from .devices import select_input_device, capture_sample_rate
+        device, info = select_input_device(
+            sd, str(command.get("AUDIO_INPUT_DEVICE", "")),
+            str(command.get("AUDIO_DEVICE_POLICY", "system")))
         if info is None:
             outgoing.put({"type": "error", "reason": "没有可用麦克风，请检查系统声音输入设置"})
             return
-        rate = selector._capture_sample_rate(device, info)
+        rate = capture_sample_rate(sd, device, info)
         overflow = threading.Event()
 
         def callback(data, _frames, _time, status):
@@ -60,11 +60,11 @@ def run_worker():
                 overflow.set()
                 return
             try:
-                outgoing.put_nowait({"type": "audio", "data": base64.b64encode(data.tobytes()).decode()})
+                outgoing.put_nowait({"type": "audio", "data": base64.b64encode(data).decode()})
             except queue.Full:
                 overflow.set()
 
-        stream = sd.InputStream(channels=1, samplerate=rate, dtype="float32", callback=callback,
+        stream = sd.RawInputStream(channels=1, samplerate=rate, dtype="float32", callback=callback,
                                 device=device, latency="low")
         # Metadata must precede audio; the parent waits for actual start success.
         outgoing.put({"type": "format", "rate": rate, "device": info["name"]})

@@ -9,6 +9,7 @@ from ..utils.logger import logger
 import time
 import threading
 from typing import AsyncGenerator, Optional
+from .devices import select_input_device, capture_sample_rate
 
 
 class _LazySoundDevice:
@@ -20,20 +21,6 @@ class _LazySoundDevice:
 
 sd = _LazySoundDevice()
 
-# 允许的设备关键字（按优先级从高到低）
-# 只允许这些设备，其他设备不使用
-# 注意：macOS 在中文环境下设备名是本地化的（如 "MacBook Pro麦克风"），
-# 所以需要同时匹配中英文关键字。
-ALLOWED_DEVICE_KEYWORDS = [
-    "dji mic",                # DJI Mic 系列无线麦克风（最高优先级）
-    "wireless mic",           # DJI Wireless Mic 等无线麦克风
-    "external microphone",    # 外接麦克风/耳机
-    "accentum",               # Sennheiser ACCENTUM 蓝牙耳机
-    "macbook pro microphone", # 内置麦克风（英文系统）
-    "macbook air microphone", # 内置麦克风（MacBook Air 英文系统）
-    "airpods",                # AirPods 蓝牙耳机
-    "麦克风",                  # 内置/通用麦克风（中文系统，最低优先级兜底）
-]
 
 
 class AudioRecorder:
@@ -252,68 +239,12 @@ class AudioRecorder:
             return False
 
     def _get_best_input_device(self):
-        """根据优先级选择最佳输入设备（只从白名单中选择）
-
-        Returns:
-            tuple: (device_index, device_info) 或 (None, None) 如果没有可用设备
-        """
-        try:
-            devices = sd.query_devices()
-            input_devices = [(i, d) for i, d in enumerate(devices) if d['max_input_channels'] > 0]
-
-            configured = os.getenv("AUDIO_INPUT_DEVICE", "").strip().lower()
-            if configured:
-                for idx, device in input_devices:
-                    if configured in str(device["name"]).lower():
-                        logger.info("使用用户指定的麦克风: %s", device["name"])
-                        return idx, device
-
-            # Respect the microphone selected in macOS. The historical
-            # whitelist could silently switch from the user's default device
-            # to AirPods/DJI hardware and make sensitivity appear random.
-            if os.getenv("AUDIO_DEVICE_POLICY", "system").strip().lower() != "preferred":
-                try:
-                    default_index = int(sd.default.device[0])
-                    if default_index >= 0:
-                        default_device = devices[default_index]
-                        if default_device["max_input_channels"] > 0:
-                            return default_index, default_device
-                except Exception:
-                    pass
-
-            # 按优先级从高到低匹配白名单设备
-            for keyword in ALLOWED_DEVICE_KEYWORDS:
-                for idx, device in input_devices:
-                    if keyword.lower() in device['name'].lower():
-                        logger.debug(f"找到匹配设备: {device['name']} (优先级关键字: {keyword})")
-                        return idx, device
-
-            # No preferred name matched; the system input is still a valid and
-            # safer fallback than refusing to record.
-            try:
-                default_index = int(sd.default.device[0])
-                if default_index >= 0:
-                    return default_index, devices[default_index]
-            except Exception:
-                pass
-            logger.warning("没有找到可用的音频输入设备")
-            return None, None
-        except Exception as e:
-            logger.error(f"选择最佳设备时出错: {e}")
-            return None, None
+        return select_input_device(sd, os.getenv("AUDIO_INPUT_DEVICE", ""),
+                                   os.getenv("AUDIO_DEVICE_POLICY", "system"))
 
     @staticmethod
     def _capture_sample_rate(device_idx, device, preferred: int = 16000) -> int:
-        """Prefer native 16 kHz capture and fall back to the device default."""
-        try:
-            sd.check_input_settings(
-                device=device_idx,
-                channels=1,
-                samplerate=preferred,
-            )
-            return preferred
-        except Exception:
-            return int(device["default_samplerate"])
+        return capture_sample_rate(sd, device_idx, device, preferred)
     
     def _auto_stop_recording(self):
         """自动停止录音（达到最大时长）"""

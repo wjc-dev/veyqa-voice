@@ -2,22 +2,23 @@
 
 from __future__ import annotations
 
+import sys
+
+# Take the worker path before importing the GUI, ASR or audio-processing stack.
+if __name__ == "__main__" and "--audio-worker" in sys.argv:
+    from src.audio.worker import run_worker
+    run_worker()
+    raise SystemExit(0)
+
 import asyncio
 import io
 import os
-import sys
 import threading
 import time
 import uuid
 from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Any, Optional
-
-# Same signed executable, private pipes only; never initialize the app/UI in a worker.
-if __name__ == "__main__" and "--audio-worker" in sys.argv:
-    from src.audio.worker import run_worker
-    run_worker()
-    raise SystemExit(0)
 
 import numpy as np
 from dotenv import load_dotenv
@@ -66,7 +67,7 @@ from src.utils.logger import logger
 from src.setup_feedback import empty_result_notice
 
 
-__version__ = "0.2.17"
+__version__ = "0.2.18"
 __author__ = "Mor-Li"
 __description__ = "Qwen and Doubao realtime voice input for macOS"
 
@@ -594,6 +595,9 @@ class VoiceAssistant:
         else:
             logger.info("已锁定本轮语音输出目标")
 
+        self.floating_preview.show(
+            preparing=True, is_relevant=lambda: self._is_current(session) and not session.cancelled)
+        capture_started = time.monotonic()
         try:
             error = self.audio_recorder.start_streaming_recording()
             if error:
@@ -612,6 +616,7 @@ class VoiceAssistant:
             return
 
         self.keyboard_manager.mark_streaming()
+        logger.info("麦克风启动就绪：%.0fms", (time.monotonic() - capture_started) * 1000)
         self.diagnostics.update(
             microphone=self.audio_recorder.current_device or "未知",
             sample_rate=self.audio_recorder.sample_rate,
@@ -649,7 +654,7 @@ class VoiceAssistant:
         if not self._is_current(session) or session.cancelled:
             return
 
-        self.floating_preview.show()
+        self.floating_preview.show(is_relevant=lambda: self._is_current(session) and not session.cancelled)
         self.floating_preview.update_text("正在听写…")
         total_audio_ms = 0.0
         voiced_audio_ms = 0.0

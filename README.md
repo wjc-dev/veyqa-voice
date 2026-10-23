@@ -2,7 +2,7 @@
 
 **轻量的 Mac 语音输入工具。按住说话，松开输入。**
 
-[官网](https://wjc-dev.github.io/veyqa-voice/) · [下载安装包](https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.17) · [English](README.en.md)
+[官网](https://wjc-dev.github.io/veyqa-voice/) · [下载安装包](https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.18) · [English](README.en.md)
 
 [![Veyqa Voice 语音输入演示](website/product-preview.svg)](https://wjc-dev.github.io/veyqa-voice/#demo)
 
@@ -15,7 +15,7 @@
 
 需要 **Apple Silicon（M 系列芯片）、macOS 13+**。
 
-1. [下载 DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.17/Veyqa-Voice-v0.2.17-macOS-arm64.dmg) 并打开。
+1. [下载 DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.18/Veyqa-Voice-v0.2.18-macOS-arm64.dmg) 并打开。
 2. 按窗口中的箭头，将 **Veyqa Voice 拖入 Applications（应用程序）**。
 3. 从“应用程序”打开 Veyqa Voice，完成首次设置。
 

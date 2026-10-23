@@ -108,6 +108,24 @@ def test_hold_chord_before_threshold_never_opens_microphone(manager):
     assert manager.actions == []
 
 
+def test_right_option_hold_has_short_guard_and_keeps_chord_cancellation(manager):
+    manager._hotkey_mode = "hold"
+    manager._voice_hotkey_spec = manager._parse_voice_hotkey("right_option")
+    from Quartz import kCGEventFlagMaskAlternate
+    manager._handle_configured_hotkey(kCGEventFlagsChanged, 61, kCGEventFlagMaskAlternate | 0x40)
+    timer = ManualTimer.timers[-1]
+    assert timer.delay == 0.08
+    manager._handle_configured_hotkey(kCGEventKeyDown, 0, kCGEventFlagMaskAlternate)
+    timer.fire()
+    assert manager.actions == []
+
+
+def test_command_hold_retains_conservative_guard(manager):
+    manager._hotkey_mode = "hold"
+    command(manager)
+    assert ManualTimer.timers[-1].delay == 0.18
+
+
 def test_late_chord_cancels_tentative_hold_without_committing_text(manager):
     manager._hotkey_mode = "hold"
     command(manager)

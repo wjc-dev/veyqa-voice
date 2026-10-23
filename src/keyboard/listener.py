@@ -891,7 +891,8 @@ class KeyboardManager:
             self._modifier_gesture = ModifierGesture(
                 mode=getattr(self, "_hotkey_mode", getattr(self, "_fn_hotkey_mode", "hold")),
                 start=start, stop=self.stop_recording, cancel=self.cancel_recording,
-                toggle=self.toggle_recording, lock=self._recording_lock)
+                toggle=self.toggle_recording, lock=self._recording_lock,
+                hold_delay=0.08 if self._voice_hotkey_spec.get("vk") == 61 else None)
         return self._modifier_gesture
 
     @staticmethod

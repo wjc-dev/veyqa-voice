@@ -52,6 +52,24 @@ class NoticeTests(unittest.TestCase):
 
 
 class AnimationLifecycleTests(unittest.TestCase):
+    def test_stale_preparation_cannot_reopen_cancelled_session(self):
+        preview = fp.FloatingPreviewWindow()
+        preview._show_now = Mock()
+        with patch.object(fp.AppHelper, "callAfter") as queued:
+            preview.show(preparing=True, is_relevant=lambda: False)
+        queued.call_args.args[0]()
+        preview._show_now.assert_not_called()
+
+    def test_preparation_does_not_animate_as_if_already_recording(self):
+        preview = fp.FloatingPreviewWindow()
+        preview._show_now = Mock()
+        preview._text_label = Mock()
+        preview._stop_animation = Mock()
+        with patch.object(fp.AppHelper, "callAfter", side_effect=lambda fn: fn()):
+            preview.show(preparing=True, is_relevant=lambda: True)
+        preview._stop_animation.assert_called_once()
+        preview._text_label.setStringValue_.assert_called_with("准备录音…")
+
     def test_native_waveform_reuses_palette_and_reduced_motion_tracks_level(self):
         wave = fp._WaveformView.alloc().initWithFrame_(fp.NSMakeRect(0, 0, 320, 58))
         colors = wave._colors

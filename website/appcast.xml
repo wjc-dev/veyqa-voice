@@ -4,26 +4,26 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Veyqa Voice</title>
         <item>
-            <title>0.2.17</title>
-            <pubDate>Fri, 23 Oct 2026 10:23:15 +0800</pubDate>
+            <title>0.2.18</title>
+            <pubDate>Fri, 23 Oct 2026 14:48:20 +0800</pubDate>
             <link>https://wjc-dev.github.io/veyqa-voice/</link>
-            <sparkle:version>231</sparkle:version>
-            <sparkle:shortVersionString>0.2.17</sparkle:shortVersionString>
+            <sparkle:version>232</sparkle:version>
+            <sparkle:shortVersionString>0.2.18</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.17
+            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.18
 
-- 新增“在 Dock 中显示”开关，保存后立即生效，无需重启。
-- 新安装默认仅驻留菜单栏，后台运行更轻盈；已有用户保留原来的显示偏好。
-- 隐藏 Dock 时保留菜单栏设置入口，也可从“应用程序”重新打开设置。
-- 菜单栏入口创建失败时恢复 Dock 入口，避免找不到设置。
+- 右 Option 按住听写响应更快，保留组合键防误触和取消保护。
+- 录音框提前反馈启动状态，缩短出现动画，麦克风就绪后自然进入听写。
+- 精简录音工作进程，减少每次启动的模块加载；保持按需收音，不常开麦克风。
+- 保留现有 API Key、模型、快捷键、词汇和其他配置。
 
-升级保留 Key、模型、快捷键和其他配置。内置服务和 App 内检查更新继续可用。
+在设置中检查更新，或运行 `brew update && brew upgrade --cask wjc-dev/veyqa/veyqa-voice`。
 ]]></description>
-            <enclosure url="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.17/Veyqa-Voice-v0.2.17-macOS-arm64.zip" length="21045094" type="application/octet-stream" sparkle:edSignature="N4Bk1u+tPh0ZSm1yIENbWVTe+NZvqgNVmKRC+/XNaw1vBadq+NtD0Fdoq4LJxKz8Bz5vF5IM2cZCY7iGC+5sCQ=="></enclosure>
+            <enclosure url="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.18/Veyqa-Voice-v0.2.18-macOS-arm64.zip" length="21046905" type="application/octet-stream" sparkle:edSignature="NRjyQvnJ0KwsEuKCO6PazsROyx0PCpv7flEWkywvxtKrg6e9PSxjJO2cf7uqVnmcHzD3DF0ht0mkYrGhUa9dBw=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: QJXkt6nog4oARwcNKHqzS8C4sGWokPR2g9u4OX/RZzvxtFxtlaHEssgg9qcAm4i0j+FAHt3dYTfdlUVdXYukCw==
-length: 1779
+edSignature: l6AipesgcGnjwNqKCRwaxJaRuyEmcrNLCJFC/cdoZgitx10Rpeh08LdO3hHlA7pzGWmu7rxfOigASPpTFTdgCw==
+length: 1777
 -->

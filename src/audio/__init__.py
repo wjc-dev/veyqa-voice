@@ -2,6 +2,12 @@
 提供音频录制和处理功能
 """
 
-from .recorder import AudioRecorder
-
 __all__ = ['AudioRecorder']
+
+
+def __getattr__(name):
+    # Importing the disposable worker must not load NumPy, libsndfile or logs.
+    if name == "AudioRecorder":
+        from .recorder import AudioRecorder
+        return AudioRecorder
+    raise AttributeError(name)

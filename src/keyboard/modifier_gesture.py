@@ -5,13 +5,14 @@ import threading
 class ModifierGesture:
     HOLD_DELAY = 0.18
 
-    def __init__(self, *, mode, start, stop, cancel, toggle, lock=None):
+    def __init__(self, *, mode, start, stop, cancel, toggle, lock=None, hold_delay=None):
         self.mode = mode
         self.start = start
         self.stop = stop
         self.cancel = cancel
         self.toggle = toggle
         self.lock = lock or threading.RLock()
+        self.hold_delay = self.HOLD_DELAY if hold_delay is None else hold_delay
         self.down = False
         self.blocked = False
         self.started = False
@@ -43,7 +44,7 @@ class ModifierGesture:
                     self.timer = None
                     self.started = bool(self.start())
 
-            self.timer = threading.Timer(self.HOLD_DELAY, begin)
+            self.timer = threading.Timer(self.hold_delay, begin)
             self.timer.daemon = True
             self.timer.start()
 

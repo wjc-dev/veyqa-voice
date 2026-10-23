@@ -55,7 +55,7 @@ class _Preview:
     def __init__(self):
         self.notices = []
 
-    def show(self):
+    def show(self, **_kwargs):
         pass
 
     def hide(self):
@@ -167,6 +167,20 @@ class _Qwen:
 
 
 class VoiceSessionTests(unittest.TestCase):
+    def test_preparation_is_shown_before_device_start_and_scoped_to_session(self):
+        assistant = self.make_assistant()
+        calls = []
+        assistant.floating_preview.show = lambda **kwargs: calls.append(kwargs)
+        def fail_device():
+            self.assertEqual(len(calls), 1)
+            self.assertTrue(calls[0]["preparing"])
+            self.assertTrue(calls[0]["is_relevant"]())
+            return "test device unavailable"
+        assistant.audio_recorder.start_streaming_recording = fail_device
+        assistant.start_streaming()
+        self.assertFalse(calls[0]["is_relevant"]())
+        self.assertIsNone(assistant._current_session)
+
     def make_assistant(self):
         stack = patch.multiple(
             app_main,

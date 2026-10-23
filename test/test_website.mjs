@@ -9,6 +9,7 @@ const html = readFileSync(new URL("index.html", site), "utf8");
 const script = readFileSync(new URL("app.js", site), "utf8");
 const css = readFileSync(new URL("style.css", site), "utf8");
 const brew = "brew install --cask wjc-dev/veyqa/veyqa-voice";
+const releaseVersion = readFileSync(new URL("../scripts/build-macos.command", import.meta.url), "utf8").match(/^VERSION="([\d.]+)"/m)[1];
 
 test("live preview wraps without truncation and stays in document flow", () => {
   const preview = css.match(/#demo-preview\s*\{([^}]+)\}/)[1];
@@ -101,7 +102,7 @@ test("static accessible website with no agent prompt or credential form", () => 
 test("one direct hero download replaces the large installation section", () => {
   assert.ok(
     html.includes(
-      "/releases/download/v0.2.17/Veyqa-Voice-v0.2.17-macOS-arm64.dmg",
+      `/releases/download/v${releaseVersion}/Veyqa-Voice-v${releaseVersion}-macOS-arm64.dmg`,
     ),
   );
   const hero = html.split('class="hero-copy"')[1].split("<figure")[0];
