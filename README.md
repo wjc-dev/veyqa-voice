@@ -2,7 +2,7 @@
 
 **轻量的 Mac 语音输入工具。按住说话，松开输入。**
 
-[官网](https://wjc-dev.github.io/veyqa-voice/) · [下载安装包](https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.16) · [English](README.en.md)
+[官网](https://wjc-dev.github.io/veyqa-voice/) · [下载安装包](https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.17) · [English](README.en.md)
 
 [![Veyqa Voice 语音输入演示](website/product-preview.svg)](https://wjc-dev.github.io/veyqa-voice/#demo)
 
@@ -15,7 +15,7 @@
 
 需要 **Apple Silicon（M 系列芯片）、macOS 13+**。
 
-1. [下载 DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.16/Veyqa-Voice-v0.2.16-macOS-arm64.dmg) 并打开。
+1. [下载 DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.17/Veyqa-Voice-v0.2.17-macOS-arm64.dmg) 并打开。
 2. 按窗口中的箭头，将 **Veyqa Voice 拖入 Applications（应用程序）**。
 3. 从“应用程序”打开 Veyqa Voice，完成首次设置。
 
@@ -48,7 +48,7 @@ DMG 用户：下载上方新版安装包，将 App 拖入“应用程序”，�
 2. **开启权限**：按引导开启麦克风、辅助功能和输入监控，返回后自动检查。系统要求重新打开时按提示操作即可。
 3. **试用输入**：点击试用文本框，按住 **右 Option** 说话，松开写入。完成后即可在其他 App 的输入框使用。
 
-点击菜单栏或 Dock 图标打开设置。快捷键、按住／切换模式和菜单栏显示均可调整，保存后生效，升级保留配置。
+点击菜单栏图标打开设置，也可从“应用程序”再次打开。新安装默认不占用 Dock；如需显示，可在“通用”中开启。快捷键、按住／切换模式均可调整，保存后生效，升级保留配置。
 
 ## 语音服务
 

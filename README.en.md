@@ -2,7 +2,7 @@
 
 **Lightweight voice input for Mac. Hold to speak, release to type.**
 
-[Website](https://wjc-dev.github.io/veyqa-voice/) · [Download](https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.16) · [简体中文](README.md)
+[Website](https://wjc-dev.github.io/veyqa-voice/) · [Download](https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.17) · [简体中文](README.md)
 
 [![Veyqa Voice demo](website/product-preview.svg)](https://wjc-dev.github.io/veyqa-voice/#demo)
 
@@ -15,7 +15,7 @@
 
 Requires **Apple Silicon and macOS 13+**.
 
-1. [Download and open the DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.16/Veyqa-Voice-v0.2.16-macOS-arm64.dmg).
+1. [Download and open the DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.17/Veyqa-Voice-v0.2.17-macOS-arm64.dmg).
 2. Follow the arrow: drag **Veyqa Voice into Applications**.
 3. Open Veyqa Voice from Applications to begin setup.
 
@@ -48,7 +48,7 @@ For DMG installations, download the new installer above, drag the app into Appli
 2. Grant microphone, Accessibility, and Input Monitoring permissions. Return to the app for automatic checks. Follow macOS prompts if it requests a relaunch.
 3. Click the trial text field, hold **right Option** to speak, then release. Finish setup and use it in other apps.
 
-Open settings from the menu bar or Dock. Adjust the shortcut, hold/toggle mode, and menu-bar visibility; save to apply. Updates preserve existing configuration.
+Open settings from the menu bar or reopen the app from Applications. New installations stay out of the Dock; enable Dock visibility in General if preferred. Adjust the shortcut and hold/toggle mode, then save to apply. Updates preserve existing configuration.
 
 ## Speech services
 

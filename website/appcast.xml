@@ -4,28 +4,26 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Veyqa Voice</title>
         <item>
-            <title>0.2.16</title>
-            <pubDate>Thu, 22 Oct 2026 17:28:45 +0800</pubDate>
+            <title>0.2.17</title>
+            <pubDate>Fri, 23 Oct 2026 10:23:15 +0800</pubDate>
             <link>https://wjc-dev.github.io/veyqa-voice/</link>
-            <sparkle:version>230</sparkle:version>
-            <sparkle:shortVersionString>0.2.16</sparkle:shortVersionString>
+            <sparkle:version>231</sparkle:version>
+            <sparkle:shortVersionString>0.2.17</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.16
+            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.17
 
-- 语音服务统一命名为“内置服务 / 个人 API”。新安装默认使用内置服务，已有配置保持不变。
-- 设置页新增滑动选中背景、轻弹反馈与页面淡入过渡，标签、服务来源和供应商切换更流畅。
-- 展开内容轻盈呈现，标题位置保持稳定，支持原地再次点击收起。
-- 适配 macOS“减少动态效果”，动画仅在交互时运行。
+- 新增“在 Dock 中显示”开关，保存后立即生效，无需重启。
+- 新安装默认仅驻留菜单栏，后台运行更轻盈；已有用户保留原来的显示偏好。
+- 隐藏 Dock 时保留菜单栏设置入口，也可从“应用程序”重新打开设置。
+- 菜单栏入口创建失败时恢复 Dock 入口，避免找不到设置。
 
-内置服务使用 Qwen Audio 3.1 Message，无需填写 API Key。也可使用千问、豆包或自定义供应商的个人 API。
-
-升级保留 Key、模型、快捷键和其他设置。支持在 App 内检查更新、下载安装并重新打开。
+升级保留 Key、模型、快捷键和其他配置。内置服务和 App 内检查更新继续可用。
 ]]></description>
-            <enclosure url="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.16/Veyqa-Voice-v0.2.16-macOS-arm64.zip" length="21044990" type="application/octet-stream" sparkle:edSignature="6mHsP3p16q62fGIcC2LpiI3GK28kAldybjHu/VvobtO+xC2O4DdMcNWQYbarH/hMg6qlzBj8K3H92LObifE0DA=="></enclosure>
+            <enclosure url="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.17/Veyqa-Voice-v0.2.17-macOS-arm64.zip" length="21045094" type="application/octet-stream" sparkle:edSignature="N4Bk1u+tPh0ZSm1yIENbWVTe+NZvqgNVmKRC+/XNaw1vBadq+NtD0Fdoq4LJxKz8Bz5vF5IM2cZCY7iGC+5sCQ=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: 1F5sPD1j1X09ftICNt7bkfcai0IjwU0nc/wmEGteEAnPeyy856CeSTmPMKDX0m6BHUxffrfeLSurD/kRZTWbCg==
-length: 1979
+edSignature: QJXkt6nog4oARwcNKHqzS8C4sGWokPR2g9u4OX/RZzvxtFxtlaHEssgg9qcAm4i0j+FAHt3dYTfdlUVdXYukCw==
+length: 1779
 -->
