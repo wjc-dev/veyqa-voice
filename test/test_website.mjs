@@ -41,7 +41,11 @@ function fixture(clipboard) {
       createRange: () => ({ selectNodeContents() {} }),
     },
     navigator: { clipboard },
-    window: { getSelection: () => selection },
+    window: {
+      getSelection: () => selection,
+      location: { hash: "" },
+      addEventListener() {},
+    },
     setTimeout: () => 1,
     clearTimeout() {},
   });
@@ -94,12 +98,19 @@ test("static accessible website with no agent prompt or credential form", () => 
   );
   assert.doesNotMatch(html, /https?:[^"']+\.(?:js|css)["']/i);
 });
-test("DMG install, permissions and trial have clear instructions", () => {
+test("one direct hero download replaces the large installation section", () => {
   assert.ok(
     html.includes(
       "/releases/download/v0.2.17/Veyqa-Voice-v0.2.17-macOS-arm64.dmg",
     ),
   );
+  const hero = html.split('class="hero-copy"')[1].split("<figure")[0];
+  assert.equal((hero.match(/class="button primary"/g) || []).length, 1);
+  assert.match(
+    hero,
+    /href="https:\/\/github.com\/wjc-dev\/veyqa-voice\/releases\/download\//,
+  );
+  assert.doesNotMatch(html, /看看怎么用|GET STARTED|install-content|key-steps/);
   for (const text of [
     "Applications（应用程序）",
     "连接并继续",
@@ -111,6 +122,7 @@ test("DMG install, permissions and trial have clear instructions", () => {
     assert.ok(html.includes(text), text);
 });
 test("precise service facts and concise vocabulary copy", () => {
+  const copy = html.replace(/\s+/g, " ");
   for (const text of [
     "Key 保存在本机",
     "音频直接发送至所选语音服务",
@@ -118,26 +130,69 @@ test("precise service facts and concise vocabulary copy", () => {
     "提升识别概率",
     "user_id",
     "seller_id",
-    "Qwen Audio 3.0",
-    "推广期间免费体验",
+    "Qwen Audio",
     "无需填写 API Key",
     "费用由 Veyqa Voice 承担",
   ])
-    assert.ok(html.includes(text), text);
+    assert.ok(copy.includes(text), text);
   assert.doesNotMatch(html, /不承诺|不等于|≠|零门槛|零配置|不上传云端/);
 });
-test("first-open help stays compact beside the download", () => {
+test("first-open and update help are collapsed in FAQ with legacy anchors", () => {
   for (const text of ["仍要打开", "隐私与安全性"])
     assert.ok(html.includes(text), text);
   assert.ok(html.includes('href="https://support.apple.com/zh-cn/102445"'));
-  assert.match(html, /<p class="fine" id="safety">/);
-  assert.ok(html.indexOf('id="safety"') < html.indexOf('class="install-content"'));
+  assert.match(html, /<details[^>]*id="safety"[^>]*>/);
+  assert.match(html, /<details[^>]*id="api-key"[^>]*>/);
+  assert.match(html, /id="install"/);
+  assert.doesNotMatch(html, /<details[^>]*\sopen(?:\s|>)/);
+  assert.match(html, /常见问题/);
   assert.doesNotMatch(html, /safety-steps|FIRST OPEN|首次打开，跟着这三步/);
   assert.doesNotMatch(html, /spctl\s+--|xattr\s+-/);
 });
-test("Homebrew is an alternative near the download, not a fourth setup step", () => {
-  assert.ok(html.indexOf('class="brew-details"') < html.indexOf('class="install-content"'));
+test("Homebrew remains copyable within FAQ", () => {
+  assert.ok(html.includes('id="faq"'));
+  assert.ok(html.indexOf('class="brew-details"') > html.indexOf('id="faq"'));
   assert.match(html, /使用 Homebrew 安装/);
   assert.doesNotMatch(html, /Homebrew ＋/);
-  assert.match(css, /\.brew-details\[open\].*\.disclosure-chevron/);
+  assert.match(css, /details\[open\].*\.disclosure-chevron/);
+});
+
+test("shared help links open the right FAQ without opening unrelated answers", () => {
+  const answers = { safety: { open: false }, "api-key": { open: false } };
+  const listeners = {};
+  const browser = {
+    location: { hash: "#safety" },
+    addEventListener: (name, handler) => {
+      listeners[name] = handler;
+    },
+  };
+  vm.runInNewContext(script, {
+    document: {
+      getElementById: (id) =>
+        answers[id] ? { closest: () => answers[id] } : null,
+      querySelectorAll: () => [],
+    },
+    window: browser,
+  });
+  assert.equal(answers.safety.open, true);
+  assert.equal(answers["api-key"].open, false);
+  browser.location.hash = "#api-key";
+  listeners.hashchange();
+  assert.equal(answers["api-key"].open, true);
+  browser.location.hash = "#install";
+  assert.doesNotThrow(() => listeners.hashchange());
+});
+
+test("three peer engine cards replace separate API setup and engine sections", () => {
+  const cards = html.split('class="engine-cards"')[1].split("</section>")[0];
+  assert.equal((cards.match(/<article\b/g) || []).length, 3);
+  for (const label of ["千问语音", "豆包语音识别", "自定义 OpenAI 兼容接口"])
+    assert.ok(cards.includes(label), label);
+  assert.match(cards, /Base URL、Key\s+和模型型号/);
+  assert.match(cards, /录音结束后转写/);
+  assert.doesNotMatch(html, /不翻车|极佳的识别率|超低延迟/);
+  assert.match(
+    css,
+    /\.engine-cards\s*\{[^}]*repeat\(3,\s*minmax\(0,\s*1fr\)\)/,
+  );
 });

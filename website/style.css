@@ -174,24 +174,6 @@ h1 span {
   gap: 11px;
   font-size: 11px;
 }
-.install-drag {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  margin: 24px 0;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  color: var(--accent);
-}
-.benefits.engine-cards {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-@media (max-width: 600px) {
-  .benefits.engine-cards {
-    grid-template-columns: 1fr;
-  }
-}
 .demo {
   margin: 0 0 30px;
   position: relative;
@@ -477,11 +459,6 @@ h3 {
   padding-top: 90px;
   padding-bottom: 90px;
 }
-.install {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 90px;
-}
 .section h2 {
   font-size: 33px;
   letter-spacing: -0.8px;
@@ -501,10 +478,6 @@ h3 {
 .section a:not(.button) {
   text-decoration-color: #4f6f72;
   text-underline-offset: 4px;
-}
-.steps a,
-#api-key a {
-  text-decoration: underline;
 }
 .terminal {
   background: var(--panel);
@@ -547,78 +520,6 @@ code {
 .prompt {
   color: #779591;
 }
-.steps {
-  margin: 30px 0 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 26px;
-}
-.steps li {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-}
-.steps li > span {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--accent);
-  border: 1px solid #354d52;
-  min-width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  text-align: center;
-  line-height: 26px;
-  margin-top: 2px;
-}
-.steps h3 {
-  font-size: 15px;
-  margin: 0 0 5px;
-}
-.steps p {
-  margin: 0;
-  font-size: 13px !important;
-}
-#api-key {
-  border-top: 1px solid var(--line);
-  padding-top: 70px;
-}
-.key-steps {
-  grid-template-columns: repeat(3, 1fr);
-  gap: 28px;
-  margin: 34px 0 22px;
-}
-.key-steps li {
-  position: relative;
-  display: block;
-}
-.key-steps li > span {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  background: #121e24;
-  margin: 0;
-}
-.guide-picture {
-  background: linear-gradient(120deg, #192730, #111b24);
-  border: 1px solid #31424b;
-  border-radius: 12px;
-  min-height: 122px;
-  margin-bottom: 23px;
-  padding: 23px 16px 20px 55px;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-.guide-picture span {
-  font-size: 11px;
-  color: var(--muted);
-}
-.guide-picture b {
-  font-size: 13px;
-  color: #c1e9e1;
-  font-weight: 500;
-}
 details {
   margin-top: 28px;
   border: 1px solid var(--line);
@@ -649,12 +550,171 @@ details[open] summary {
   font-size: 18px;
   line-height: 1;
 }
-.brew-details[open] .disclosure-chevron {
+details[open] .disclosure-chevron {
   transform: rotate(180deg);
 }
 .brew-details pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.engine-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 32px;
+}
+.engine-cards article {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #17212980, #10171d55);
+}
+.engine-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.engine-monogram {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #9cddd829;
+  border-radius: 10px;
+  color: var(--accent);
+  font-size: 18px;
+}
+.engine-badge {
+  font-size: 11px;
+  color: var(--muted);
+}
+.engine-cards h3 {
+  font-size: 18px;
+  margin: 0 0 16px;
+  line-height: 1.6;
+}
+.engine-name {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.section .engine-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 18px;
+  font-size: 11px;
+}
+.engine-tags span {
+  padding: 3px 9px;
+  border: 1px solid #9cddd81a;
+  border-radius: 6px;
+  color: #a6c6c3;
+  background: #9cddd806;
+}
+.section .engine-description {
+  margin: 0 0 26px;
+  font-size: 13px;
+}
+.engine-cards a {
+  margin-top: auto;
+  color: var(--accent);
+  font-size: 12px;
+  align-self: flex-start;
+}
+.faq {
+  display: grid;
+  grid-template-columns: 0.65fr 1.35fr;
+  gap: 70px;
+  border-top: 1px solid var(--line);
+  padding-top: 58px;
+  padding-bottom: 72px;
+}
+.faq h2 {
+  margin: 0;
+  font-size: 25px;
+}
+.faq .eyebrow {
+  margin-bottom: 14px;
+}
+.faq details {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  scroll-margin-top: 24px;
+}
+.faq summary {
+  min-height: 56px;
+  padding: 16px 0;
+  gap: 16px;
+  color: var(--text);
+}
+.faq summary:hover {
+  color: var(--accent);
+}
+.faq details[open] summary {
+  border: 0;
+}
+.faq-answer {
+  padding: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.faq-answer p {
+  margin: 0 0 12px;
+}
+.faq-answer a {
+  color: var(--accent);
+}
+.faq .terminal {
+  margin-bottom: 16px;
+  border-radius: 10px;
+}
+@media (max-width: 900px) {
+  .engine-cards {
+    gap: 12px;
+  }
+  .engine-cards article {
+    padding: 20px;
+  }
+  .engine-cards h3 {
+    font-size: 17px;
+  }
+  .engine-name {
+    display: block;
+  }
+  .faq {
+    gap: 35px;
+  }
+}
+@media (max-width: 760px) {
+  .engine-cards {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .engine-cards article {
+    padding: 24px;
+  }
+  .engine-heading {
+    margin-bottom: 18px;
+  }
+  .engine-name {
+    display: inline;
+  }
+  .faq {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 40px 0 52px;
+  }
 }
 .footer {
   border-top: 1px solid #ffffff0d;
@@ -728,17 +788,11 @@ details[open] summary {
   .demo-text {
     font-size: 22px;
   }
-  .install {
-    gap: 40px;
-  }
   .benefits article + article {
     padding-left: 24px;
   }
   .benefits h2 {
     font-size: 16px;
-  }
-  .key-steps {
-    gap: 20px;
   }
 }
 @media (max-width: 760px) {
@@ -787,7 +841,9 @@ details[open] summary {
     gap: 3px;
   }
   .workflow {
-    gap: 20px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
     padding: 15px 0 40px;
   }
   .workflow > div {
@@ -813,6 +869,11 @@ details[open] summary {
   .done-mark {
     line-height: 31px;
   }
+  .mini-wave {
+    font-size: 12px;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
   .benefits {
     grid-template-columns: 1fr;
     gap: 27px;
@@ -836,40 +897,7 @@ details[open] summary {
   .section h2 {
     font-size: 29px;
   }
-  .install {
-    grid-template-columns: 1fr;
-    gap: 26px;
-  }
-  .key-steps {
-    grid-template-columns: 1fr;
-    gap: 28px;
-  }
-  .key-steps li > div {
-    display: grid;
-    grid-template-columns: minmax(125px, 0.8fr) 1.2fr;
-    gap: 0 20px;
-    align-items: start;
-  }
-  .guide-picture {
-    grid-row: 1/3;
-    min-height: 140px;
-    margin: 0;
-    padding: 52px 14px 16px;
-    gap: 8px;
-  }
-  .guide-picture span {
-    font-size: 10px;
-  }
-  .guide-picture b {
-    font-size: 11px;
-  }
-  .key-steps h3 {
-    margin-top: 6px;
-    font-size: 14px;
-  }
-  .key-steps p {
-    font-size: 12px !important;
-  }
+
   .footer {
     flex-wrap: wrap;
     gap: 16px;

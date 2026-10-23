@@ -1,5 +1,13 @@
 /* No analytics, network requests, or key collection. Copy only on user action. */
 "use strict";
+// Keep shared help links useful even when their answers start collapsed.
+function revealLinkedHelp() {
+  const target = document.getElementById(window.location.hash.slice(1));
+  const details = target?.closest("details");
+  if (details) details.open = true;
+}
+window.addEventListener("hashchange", revealLinkedHelp);
+revealLinkedHelp();
 let feedbackTimer;
 const status = document.getElementById("copy-status");
 function feedback(message) {

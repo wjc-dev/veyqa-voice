@@ -16,8 +16,8 @@
     <meta property="og:type" content="website" />
     <link rel="canonical" href="https://wjc-dev.github.io/veyqa-voice/" />
     <link rel="icon" href="./mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./style.css?v=0.2.9-222" />
-    <script src="./app.js?v=0.2.9-222" defer></script>
+    <link rel="stylesheet" href="./style.css?v=0.2.17-minimal" />
+    <script src="./app.js?v=0.2.17-minimal" defer></script>
     <script src="./demo.js?v=0.2.9-222" defer></script>
     <title>Veyqa Voice — 轻量的 Mac 语音输入</title>
   </head>
@@ -30,7 +30,7 @@
         ></a
       >
       <nav aria-label="主导航">
-        <a href="#demo">看演示</a><a href="#install">安装</a
+        <a href="#engines">识别引擎</a><a href="#faq">常见问题</a
         ><a href="https://github.com/wjc-dev/veyqa-voice">GitHub ↗</a>
       </nav>
     </header>
@@ -41,12 +41,13 @@
             <span class="status-dot"></span> LIGHTWEIGHT VOICE INPUT FOR MAC
           </p>
           <h1 id="hero-title">按住说话，<br /><span>松开输入。</span></h1>
-          <p class="lead">
-            轻量的 Mac 语音输入工具。<br />与现有输入法一起使用，保留你的原话。<br />推广期间免费体验，无需填写 API Key。
-          </p>
-          <div class="actions">
-            <a class="button primary" href="#install">下载 Mac 版 ↓</a
-            ><a class="text-link" href="#demo">看看怎么用 ↗</a>
+          <p class="lead">不打扰现有输入法的 Mac 轻量语音工具，开箱即用。</p>
+          <div class="actions" id="install">
+            <a
+              class="button primary"
+              href="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.17/Veyqa-Voice-v0.2.17-macOS-arm64.dmg"
+              >下载 Mac 版 ↓</a
+            >
           </div>
           <p class="fine hero-meta">
             macOS 13+ <span>·</span> Apple Silicon <span>·</span> 开源
@@ -66,7 +67,8 @@
           </div>
           <div class="demo-editor">
             <p class="demo-date">
-              <span id="demo-topic">数据查询</span><span id="demo-count">1 / 3</span>
+              <span id="demo-topic">数据查询</span
+              ><span id="demo-count">1 / 3</span>
             </p>
             <p class="demo-text">
               <span id="demo-output"
@@ -111,62 +113,181 @@
       <section class="shell benefits" aria-label="产品特点">
         <article>
           <span class="feature-number">01 / LIGHTWEIGHT</span>
-          <h2>需要时，随时听写</h2>
+          <h2>无感常驻</h2>
           <p>空闲时保持轻量。<br />默认仅驻留菜单栏，Dock 图标可按需开启。</p>
         </article>
         <article>
           <span class="feature-number">02 / WORK TOGETHER</span>
-          <h2>保留你的输入习惯</h2>
-          <p>拼音、双拼、Rime 照常使用。<br />用语音补充键盘输入。</p>
+          <h2>与键盘输入无缝互补</h2>
+          <p>
+            拼音、双拼、Rime 照常使用，保留长期输入习惯，用语音补充键盘输入。
+          </p>
         </article>
         <article>
           <span class="feature-number">03 / YOUR WORDS</span>
-          <h2>直接转写，保留原话</h2>
-          <p>
-            文字写入当前输入框，由你确认发送。<br />添加 user_id、seller_id
-            等专有词汇。
-          </p>
+          <h2>忠于原意，认得专有名词</h2>
+          <p>文字写入当前输入框，可添加 user_id、seller_id 等专有词汇。</p>
         </article>
       </section>
       <section
-        class="shell install section"
-        id="install"
-        aria-labelledby="install-title"
+        class="shell section"
+        id="engines"
+        aria-labelledby="engines-title"
       >
         <div class="section-heading">
-          <p class="eyebrow">GET STARTED</p>
-          <h2 id="install-title">下载，拖入，<br />开始设置。</h2>
+          <p class="eyebrow">SPEECH ENGINES</p>
+          <h2 id="engines-title">选择适合你的识别引擎</h2>
           <p>
-            下载 DMG 并打开，将 Veyqa Voice 拖入
-            Applications（应用程序），再从“应用程序”启动。
+            内置服务开箱即用；切换为自有 API 时，支持主流语音模型与自由扩展。
           </p>
-          <div class="install-drag" aria-label="将 Veyqa Voice 拖入应用程序">
-            <img
-              src="./mark.svg"
-              width="48"
-              height="48"
-              alt="Veyqa Voice"
-            /><span aria-hidden="true">→</span
-            ><span>Applications<br /><small>应用程序</small></span>
-          </div>
-          <a
-            class="button primary"
-            href="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.17/Veyqa-Voice-v0.2.17-macOS-arm64.dmg"
-            >下载 Mac 版 ↓</a
-          >
-          <p class="fine">
-            M 系列 Mac · macOS 13+ ·
-            <a href="https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.17"
-              >0.2.17 Preview ↗</a
+        </div>
+        <div class="engine-cards">
+          <article>
+            <div class="engine-heading">
+              <span class="engine-monogram" aria-hidden="true">Q</span
+              ><span class="engine-badge">首选推荐</span>
+            </div>
+            <h3>千问语音 <span class="engine-name">Qwen Audio</span></h3>
+            <p class="engine-tags">
+              <span>流式识别</span><span>实时预览</span>
+            </p>
+            <p class="engine-description">
+              边说边出字，支持长句转写与中英混说。从随口一句，到完整的工作笔记。
+            </p>
+            <a href="https://help.aliyun.com/zh/model-studio/asr-model/"
+              >官方模型与说明 ↗</a
             >
-          </p>
-          <p class="fine" id="safety">
-            首次打开若提示“无法验证开发者”，前往“系统设置 → 隐私与安全性”，点击“仍要打开”。
-            <a href="https://support.apple.com/zh-cn/102445">查看说明 ↗</a>
-          </p>
+          </article>
+          <article>
+            <div class="engine-heading">
+              <span class="engine-monogram" aria-hidden="true">D</span
+              ><span class="engine-badge">按需切换</span>
+            </div>
+            <h3>豆包语音识别</h3>
+            <p class="engine-tags">
+              <span>火山引擎驱动</span><span>热词增强</span>
+            </p>
+            <p class="engine-description">
+              流式转写，支持词汇提示。添加技术专有名词与业务缩写，让识别更贴近你的工作。
+            </p>
+            <a
+              href="https://docs.volcengine.com/docs/DoubaoVoice/model-list?lang=zh"
+              >官方模型与说明 ↗</a
+            >
+          </article>
+          <article>
+            <div class="engine-heading">
+              <span class="engine-monogram" aria-hidden="true">＋</span
+              ><span class="engine-badge">自由扩展</span>
+            </div>
+            <h3>自定义 OpenAI 兼容接口</h3>
+            <p class="engine-tags">
+              <span>灵活扩展</span><span>私有化部署</span>
+            </p>
+            <p class="engine-description">
+              接入兼容的 Whisper、Groq 或本地语音服务。填写 Base URL、Key
+              和模型型号，录音结束后转写。
+            </p>
+            <a href="#api-key">配置个人 API ↓</a>
+          </article>
+        </div>
+      </section>
+      <section class="shell faq" id="faq" aria-labelledby="faq-title">
+        <div class="faq-heading">
+          <p class="eyebrow">A LITTLE HELP</p>
+          <h2 id="faq-title">常见问题</h2>
+        </div>
+        <div class="faq-items">
+          <details>
+            <summary>
+              下载后怎么开始？<span
+                class="disclosure-chevron"
+                aria-hidden="true"
+                >⌄</span
+              >
+            </summary>
+            <div class="faq-answer">
+              <p>
+                打开 DMG，将 Veyqa Voice 拖入 Applications（应用程序），再打开
+                App。选择内置服务，点击“连接并继续”，按引导开启麦克风、辅助功能和输入监控；回到
+                App 自动检查权限后，在试用文本框按住右 Option 说一句即可。
+              </p>
+            </div>
+          </details>
+          <details id="safety">
+            <summary>
+              首次打开提示“无法验证开发者”？<span
+                class="disclosure-chevron"
+                aria-hidden="true"
+                >⌄</span
+              >
+            </summary>
+            <div class="faq-answer">
+              <p>
+                当前版本尚未经过 Apple 公证。从官网下载后，在“系统设置 →
+                隐私与安全性”点击“仍要打开”。<a
+                  href="https://support.apple.com/zh-cn/102445"
+                  >Apple 打开说明 ↗</a
+                >
+              </p>
+            </div>
+          </details>
+          <details id="api-key">
+            <summary>
+              如何配置个人 API？<span
+                class="disclosure-chevron"
+                aria-hidden="true"
+                >⌄</span
+              >
+            </summary>
+            <div class="faq-answer">
+              <p>
+                打开“设置 → 语音服务 → 个人
+                API”，选择供应商，填写凭证并检查连接，再选择模型。
+              </p>
+              <p>
+                千问：在百炼创建 API Key，粘贴到
+                App。默认使用中国内地（北京），其他地区可在高级设置调整。<a
+                  href="https://help.aliyun.com/zh/model-studio/get-api-key"
+                  >获取千问凭证 ↗</a
+                >
+              </p>
+              <p>
+                豆包：在火山引擎开通语音识别服务，按应用内帮助填写 App ID 和
+                Access Token。<a
+                  href="https://docs.volcengine.com/docs/DoubaoVoice/model-list?lang=zh"
+                  >豆包接入说明 ↗</a
+                >
+              </p>
+              <p>
+                自定义：填写兼容音频转写接口的 Base URL、Key 和模型型号。Key
+                保存在本机，费用由对应服务商收取。
+              </p>
+            </div>
+          </details>
+          <details>
+            <summary>
+              内置服务需要付费或填写 Key 吗？<span
+                class="disclosure-chevron"
+                aria-hidden="true"
+                >⌄</span
+              >
+            </summary>
+            <div class="faq-answer">
+              <p>
+                推广期间免费体验，无需填写 API Key。内置服务使用 Qwen Audio 3.1
+                Message，费用由 Veyqa Voice
+                承担。音频直接发送至所选语音服务，本地录音存档默认关闭。添加专有词汇可提升识别概率。
+              </p>
+            </div>
+          </details>
           <details class="brew-details">
             <summary>
-              使用 Homebrew 安装<span class="disclosure-chevron" aria-hidden="true">⌄</span>
+              使用 Homebrew 安装<span
+                class="disclosure-chevron"
+                aria-hidden="true"
+                >⌄</span
+              >
             </summary>
             <div class="terminal">
               <div class="terminal-label">
@@ -183,138 +304,29 @@
               <pre><span class="prompt" aria-hidden="true">$ </span><code id="brew-command">brew install --cask wjc-dev/veyqa/veyqa-voice</code></pre>
             </div>
           </details>
-          <p class="fine">
-            以后更新：在 App 设置中点击“检查更新”，下载并重新打开，Key 和配置保留。
-            0.2.8 及更早版本需先退出 App，用新版 DMG 替换一次。
-            <a href="https://github.com/wjc-dev/veyqa-voice#更新">Homebrew 更新方法 ↗</a>
-          </p>
-        </div>
-        <div class="install-content">
-          <ol class="steps">
-            <li>
-              <span>1</span>
-              <div>
-                <h3>连接语音服务</h3>
-                <p>
-                  默认“内置服务”，无需注册或填写 Key，点击“连接并继续”。
-                  也可切换个人 API，已有配置保持不变。<a href="#api-key"
-                    >使用自己的 Key ↓</a
-                  >
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>2</span>
-              <div>
-                <h3>开启权限</h3>
-                <p>
-                  按引导开启麦克风、辅助功能和输入监控。返回 App
-                  后自动检查；系统要求重新打开时，按提示操作即可。
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>3</span>
-              <div>
-                <h3>试一句，完成设置</h3>
-                <p>
-                  点击试用文本框，按住右 Option 说话，松开写入。完成后即可在其他
-                  App 使用。点击菜单栏图标打开设置，也可从“应用程序”再次打开。
-                </p>
-              </div>
-            </li>
-          </ol>
-        </div>
-      </section>
-      <section class="shell section" id="api-key" aria-labelledby="key-title">
-        <div class="section-heading">
-          <p class="eyebrow">ONE-TIME SETUP</p>
-          <h2 id="key-title">也可以使用<br />个人 API Key。</h2>
-          <p>
-            内置服务无需填写 Key。想使用其他模型时，可切换自己的语音服务账户；Key 保存在本机，费用由对应服务商收取。
-          </p>
-        </div>
-        <ol class="steps key-steps">
-          <li>
-            <span>1</span>
-            <div>
-              <div class="guide-picture" aria-hidden="true">
-                <span>阿里云百炼</span><b>API Key →</b>
-              </div>
-              <h3>打开百炼，登录账号</h3>
+          <details>
+            <summary>
+              如何更新？<span class="disclosure-chevron" aria-hidden="true"
+                >⌄</span
+              >
+            </summary>
+            <div class="faq-answer">
               <p>
-                进入<a
-                  href="https://bailian.console.aliyun.com/?tab=model#/api-key"
-                  >百炼 API Key 页面 ↗</a
-                >，按控制台提示开通语音服务。
+                在 App 设置中点击“检查更新”，下载并重新打开，Key
+                和配置保留。0.2.8 及更早版本先退出 App，用新版 DMG 替换一次。<a
+                  href="https://github.com/wjc-dev/veyqa-voice#更新"
+                  >Homebrew 更新方法 ↗</a
+                >
+              </p>
+              <p>
+                <a
+                  href="https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.17"
+                  >查看 0.2.17 更新内容 ↗</a
+                >
               </p>
             </div>
-          </li>
-          <li>
-            <span>2</span>
-            <div>
-              <div class="guide-picture" aria-hidden="true">
-                <span>地区：中国内地（北京）</span><b>创建 API Key ＋</b>
-              </div>
-              <h3>创建 Key，然后复制</h3>
-              <p>
-                应用默认中国内地（北京）。其他地区可在“高级设置”调整。Key
-                请仅填写在应用的凭证输入框。
-              </p>
-            </div>
-          </li>
-          <li>
-            <span>3</span>
-            <div>
-              <div class="guide-picture" aria-hidden="true">
-                <span>API Key ············</span><b>连接并继续 →</b>
-              </div>
-              <h3>粘贴到 Veyqa，检查连接</h3>
-              <p>
-                点击“连接并继续”，成功后自动保存。随后开启权限，在试用文本框完成首次输入。
-              </p>
-            </div>
-          </li>
-        </ol>
-        <p class="fine">
-          <a href="https://help.aliyun.com/zh/model-studio/get-api-key"
-            >百炼官方配置教程 ↗</a
-          >
-        </p>
-      </section>
-      <section
-        class="shell section"
-        id="engines"
-        aria-labelledby="engines-title"
-      >
-        <div class="section-heading">
-          <p class="eyebrow">SPEECH ENGINES</p>
-          <h2 id="engines-title">选择适合你的语音服务。</h2>
-          <p>
-            内置服务使用千问 3.1 Message，边说边显示，默认保留原话，费用由 Veyqa Voice 承担。使用个人 API 时，可选择千问、豆包模型并刷新官方目录。音频直接发送至所选语音服务，录音存档默认关闭。
-          </p>
+          </details>
         </div>
-        <div class="benefits engine-cards">
-          <article>
-            <span class="feature-number">默认 · 千问</span>
-            <h3>Qwen Audio 3.0 / 3.1 ASR</h3>
-            <p>
-              流式识别，边说边查看预览。可选持续转写或短句听写，支持多语种及方言、热词增强。
-            </p>
-            <a href="https://help.aliyun.com/zh/model-studio/asr-model/"
-              >模型说明 ↗</a
-            >
-          </article>
-          <article>
-            <span class="feature-number">可选 · 豆包</span>
-            <h3>豆包语音识别</h3>
-            <p>
-              使用火山引擎语音账户，支持流式转写与词汇提示。已有豆包凭证可直接在应用中切换。
-            </p>
-            <a href="https://docs.volcengine.com/docs/DoubaoVoice/model-list?lang=zh">模型说明 ↗</a>
-          </article>
-        </div>
-        <p class="fine">也支持自定义 OpenAI 兼容语音服务：填入 API 地址、Key 和模型型号，录音结束后转写。</p>
       </section>
     </main>
     <footer class="shell footer">
