@@ -66,7 +66,7 @@ from src.utils.logger import logger
 from src.setup_feedback import empty_result_notice
 
 
-__version__ = "0.2.16"
+__version__ = "0.2.17"
 __author__ = "Mor-Li"
 __description__ = "Qwen and Doubao realtime voice input for macOS"
 
@@ -432,7 +432,7 @@ class VoiceAssistant:
             logger.debug("更新状态栏失败: %s", exc)
 
     def _start_unconfigured(self) -> None:
-        self._reject_start(f"请点击 Dock 图标，在设置中连接{self.engine_label}并保存，再开始听写")
+        self._reject_start(f"请打开 Veyqa Voice 设置，连接{self.engine_label}并保存，再开始听写")
 
     def _reject_start(self, notice: str) -> None:
         """Always release the key state, even if the feedback UI fails."""

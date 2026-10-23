@@ -289,6 +289,7 @@ final class SettingsModel: ObservableObject {
     @Published var hotkeyBackend = HotkeyConfig.backend(for: HotkeyConfig.defaultSpec)
     @Published var launchAtLogin = true
     @Published var showMenuBarIcon = false
+    @Published var showDockIcon = true
     @Published var reopeningApp = false {
         didSet {
             SettingsAppDelegate.reopeningApp = reopeningApp
@@ -333,7 +334,7 @@ final class SettingsModel: ObservableObject {
          customASRModel, qwenAPIKey, qwenAPIHost, qwenWorkspace, qwenRegion, qwenLanguage,
          doubaoAppKey, doubaoAccessKey, doubaoBoostingTableID, hotkeySpec, hotkeyLabel,
          hotkeyMode, punctuationMode, personalContext, customVocabulary,
-         String(launchAtLogin), String(showMenuBarIcon), String(qwenContextEnabled),
+         String(launchAtLogin), String(showMenuBarIcon), String(showDockIcon), String(qwenContextEnabled),
          String(recentMemoryEnabled)]
     }
 
@@ -479,7 +480,8 @@ final class SettingsModel: ObservableObject {
             : HotkeyConfig.defaultLabel
         hotkeyBackend = Self.backend(for: hotkeySpec)
         launchAtLogin = Self.bool(environment["LAUNCH_AT_LOGIN"], fallback: isBundled)
-        showMenuBarIcon = Self.bool(environment["SHOW_MENU_BAR_ICON"], fallback: false)
+        showDockIcon = Self.bool(environment["SHOW_DOCK_ICON"], fallback: true)
+        showMenuBarIcon = !showDockIcon || Self.bool(environment["SHOW_MENU_BAR_ICON"], fallback: false)
 
         qwenRegion = environment["QWEN_REGION"] ?? "beijing"
         qwenAPIKey = environment["QWEN_API_KEY"] ?? environment["DASHSCOPE_API_KEY"] ?? ""
@@ -979,6 +981,7 @@ final class SettingsModel: ObservableObject {
             "SINGLE_FN_HOTKEY": "true",
             "LAUNCH_AT_LOGIN": String(launchAtLogin),
             "SHOW_MENU_BAR_ICON": String(showMenuBarIcon),
+            "SHOW_DOCK_ICON": String(showDockIcon),
             "QWEN_API_KEY": normalizedKey,
             "QWEN_API_HOST": qwenAPIHost,
             "QWEN_WORKSPACE_ID": qwenAPIHost.isEmpty ? qwenWorkspace : "",
@@ -1814,8 +1817,17 @@ struct GeneralSettingsView: View {
                         Text(model.updateInfo.status).font(.callout).foregroundStyle(.secondary)
                     }
                     SettingsToggleRow(title: "登录后自动启动", isOn: $model.launchAtLogin)
+                    SettingsToggleRow(title: "在 Dock 中显示", isOn: Binding(
+                        get: { model.showDockIcon },
+                        set: {
+                            model.showDockIcon = $0
+                            if !$0 { model.showMenuBarIcon = true }
+                        }))
                     SettingsToggleRow(title: "显示菜单栏图标", isOn: $model.showMenuBarIcon)
-                    Text("点击菜单栏或 Dock 图标，随时打开设置。")
+                        .disabled(!model.showDockIcon)
+                    Text(model.showDockIcon
+                         ? "点击菜单栏或 Dock 图标打开设置。"
+                         : "从菜单栏打开设置，也可从“应用程序”再次打开 Veyqa Voice。")
                         .font(.callout).foregroundStyle(.secondary)
                     HStack(spacing: 10) {
                         Label(

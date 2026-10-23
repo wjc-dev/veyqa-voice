@@ -23,15 +23,16 @@ class PackagingIdentityTests(unittest.TestCase):
         self.assertIn(f'PACKAGE_NAME="Veyqa-Voice-v{version}"', source_package)
         self.assertIn(f"<string>{version}</string>", settings_info)
 
-    def test_main_app_is_a_regular_dock_application(self):
+    def test_main_app_starts_without_dock_flash(self):
         spec = (ROOT / "packaging" / "VoiceInput.spec").read_text(encoding="utf-8")
         controller = (ROOT / "src" / "ui" / "status_bar.py").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn('"LSUIElement": False', spec)
+        self.assertIn('"LSUIElement": True', spec)
         self.assertIn("NSApplicationActivationPolicyRegular", controller)
-        self.assertNotIn("NSApplicationActivationPolicyAccessory", controller)
+        self.assertIn("NSApplicationActivationPolicyAccessory", controller)
+        self.assertIn('SHOW_DOCK_ICON", "true"', controller)
         self.assertIn('SHOW_MENU_BAR_ICON", "false"', controller)
 
     def test_current_app_and_login_item_use_stable_qwen_identity(self):

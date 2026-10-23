@@ -81,6 +81,7 @@ def ensure_runtime_layout() -> None:
                 "FN_HOTKEY_MODE=hold\n"
                 "GLOBAL_HOTKEY_BACKEND=passive\n"
                 "SHOW_MENU_BAR_ICON=true\n"
+                "SHOW_DOCK_ICON=false\n"
                 "PUNCTUATION_MODE=spaces\n"
                 "AUDIO_ARCHIVE_ENABLED=false\n"
                 "DISFLUENCY_FILTER_ENABLED=false\n"

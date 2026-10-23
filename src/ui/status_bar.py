@@ -1,4 +1,4 @@
-"""macOS app controller for the resident Dock entry and settings window."""
+"""macOS app controller for the menu bar, optional Dock entry and settings."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from Cocoa import (
     NSApplicationActivateAllWindows,
     NSApplicationActivateIgnoringOtherApps,
     NSApplicationActivationPolicyRegular,
+    NSApplicationActivationPolicyAccessory,
     NSImage,
     NSMenu,
     NSMenuItem,
@@ -66,9 +67,13 @@ def _service_label() -> str:
         os.getenv("TRANSCRIPTION_SERVICE", "qwen").lower(), "千问")
 
 
+def _dock_icon_enabled() -> bool:
+    # Older installs keep their familiar Dock entry until explicitly changed.
+    return os.getenv("SHOW_DOCK_ICON", "true").lower() == "true"
+
+
 def _menu_bar_enabled() -> bool:
-    """Keep the legacy menu-bar entry opt-in instead of making it the only UI."""
-    return os.getenv("SHOW_MENU_BAR_ICON", "false").lower() == "true"
+    return not _dock_icon_enabled() or os.getenv("SHOW_MENU_BAR_ICON", "false").lower() == "true"
 
 
 def _write_status_log(message: str) -> None:
@@ -320,7 +325,7 @@ class _ApplicationDelegate(NSObject):
 
 
 class StatusBarController:
-    """Keep the app resident in the Dock and own its optional menu-bar item."""
+    """Own the app's entry points while dictation runs independently."""
 
     def __init__(
         self,
@@ -380,7 +385,7 @@ class StatusBarController:
         self._open_settings()
 
     def apply_preferences(self) -> None:
-        """Apply the optional menu entry without restarting the resident app."""
+        """Apply entry-point visibility on the AppKit thread without restarting."""
         def apply():
             if _menu_bar_enabled():
                 if self._status_item is None:
@@ -389,7 +394,16 @@ class StatusBarController:
             elif self._status_item is not None:
                 NSStatusBar.systemStatusBar().removeStatusItem_(self._status_item)
                 self._status_item = None
+            self._apply_activation_policy(NSApplication.sharedApplication())
         AppHelper.callAfter(apply)
+
+    def _apply_activation_policy(self, app) -> None:
+        menu_ready = self._status_item is not None and self._status_item.button() is not None
+        policy = (NSApplicationActivationPolicyRegular
+                  if _dock_icon_enabled() or not menu_ready
+                  else NSApplicationActivationPolicyAccessory)
+        if app.activationPolicy() != policy:
+            app.setActivationPolicy_(policy)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -397,10 +411,8 @@ class StatusBarController:
 
     def _setup(self) -> None:
         app = NSApplication.sharedApplication()
-        # The Dock is the stable primary entry point. A menu-bar item can be
-        # hidden by macOS when space is tight, so it must never be the user's
-        # only way back into settings.
-        app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+        # Finder/Spotlight reopen events still reach this delegate in accessory
+        # mode. Install the menu entry before deciding whether to hide the Dock.
         # A bundled Python runtime can inherit its framework's generic icon.
         # Resolve the signed outer bundle's asset explicitly, without resetting
         # the user's Dock or global LaunchServices caches.
@@ -433,6 +445,7 @@ class StatusBarController:
             self._schedule_status_health_check()
         else:
             _write_status_log("dock entry ready; menu bar disabled")
+        self._apply_activation_policy(app)
         if self._open_settings_on_start:
             AppHelper.callLater(
                 0.8,
@@ -529,6 +542,7 @@ class StatusBarController:
                     except Exception:  # noqa: BLE001
                         pass
             finally:
+                self._apply_activation_policy(NSApplication.sharedApplication())
                 self._schedule_status_health_check()
 
         AppHelper.callLater(30.0, _check)

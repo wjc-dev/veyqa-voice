@@ -11,6 +11,7 @@ class SettingsLaunchTests(unittest.TestCase):
         controller = status_bar.StatusBarController.__new__(status_bar.StatusBarController)
         controller._status_item = None
         with patch.object(status_bar.AppHelper, "callAfter", side_effect=lambda f: f()), \
+                patch.object(status_bar, "NSApplication"), \
                 patch.object(status_bar, "_menu_bar_enabled", return_value=True) as enabled, \
                 patch.object(controller, "_install_status_item") as install, \
                 patch.object(controller, "_schedule_status_health_check") as schedule, \
@@ -115,13 +116,44 @@ class SettingsLaunchTests(unittest.TestCase):
 
         send_signal.assert_called_once_with(process.pid, status_bar.signal.SIGUSR1)
 
-    def test_app_uses_regular_activation_policy_for_a_stable_dock_entry(self):
-        source = (Path(__file__).resolve().parents[1] / "src/ui/status_bar.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("NSApplicationActivationPolicyRegular", source)
-        self.assertNotIn("NSApplicationActivationPolicyAccessory", source)
-        self.assertNotIn("NSApplicationActivationPolicyProhibited", source)
+    def test_dock_can_be_hidden_and_restored_without_restarting(self):
+        controller = status_bar.StatusBarController.__new__(status_bar.StatusBarController)
+        controller._status_item = MagicMock()
+        app = MagicMock()
+        app.activationPolicy.return_value = status_bar.NSApplicationActivationPolicyRegular
+        with patch.dict(status_bar.os.environ, {"SHOW_DOCK_ICON": "false"}):
+            controller._apply_activation_policy(app)
+        app.setActivationPolicy_.assert_called_once_with(status_bar.NSApplicationActivationPolicyAccessory)
+        app.reset_mock()
+        app.activationPolicy.return_value = status_bar.NSApplicationActivationPolicyAccessory
+        with patch.dict(status_bar.os.environ, {"SHOW_DOCK_ICON": "true"}):
+            controller._apply_activation_policy(app)
+        app.setActivationPolicy_.assert_called_once_with(status_bar.NSApplicationActivationPolicyRegular)
+
+    def test_hidden_dock_keeps_menu_entry_even_with_conflicting_config(self):
+        with patch.dict(status_bar.os.environ, {"SHOW_DOCK_ICON": "false", "SHOW_MENU_BAR_ICON": "false"}, clear=True):
+            self.assertTrue(status_bar._menu_bar_enabled())
+
+    def test_failed_menu_creation_keeps_dock_as_recovery_entry(self):
+        controller = status_bar.StatusBarController.__new__(status_bar.StatusBarController)
+        app = MagicMock()
+        app.activationPolicy.return_value = status_bar.NSApplicationActivationPolicyAccessory
+        with patch.dict(status_bar.os.environ, {"SHOW_DOCK_ICON": "false"}):
+            for item in [None, MagicMock()]:
+                if item is not None:
+                    item.button.return_value = None
+                controller._status_item = item
+                controller._apply_activation_policy(app)
+                app.setActivationPolicy_.assert_called_with(status_bar.NSApplicationActivationPolicyRegular)
+
+    def test_unchanged_activation_policy_does_not_refresh_dock(self):
+        controller = status_bar.StatusBarController.__new__(status_bar.StatusBarController)
+        controller._status_item = MagicMock()
+        app = MagicMock()
+        app.activationPolicy.return_value = status_bar.NSApplicationActivationPolicyAccessory
+        with patch.dict(status_bar.os.environ, {"SHOW_DOCK_ICON": "false"}):
+            controller._apply_activation_policy(app)
+        app.setActivationPolicy_.assert_not_called()
 
     def test_menu_bar_is_disabled_by_default(self):
         with patch.dict(status_bar.os.environ, {}, clear=True):
@@ -219,6 +251,7 @@ class SettingsLaunchTests(unittest.TestCase):
         with (
             patch.object(controller, "_install_status_item") as install,
             patch.object(controller, "_schedule_status_health_check") as reschedule,
+            patch.object(status_bar, "NSApplication"),
             patch.object(status_bar, "_write_status_log"),
         ):
             health_check()
@@ -242,6 +275,7 @@ class SettingsLaunchTests(unittest.TestCase):
         with (
             patch.object(controller, "_refresh") as refresh,
             patch.object(controller, "_schedule_status_health_check"),
+            patch.object(status_bar, "NSApplication"),
             patch.object(status_bar, "_write_status_log"),
         ):
             health_check()

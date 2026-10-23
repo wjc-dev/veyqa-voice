@@ -102,7 +102,7 @@ def test_unconfigured_hotkey_does_not_open_settings():
     app.status_controller = Mock()
     app._start_unconfigured()
     app.status_controller.open_settings.assert_not_called()
-    assert "点击 Dock" in app.floating_preview.show_notice.call_args.args[0]
+    assert "打开 Veyqa Voice 设置" in app.floating_preview.show_notice.call_args.args[0]
 
 
 def test_hotkey_in_settings_does_not_start_microphone():
