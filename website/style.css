@@ -195,6 +195,19 @@ h1 span {
   font-size: 11px;
   color: var(--muted);
 }
+.demo[data-reveal="visible"] {
+  animation: demo-arrive 450ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes demo-arrive {
+  from {
+    opacity: 0.35;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 .window-dots {
   display: flex;
   gap: 6px;
@@ -304,7 +317,7 @@ h1 span {
 .wave i:nth-child(7n) {
   height: 8px;
 }
-[data-phase="listening"] .wave i {
+[data-playing="true"][data-phase="listening"] .wave i {
   animation: voice 0.65s ease-in-out infinite alternate;
 }
 [data-phase="listening"] .wave i:nth-child(2n) {

@@ -26,7 +26,8 @@
   ];
   let timer = null;
   let running = false;
-  let visited = false;
+  let userPaused = false;
+  let inView = !("IntersectionObserver" in window);
   let step = 0;
   let scene = 0;
   function frames() {
@@ -34,8 +35,11 @@
     return [
       ["ready", "", "准备听写", "01 / 按住右 Option", 700],
       [
-        "listening", "", sentence.slice(0, sentence.indexOf("，")),
-        "02 / 说话时，预览逐步出现", 1700,
+        "listening",
+        "",
+        sentence.slice(0, sentence.indexOf("，")),
+        "02 / 说话时，预览逐步出现",
+        1700,
       ],
       ["listening", "", sentence, "02 / 直接转写，保留原话", 1800],
       ["processing", "", "正在完成识别…", "03 / 松开按键，完成识别", 600],
@@ -54,7 +58,8 @@
     clearTimeout(timer);
     timer = null;
     running = false;
-    render(frames().at(-1));
+    root.dataset.playing = "false";
+    root.dataset.reveal = "idle";
     play.textContent = reduced.matches ? "下个示例 →" : "播放演示 ↻";
   }
   function next() {
@@ -70,36 +75,65 @@
     timer = setTimeout(next, frame[4]);
   }
   function start() {
-    visited = true;
+    if (running || userPaused || reduced.matches || document.hidden || !inView)
+      return;
     stop();
-    if (reduced.matches || document.hidden) return;
     running = true;
-    step = 0;
+    root.dataset.playing = "true";
+    root.dataset.reveal = "visible";
+    // Let the card settle before the first spoken preview appears.
+    step = 1;
     play.textContent = "暂停演示 Ⅱ";
-    next();
+    render(frames()[0]);
+    timer = setTimeout(next, 1150);
+  }
+  function syncPlayback() {
+    if (reduced.matches) {
+      stop();
+      render(frames().at(-1));
+    } else if (!inView || document.hidden) {
+      stop();
+      if (!userPaused) render(frames()[0]);
+    } else start();
   }
   play.hidden = false;
   stop();
+  render(reduced.matches ? frames().at(-1) : frames()[0]);
   play.addEventListener("click", () => {
     if (reduced.matches) {
       scene = (scene + 1) % scenes.length;
       stop();
-    } else if (running) stop();
-    else start();
+      render(frames().at(-1));
+    } else if (running) {
+      userPaused = true;
+      stop();
+    } else {
+      userPaused = false;
+      // Explicit play works even when only the lower controls are in view.
+      inView = true;
+      start();
+    }
   });
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) stop();
-  });
-  reduced.addEventListener("change", () => {
-    if (reduced.matches) stop();
-  });
+  document.addEventListener("visibilitychange", syncPlayback);
+  reduced.addEventListener("change", syncPlayback);
   if ("IntersectionObserver" in window) {
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (!entry.isIntersecting) stop();
-        else if (!visited && !reduced.matches) start();
+        // Normalize against the available viewport so tall mobile cards can
+        // qualify too. Separate enter/leave thresholds prevent edge flicker.
+        const availableHeight = Math.min(
+          entry.boundingClientRect.height,
+          entry.rootBounds?.height || window.innerHeight,
+        );
+        const coverage =
+          entry.isIntersecting && availableHeight > 0
+            ? entry.intersectionRect.height / availableHeight
+            : 0;
+        if (!inView && coverage >= 0.65) inView = true;
+        else if (inView && coverage < 0.25) inView = false;
+        syncPlayback();
       },
-      { threshold: 0.35 },
+      { threshold: Array.from({ length: 21 }, (_, index) => index / 20) },
     );
     observer.observe(root);
   }
