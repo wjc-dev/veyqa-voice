@@ -1,0 +1,53 @@
+[package]
+name = "veyqa-voice-rs"
+version = "0.3.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Push-to-talk voice input for macOS"
+license = "MIT"
+repository = "https://github.com/wjc-dev/veyqa-voice"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1"
+uuid = { version = "1", features = ["v4"] }
+libc = "0.2"
+crossbeam-channel = "0.5"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "fs", "net", "signal"] }
+tokio-util = "0.7"
+tokio-tungstenite = { version = "0.30", features = ["connect", "handshake", "native-tls"] }
+tokio-native-tls = "0.3"
+native-tls = "0.2"
+bytes = "1"
+futures-util = "0.3"
+cpal = "0.18"
+hound = "3"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSData", "NSArray", "NSDictionary", "NSBundle", "NSURL", "NSThread", "NSRunLoop", "NSTimer", "NSNotification", "NSDate", "NSObjCRuntime"] }
+objc2-app-kit = { version = "0.3", features = [
+  "NSApplication", "NSResponder", "NSView", "NSWindow", "NSPanel", "NSScreen",
+  "NSStatusBar", "NSStatusItem", "NSStatusBarButton", "NSMenu", "NSMenuItem",
+  "NSControl", "NSButton", "NSEvent", "NSColor", "NSFont", "NSFontDescriptor",
+  "NSBezierPath", "NSGraphics", "NSTextField", "NSCell", "NSTextFieldCell",
+  "NSImage", "NSAnimationContext", "NSWorkspace", "NSPasteboard",
+  "NSRunningApplication", "block2",
+] }
+objc2-core-foundation = { version = "0.3", features = ["CFDate", "CFRunLoop", "CFMachPort", "CFString", "CFDictionary", "CFArray", "CFNumber"] }
+objc2-core-graphics = { version = "0.3", features = ["CGEvent", "CGEventTypes", "CGEventSource", "CGRemoteOperation", "CGWindow"] }
+objc2-application-services = { version = "0.3", features = ["AXUIElement", "AXValue", "AXValueConstants", "AXError", "libc"] }
+block2 = "0.6"
+fancy-regex = "0.20.0"
+unicode-general-category = "1.1.0"
+sha2 = "0.11.0"
+objc2-av-foundation = { version = "0.3.2", features = ["AVCaptureDevice", "AVMediaFormat", "block2"] }
+flate2 = "1.1.10"
+url = "2"
+
+[profile.release]
+panic = "unwind"
+opt-level = 3
+lto = "thin"
+strip = "symbols"

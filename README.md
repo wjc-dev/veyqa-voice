@@ -60,7 +60,28 @@ DMG 用户：下载上方新版安装包，将 App 拖入“应用程序”，�
 
 音频直接发送至所选语音服务，本地录音存档默认关闭。个人 API Key 保存在本机，对应费用由你的服务商账户承担。
 
-[反馈问题](https://github.com/wjc-dev/veyqa-voice/issues) · [开发文档](docs/development.md) · [贡献](.github/CONTRIBUTING.md) · [安全问题](.github/SECURITY.md)
+## 源码与构建
+
+0.3.0 起的听写引擎是本仓库的 Rust 实现，设置页与 supervisor 为 Swift。0.2.18 及更早的 Python 版源码保留在 [`python-0.2.18`](https://github.com/wjc-dev/veyqa-voice/tree/python-0.2.18) 标签。
+
+- `src/`：快捷键、录音、语音服务、文本清洗、写入与恢复。
+- `native/`：Swift 设置页、supervisor 与更新桥接。
+- `config/`：随包资源（模型目录、图标、功能开关）。
+- `website/`：官网与 Sparkle 更新源。
+- `scripts/`：构建、打包与测量脚本。
+
+```bash
+# 开发构建：独立 bundle id 与数据目录，可与已安装版并存
+./scripts/build-rust-macos.command
+
+# 生产构建：沿用 com.wjcdev.veyqa 身份，再生成 ZIP/DMG 与更新源
+VEYQA_DISTRIBUTION=public ./scripts/build-rust-macos.command
+./scripts/package-public.command
+```
+
+需要 Apple Silicon Mac、macOS 13+、Rust 1.85+ 与 Xcode Command Line Tools。构建使用固定签名证书并要求其已在本机钥匙串中，可用 `VEYQA_SIGNING_IDENTITY` 指定其他证书指纹；更新源由 Sparkle EdDSA 密钥签名。
+
+[反馈问题](https://github.com/wjc-dev/veyqa-voice/issues) · [贡献](.github/CONTRIBUTING.md) · [安全问题](.github/SECURITY.md)
 
 ## 许可证
 

@@ -1,68 +1,17 @@
-# 忽略所有.env文件
+# 构建产物
+/target
+/dist
+/dist-*
+/logs
+/.package-build
+*.log
+
+# 本机操作记录
+/.local
+
+# 本机配置
 .env
 .env_*
 .env.*
 
-# 忽略Python缓存
-*.pyc
-*.pyo
-__pycache__/
-
-# 忽略 venv 目录
-.venv/
-
-# 忽略 macos 的 .DS_Store 文件
 .DS_Store
-
-# 忽略 practice.md 文件
-practice.md
-
-# 忽略 cursorrules 文件
-.cursorrules
-
-# 忽略 logs 目录
-logs/
-app.log
-
-# 忽略 .eggs
-.eggs/
-
-# 忽略 build
-build/
-.package-build/
-dist-internal/
-outputs/
-.settings-open
-.shortcut-capture
-.settings-instance
-
-# 忽略 dist
-dist/
-whisper-env
-
-# 忽略音频存档目录
-audio_archive/
-# 但保留音频存档目录结构，忽略cache.json
-audio_archive/cache.json
-
-# 本机自动学习的语音纠错词库（可能包含私人词汇）
-corrections.json
-personal_context.txt
-custom_vocabulary.txt
-recovery.json
-.recovery.json.lock
-diagnostics.json
-health.json
-automatic-restarts.json
-login-item-registration.json
-.restart-request
-.health-fault-injected
-
-.claude
-dist-local/
-
-# 忽略 trash 目录
-trash/
-report*/
-permissions.json
-.app-instance.lock

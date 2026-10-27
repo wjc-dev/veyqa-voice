@@ -60,7 +60,28 @@ With your own API credentials, choose Qwen or Doubao models and refresh their of
 
 Audio goes directly to the selected speech service. Personal API credentials stay on your Mac and usage is billed to your provider account. Local audio archives are off by default.
 
-[Issues](https://github.com/wjc-dev/veyqa-voice/issues) · [Development](docs/development.md) · [Contributing](.github/CONTRIBUTING.md) · [Security](.github/SECURITY.md)
+## Source and build
+
+Since 0.3.0 the dictation engine is the Rust implementation in this repository; the settings UI and supervisor are Swift. The Python sources for 0.2.18 and earlier remain on the [`python-0.2.18`](https://github.com/wjc-dev/veyqa-voice/tree/python-0.2.18) tag.
+
+- `src/` — shortcut handling, audio capture, speech services, text cleanup, insertion and recovery.
+- `native/` — Swift settings window, supervisor and update bridge.
+- `config/` — bundled resources (model catalogues, icons, feature flags).
+- `website/` — website and the Sparkle update feed.
+- `scripts/` — build, packaging and measurement scripts.
+
+```bash
+# Development build: separate bundle id and data directory, coexists with an installation
+./scripts/build-rust-macos.command
+
+# Production build: same com.wjcdev.veyqa identity, then ZIP/DMG and update feed
+VEYQA_DISTRIBUTION=public ./scripts/build-rust-macos.command
+./scripts/package-public.command
+```
+
+Requires an Apple Silicon Mac, macOS 13+, Rust 1.85+ and Xcode Command Line Tools. The build expects a fixed signing certificate in your keychain; set `VEYQA_SIGNING_IDENTITY` to use a different certificate fingerprint. The update feed is signed with a Sparkle EdDSA key.
+
+[Issues](https://github.com/wjc-dev/veyqa-voice/issues) · [Contributing](.github/CONTRIBUTING.md) · [Security](.github/SECURITY.md)
 
 ## License
 

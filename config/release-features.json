@@ -1,3 +1,4 @@
 {
-  "builtin_speech": false
+  "builtin_speech": true,
+  "private_trial": true
 }

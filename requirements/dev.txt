@@ -1,3 +1,0 @@
--r runtime.txt
-pytest>=8,<9
-dmgbuild==1.6.7
