@@ -9,7 +9,7 @@ const html = readFileSync(new URL("index.html", site), "utf8");
 const script = readFileSync(new URL("app.js", site), "utf8");
 const css = readFileSync(new URL("style.css", site), "utf8");
 const brew = "brew install --cask wjc-dev/veyqa/veyqa-voice";
-const releaseVersion = readFileSync(new URL("../scripts/build-macos.command", import.meta.url), "utf8").match(/^VERSION="([\d.]+)"/m)[1];
+const releaseVersion = html.match(/releases\/download\/v([\d.]+)\/Veyqa-Voice-v/m)[1];
 
 test("live preview wraps without truncation and stays in document flow", () => {
   const preview = css.match(/#demo-preview\s*\{([^}]+)\}/)[1];

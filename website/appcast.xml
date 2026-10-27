@@ -4,26 +4,48 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Veyqa Voice</title>
         <item>
-            <title>0.2.18</title>
-            <pubDate>Fri, 23 Oct 2026 14:48:20 +0800</pubDate>
+            <title>0.3.0</title>
+            <pubDate>Tue, 27 Oct 2026 14:24:47 +0800</pubDate>
             <link>https://wjc-dev.github.io/veyqa-voice/</link>
-            <sparkle:version>232</sparkle:version>
-            <sparkle:shortVersionString>0.2.18</sparkle:shortVersionString>
+            <sparkle:version>300</sparkle:version>
+            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.2.18
+            <description sparkle:format="markdown"><![CDATA[# Veyqa Voice 0.3.0
 
-- 右 Option 按住听写响应更快，保留组合键防误触和取消保护。
-- 录音框提前反馈启动状态，缩短出现动画，麦克风就绪后自然进入听写。
-- 精简录音工作进程，减少每次启动的模块加载；保持按需收音，不常开麦克风。
-- 保留现有 API Key、模型、快捷键、词汇和其他配置。
+- 听写引擎重写为原生应用，菜单栏、设置页和快捷键保持原样。
+- 按需收音：空闲时不占用麦克风，按键后更快进入录音状态。
+- 安装包从约 46 MB 降到约 12 MB（ZIP 约 5 MB），冷启动不再加载 Python 运行时。
+- 常驻内存与空闲 CPU 按原生引擎重新设计，空闲时不占用麦克风。
+- 内置服务继续免费使用，无需注册或填写 API Key；已有个人 Key、模型和词汇保存在本机并原样保留。
+- 升级沿用同一应用标识、数据目录和签名身份，麦克风、辅助功能、输入监控授权无需重新设置。
+- 保留录音存档、恢复未写入文本、纠错学习、模型目录和自动更新。
 
-在设置中检查更新，或运行 `brew update && brew upgrade --cask wjc-dev/veyqa/veyqa-voice`。
+## 更新
+
+在“设置 → 通用 → 应用”点击“检查更新”，或重新下载安装包覆盖“应用程序”中的旧版。配置与授权保留，无需先卸载。
+
+Homebrew 用户：
+
+```bash
+brew update
+brew upgrade --cask wjc-dev/veyqa/veyqa-voice
+```
+
+需要 Apple Silicon、macOS 13+。当前为尚未经 Apple 公证的 Preview；首次打开需在“系统设置 → 隐私与安全性”确认。
+
+## 验证
+
+- Rust 引擎 357 项回归测试通过。
+- 发布包经固定签名身份校验，应用标识、辅助功能权限与更新签名键保持一致。
+- 升级不写入或迁移语音服务密钥，沿用本机现有配置。
+
+尚未经 Apple 公证，也尚未在第二台 Mac 上验证。
 ]]></description>
-            <enclosure url="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.18/Veyqa-Voice-v0.2.18-macOS-arm64.zip" length="21046905" type="application/octet-stream" sparkle:edSignature="NRjyQvnJ0KwsEuKCO6PazsROyx0PCpv7flEWkywvxtKrg6e9PSxjJO2cf7uqVnmcHzD3DF0ht0mkYrGhUa9dBw=="></enclosure>
+            <enclosure url="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.3.0/Veyqa-Voice-v0.3.0-macOS-arm64.zip" length="5159468" type="application/octet-stream" sparkle:edSignature="z1v40tXhRgclw0CH2R/Sj4v7MHC2ZA+LO9g28tq4x7aoqnnfZqa3w+kKu1RhekVApP6ePJJXt882xVf6WkPrAA=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: l6AipesgcGnjwNqKCRwaxJaRuyEmcrNLCJFC/cdoZgitx10Rpeh08LdO3hHlA7pzGWmu7rxfOigASPpTFTdgCw==
-length: 1777
+edSignature: nQ2oG9SwyL1ABLV0joh81Qi2YmHgGWIXfrlDYXs/+Y8L3ypfTM1JRAlgGhqqUg5EuCuUWaC1YQYu3SudsVKmDw==
+length: 2754
 -->

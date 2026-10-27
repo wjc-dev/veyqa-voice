@@ -2,7 +2,7 @@
 
 **Lightweight voice input for Mac. Hold to speak, release to type.**
 
-[Website](https://wjc-dev.github.io/veyqa-voice/) · [Download](https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.2.18) · [简体中文](README.md)
+[Website](https://wjc-dev.github.io/veyqa-voice/) · [Download](https://github.com/wjc-dev/veyqa-voice/releases/tag/v0.3.0) · [简体中文](README.md)
 
 [![Veyqa Voice demo](website/product-preview.svg)](https://wjc-dev.github.io/veyqa-voice/#demo)
 
@@ -15,7 +15,7 @@
 
 Requires **Apple Silicon and macOS 13+**.
 
-1. [Download and open the DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.2.18/Veyqa-Voice-v0.2.18-macOS-arm64.dmg).
+1. [Download and open the DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.3.0/Veyqa-Voice-v0.3.0-macOS-arm64.dmg).
 2. Follow the arrow: drag **Veyqa Voice into Applications**.
 3. Open Veyqa Voice from Applications to begin setup.
 
@@ -32,6 +32,8 @@ brew install --cask wjc-dev/veyqa/veyqa-voice
 Open Settings → General → App → Check for Updates, then download and relaunch. New versions are checked daily by default. Your API credentials and settings are retained; no uninstall is needed.
 
 Version 0.2.8 and earlier need one manual upgrade using Homebrew or the DMG before in-app updates become available.
+
+Version 0.3.0 moves the dictation engine to a native implementation while keeping the same bundle identifier, data directory, and signing identity. Your API credentials, shortcut, vocabulary, and system permissions carry over.
 
 Alternatively, quit the app and update with Homebrew:
 
