@@ -32,20 +32,18 @@ brew update
 brew upgrade --cask wjc-dev/veyqa/veyqa-voice
 ```
 
-需要 Apple Silicon、macOS 13+。当前为尚未经 Apple 公证的 Preview；首次打开需在“系统设置 → 隐私与安全性”确认。
+需要 Apple Silicon、macOS 13+。
 
 ## 验证
 
 - Rust 引擎 357 项回归测试通过。
 - 发布包经固定签名身份校验，应用标识、辅助功能权限与更新签名键保持一致。
 - 升级不写入或迁移语音服务密钥，沿用本机现有配置。
-
-尚未经 Apple 公证，也尚未在第二台 Mac 上验证。
 ]]></description>
             <enclosure url="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.3.0/Veyqa-Voice-v0.3.0-macOS-arm64.zip" length="5159468" type="application/octet-stream" sparkle:edSignature="z1v40tXhRgclw0CH2R/Sj4v7MHC2ZA+LO9g28tq4x7aoqnnfZqa3w+kKu1RhekVApP6ePJJXt882xVf6WkPrAA=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: nQ2oG9SwyL1ABLV0joh81Qi2YmHgGWIXfrlDYXs/+Y8L3ypfTM1JRAlgGhqqUg5EuCuUWaC1YQYu3SudsVKmDw==
-length: 2754
+edSignature: qwRefmyg6wKcB2AknwZ0ONkbMEpGYHoFkUPiwzvoXZTUfMwU908LsCICHSzRLvfCar25vZYR6HfamI/2mGIQBg==
+length: 2576
 -->
