@@ -15,17 +15,27 @@
 
 Requires **Apple Silicon and macOS 13+**.
 
-1. [Download and open the DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.3.0/Veyqa-Voice-v0.3.0-macOS-arm64.dmg).
-2. Follow the arrow: drag **Veyqa Voice into Applications**.
-3. Open Veyqa Voice from Applications to begin setup.
+The fastest way is one Terminal command. It does not go through a browser, so the "cannot verify the developer" prompt never appears:
 
-For an unidentified-developer prompt, open System Settings → Privacy & Security → Open Anyway. [See Apple's guide](https://support.apple.com/en-us/102445).
+```bash
+curl -fsSL https://wjc-dev.github.io/veyqa-voice/install.sh | bash
+```
 
-Or install with Homebrew:
+The script reads the official update feed, verifies the app's signature, installs it into Applications and opens it. Run it again to upgrade; your settings and permissions are kept. Source: [website/install.sh](website/install.sh).
+
+Or install with Homebrew (also prompt-free):
 
 ```bash
 brew install --cask wjc-dev/veyqa/veyqa-voice
 ```
+
+Or install manually:
+
+1. [Download and open the DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.3.0/Veyqa-Voice-v0.3.0-macOS-arm64.dmg).
+2. Follow the arrow: drag **Veyqa Voice into Applications**.
+3. Open Veyqa Voice from Applications to begin setup.
+
+A browser-downloaded DMG may show an unidentified-developer prompt on first launch. Open System Settings → Privacy & Security and click "Open Anyway", or run `xattr -dr com.apple.quarantine "/Applications/Veyqa Voice.app"`. [See Apple's guide](https://support.apple.com/en-us/102445).
 
 ## Updating
 

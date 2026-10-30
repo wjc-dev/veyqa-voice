@@ -15,17 +15,27 @@
 
 需要 **Apple Silicon（M 系列芯片）、macOS 13+**。
 
-1. [下载 DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.3.0/Veyqa-Voice-v0.3.0-macOS-arm64.dmg) 并打开。
-2. 按窗口中的箭头，将 **Veyqa Voice 拖入 Applications（应用程序）**。
-3. 从“应用程序”打开 Veyqa Voice，完成首次设置。
+推荐在“终端”粘贴一行命令安装。它不经过浏览器，因此不会出现“无法验证开发者”提示：
 
-首次提示“无法验证开发者”？在“系统设置 → 隐私与安全性”点击“仍要打开”。[查看说明](https://support.apple.com/zh-cn/102445)。
+```bash
+curl -fsSL https://wjc-dev.github.io/veyqa-voice/install.sh | bash
+```
 
-也可以使用 Homebrew 安装：
+脚本会读取官方更新源、校验应用签名，安装到“应用程序”并打开。升级时重复运行即可，配置和授权保留。源码见 [website/install.sh](website/install.sh)。
+
+也可以使用 Homebrew 安装（同样没有该提示）：
 
 ```bash
 brew install --cask wjc-dev/veyqa/veyqa-voice
 ```
+
+或者手动安装：
+
+1. [下载 DMG](https://github.com/wjc-dev/veyqa-voice/releases/download/v0.3.0/Veyqa-Voice-v0.3.0-macOS-arm64.dmg) 并打开。
+2. 按窗口中的箭头，将 **Veyqa Voice 拖入 Applications（应用程序）**。
+3. 从“应用程序”打开 Veyqa Voice，完成首次设置。
+
+DMG 由浏览器下载，首次打开可能提示“无法验证开发者”。在“系统设置 → 隐私与安全性”点击“仍要打开”，或运行 `xattr -dr com.apple.quarantine "/Applications/Veyqa Voice.app"`。[查看说明](https://support.apple.com/zh-cn/102445)。
 
 ## 更新
 

@@ -16,7 +16,7 @@
     <meta property="og:type" content="website" />
     <link rel="canonical" href="https://wjc-dev.github.io/veyqa-voice/" />
     <link rel="icon" href="./mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./style.css?v=0.3.0-viewport" />
+    <link rel="stylesheet" href="./style.css?v=0.3.1-install" />
     <script src="./app.js?v=0.3.0-minimal" defer></script>
     <script src="./demo.js?v=0.3.0-viewport" defer></script>
     <title>Veyqa Voice — 轻量的 Mac 语音输入</title>
@@ -43,12 +43,34 @@
           <h1 id="hero-title">按住说话，<br /><span>松开输入。</span></h1>
           <p class="lead">不打扰现有输入法的 Mac 轻量语音工具，开箱即用。</p>
           <div class="actions" id="install">
-            <a
-              class="button primary"
-              href="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.3.0/Veyqa-Voice-v0.3.0-macOS-arm64.dmg"
-              >下载 Mac 版 ↓</a
-            >
+            <div class="terminal install-terminal">
+              <div class="terminal-label">
+                <span>推荐 · 一键安装，没有“无法验证开发者”提示</span
+                ><button
+                  type="button"
+                  class="copy-button"
+                  data-copy="install-command"
+                  aria-label="复制一键安装命令"
+                >
+                  复制命令 ⧉
+                </button>
+              </div>
+              <pre><span class="prompt" aria-hidden="true">$ </span><code id="install-command">curl -fsSL https://wjc-dev.github.io/veyqa-voice/install.sh | bash</code></pre>
+            </div>
+            <p class="install-notes">
+              <a
+                class="button primary"
+                href="https://github.com/wjc-dev/veyqa-voice/releases/download/v0.3.0/Veyqa-Voice-v0.3.0-macOS-arm64.dmg"
+                >下载 DMG ↓</a
+              ><span class="fine">DMG 首次打开需在“系统设置”确认一次</span>
+            </p>
           </div>
+          <p class="fine install-hint">
+            在“终端”粘贴回车即可：脚本从 GitHub 下载官方安装包、校验签名后放入“应用程序”。<a
+              href="https://github.com/wjc-dev/veyqa-voice/blob/main/website/install.sh"
+              >查看脚本 ↗</a
+            >
+          </p>
           <p class="fine hero-meta">
             macOS 13+ <span>·</span> Apple Silicon <span>·</span> 开源
           </p>
@@ -200,16 +222,22 @@
         <div class="faq-items">
           <details>
             <summary>
-              下载后怎么开始？<span
-                class="disclosure-chevron"
-                aria-hidden="true"
+              怎么安装？<span class="disclosure-chevron" aria-hidden="true"
                 >⌄</span
               >
             </summary>
             <div class="faq-answer">
               <p>
-                打开 DMG，将 Veyqa Voice 拖入 Applications（应用程序），再打开
-                App。选择内置服务，点击“连接并继续”，按引导开启麦克风、辅助功能和输入监控；回到
+                推荐一键安装：在“终端”粘贴
+                <code>curl -fsSL https://wjc-dev.github.io/veyqa-voice/install.sh | bash</code>
+                并回车。脚本会下载官方安装包、校验签名、放入“应用程序”并打开，不会出现“无法验证开发者”提示。
+              </p>
+              <p>
+                也可以下载 DMG，将 Veyqa Voice 拖入 Applications（应用程序），或使用 Homebrew
+                安装。
+              </p>
+              <p>
+                打开 App 后选择内置服务，点击“连接并继续”，按引导开启麦克风、辅助功能和输入监控；回到
                 App 自动检查权限后，在试用文本框按住右 Option 说一句即可。
               </p>
             </div>
@@ -224,11 +252,16 @@
             </summary>
             <div class="faq-answer">
               <p>
-                当前版本尚未经过 Apple 公证。从官网下载后，在“系统设置 →
+                只有从浏览器下载 DMG 时才会出现：浏览器会给文件打上隔离标记，而当前版本尚未经过
+                Apple 公证。确认安装包来自官网后，在“系统设置 →
                 隐私与安全性”点击“仍要打开”。<a
                   href="https://support.apple.com/zh-cn/102445"
                   >Apple 打开说明 ↗</a
                 >
+              </p>
+              <p>
+                不想走这一步：改用一键安装或 Homebrew，两者都不经过浏览器，不会出现该提示。已经装好但被拦下时，也可以运行
+                <code>xattr -dr com.apple.quarantine "/Applications/Veyqa Voice.app"</code>。
               </p>
             </div>
           </details>
@@ -283,7 +316,7 @@
           </details>
           <details class="brew-details">
             <summary>
-              使用 Homebrew 安装<span
+              使用 Homebrew 安装（同样没有提示）<span
                 class="disclosure-chevron"
                 aria-hidden="true"
                 >⌄</span

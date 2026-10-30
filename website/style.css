@@ -129,11 +129,41 @@ h1 span {
   margin: 0;
 }
 .actions {
+  margin-top: 30px;
+}
+.install-terminal {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-align: left;
+}
+.install-terminal .terminal-label {
+  gap: 12px;
+}
+.install-terminal .terminal-label span {
+  min-width: 0;
+  line-height: 1.4;
+}
+.install-terminal .copy-button {
+  flex: none;
+}
+.install-terminal pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.install-notes {
   display: flex;
   align-items: center;
-  gap: 24px;
-  margin-top: 34px;
+  gap: 14px;
   flex-wrap: wrap;
+  margin: 12px 0 0;
+}
+.install-hint {
+  margin: 12px 0 0;
+  line-height: 1.7;
+}
+.install-hint a {
+  text-decoration-color: #4f6f72;
+  text-underline-offset: 3px;
 }
 .button {
   display: inline-flex;
