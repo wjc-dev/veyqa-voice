@@ -150,42 +150,19 @@ h1 span {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.install-notes {
+.install-alt {
   display: flex;
   align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
-  margin: 14px 0 0;
+  gap: 10px;
+  margin: 8px 0 0;
 }
-.install-script {
-  text-decoration-color: #4f6f72;
+.install-alt a {
+  color: var(--muted);
+  text-decoration-color: #3c545b;
   text-underline-offset: 3px;
 }
-.button {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  gap: 24px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  padding: 13px 21px;
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  min-height: 48px;
-  transition:
-    background 0.18s,
-    transform 0.18s;
-}
-.primary {
-  background: #b5e6df;
-  color: #102723;
-  box-shadow: 0 3px 18px #82ddc90c;
-}
-.primary:hover {
-  background: #d0f2ed;
-  color: #102723;
-  transform: translateY(-1px);
+.install-alt a:hover {
+  color: var(--accent);
 }
 .text-link {
   font-size: 13px;
@@ -195,7 +172,7 @@ h1 span {
   color: var(--muted);
 }
 .hero-meta {
-  margin: 22px 0 0;
+  margin: 18px 0 0;
   display: flex;
   gap: 11px;
   font-size: 11px;
@@ -514,7 +491,7 @@ h3 {
   margin-top: 10px;
   color: var(--accent);
 }
-.section a:not(.button) {
+.section a {
   text-decoration-color: #4f6f72;
   text-underline-offset: 4px;
 }
@@ -965,8 +942,5 @@ details[open] .disclosure-chevron {
   *::after {
     animation: none !important;
     transition: none !important;
-  }
-  .primary:hover {
-    transform: none;
   }
 }
