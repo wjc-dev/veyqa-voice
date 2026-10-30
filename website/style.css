@@ -153,15 +153,11 @@ h1 span {
 .install-notes {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 18px;
   flex-wrap: wrap;
-  margin: 12px 0 0;
+  margin: 14px 0 0;
 }
-.install-hint {
-  margin: 12px 0 0;
-  line-height: 1.7;
-}
-.install-hint a {
+.install-script {
   text-decoration-color: #4f6f72;
   text-underline-offset: 3px;
 }
