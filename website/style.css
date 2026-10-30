@@ -718,6 +718,14 @@ details[open] .disclosure-chevron {
 .faq-answer a {
   color: var(--accent);
 }
+.faq-answer code {
+  color: #bfe6e1;
+  background: #9cddd80d;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 12px;
+}
 .faq .terminal {
   margin-bottom: 16px;
   border-radius: 10px;
